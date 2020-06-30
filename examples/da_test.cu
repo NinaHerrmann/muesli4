@@ -51,7 +51,7 @@ Mult(int factor):
 MSL_USERFUNC int operator() (int x) const {return x*y;}
 };
 
-//class Project1 : public Functor2<int, int, int>{
+//class Project1 : public Functor2<int, int, int>{  // class funktioniert nicht; nur struct !?
 //  MSL_USERFUNC int operator()(int i, int Ai) const {return i;}
 //};
 
@@ -88,8 +88,9 @@ void da_test(int dim) {
   printf("result: %i\n",result);
   a.show("a5");
 
-  msl::DA<int> b(dim, 3);
-//    b = a.map(sq));  //syntax error?!
+  msl::DA<int>  // b(dim,1);
+  b = a.map(sq); //simplified! type error with non-simplified map (see da.cpp); additionally: crash after map
+  printf("behind map\n");
   b.show("b1");
 
   a.zipInPlace(b,sum);
@@ -101,9 +102,9 @@ void da_test(int dim) {
 
   a.broadcastPartition(1);
   a.show("a8");
-  }
+  return;
 }
-} // close namespaces
+}} // close namespaces
 
 int main(int argc, char** argv){
   msl::initSkeletons(argc, argv);

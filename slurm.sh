@@ -19,7 +19,7 @@
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-cd /home/k/kuchen/Muesli3
+cd /home/k/kuchen/Muesli4
 
 ./build.sh
 export OMP_NUM_THREADS=4
@@ -31,6 +31,6 @@ export I_MPI_DEBUG=3
 export I_MPI_FABRICS=shm:tcp
 
 # dim #runs #gpus 
-mpirun /home/k/kuchen/Muesli3/build/da_test 32 2  
+mpirun /home/k/kuchen/Muesli4/build/da_test 32 2  
 # alternativ: mpirun -np 2 <Datei>
 # alternativ: srun <Datei>

@@ -147,7 +147,7 @@ public:
    *
    * @param rhs Right hand side of assignment operator.
    */
-  DA<T>& operator=(const DA<T>& rhs);
+//  DA<T>& operator=(const DA<T>& rhs);
 
 
   //
@@ -237,8 +237,9 @@ public:
    * @tparam R Return type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename MapFunctor>
-  msl::DA<R> map(MapFunctor& f);
+  template <typename F>
+  msl::DA<T> map(F& f);  // preliminary simplification, in order to avoid type error
+  // should be: msl::DA<R> map(F& f);
 
   /**
    * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
@@ -689,6 +690,13 @@ public:
    */
   int getFirstIndex() const;
 
+   /**
+   * \brief Setter for cpuMemoryInSync. 
+   *
+   * @param b new value of cpuMemoryInSync
+   */
+  void setCpuMemoryInSync(bool b);
+
   /**
    * \brief Checks whether the element at the given global index \em index is
    *        locally stored.
@@ -820,8 +828,8 @@ private:
   int firstIndex;
   // total number of MPI processes
   int np;
-  // checks whether data is up to date in main (cpu) memory; true := up-to-date, false := newer data on GPU
-  bool cpuMemoryFlag;
+  // tells, whether data is up to date in main (cpu) memory; true := up-to-date, false := newer data on GPU
+  bool cpuMemoryInSync;
   // execution plans for each gpu
   GPUExecutionPlan<T>* plans = 0;
   // checks whether data is copy distributed among all processes
