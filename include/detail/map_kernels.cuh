@@ -33,8 +33,8 @@
 #pragma once
 
 #include "exec_plan.h"
-#include "plmatrix.h"
-#include "plarray.h"
+// #include "plmatrix.h"
+// #include "plarray.h"
 
 namespace msl {
 
@@ -61,21 +61,21 @@ __global__ void mapIndexKernel(T* in,
                                F func,
                                bool localIndices);
 
-template <typename T, typename R, typename F>
-__global__ void mapStencilKernel(T* in,
-                                 R* out,
-                                 GPUExecutionPlan<T> plan,
-                                 PLArray<T>* input,
-                                 F func,
-                                 int tile_width);
+//template <typename T, typename R, typename F>
+//__global__ void mapStencilKernel(T* in,
+//                                 R* out,
+//                                 GPUExecutionPlan<T> plan,
+//                                 PLArray<T>* input,
+//                                 F func,
+//                                 int tile_width);
 
-template <typename T, typename R, typename F>
-__global__ void mapStencilKernel(T* in,
-                                 R* out,
-                                 GPUExecutionPlan<T> plan,
-                                 PLMatrix<T>* input,
-                                 F func,
-                                 int tile_width);
+//template <typename T, typename R, typename F>
+//__global__ void mapStencilKernel(T* in,
+//                                 R* out,
+//                                 GPUExecutionPlan<T> plan,
+//                                 PLMatrix<T>* input,
+//                                 F func,
+//                                 int tile_width);
 
 }
 }

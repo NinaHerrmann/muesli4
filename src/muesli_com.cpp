@@ -333,17 +333,17 @@ inline C2 msl::proj2_2(C1 a, C2 b)
   return b;
 }
 
-template <typename F>
-inline int msl::auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int col)
-{
-  return (col + f(row) + blocks) % blocks;
-}
+//template <typename F>
+//inline int msl::auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int col)
+//{
+//  return (col + f(row) + blocks) % blocks;
+//}
 
-template <typename F>
-inline int msl::auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int col)
-{
-  return (row + f(col) + blocks) % blocks;
-}
+//template <typename F>
+//inline int msl::auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int col)
+//{
+//  return (row + f(col) + blocks) % blocks;
+//}
 
 template <typename T>
 inline void msl::show(T* a, int size)

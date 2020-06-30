@@ -88,9 +88,7 @@ void da_test(int dim) {
   printf("result: %i\n",result);
   a.show("a5");
 
-  msl::DA<int>  // b(dim,1);
-  b = a.map(sq); //simplified! type error with non-simplified map (see da.cpp); additionally: crash after map
-  printf("behind map\n");
+  msl::DA<int> b = a.map(sq); //simplified! type error with non-simplified map (see da.cpp)
   b.show("b1");
 
   a.zipInPlace(b,sum);

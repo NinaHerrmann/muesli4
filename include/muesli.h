@@ -51,7 +51,6 @@
 #include <math.h>
 
 #include "exception.h"
-#include "curry.h"
 #include "conversion.h"
 #include "timer.h"
 
@@ -549,11 +548,11 @@ inline C1 proj1_2(C1 a, C2 b);
 template <typename C1, typename C2>
 inline C2 proj2_2(C1 a, C2 b);
 
-template <typename F>
-inline int auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int col);
+//template <typename F>
+// inline int auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int col);
 
-template <typename F>
-inline int auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int col);
+//template <typename F>
+// inline int auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int col);
 
 template <typename T>
 inline void show(T* a, int size);

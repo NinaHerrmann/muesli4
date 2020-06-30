@@ -38,8 +38,7 @@
 #include "muesli.h"
 #include "exception.h"
 #include "functors.h"
-#include "larray.h"
-#include "plarray.h"
+// #include "plarray.h"
 #include "exec_plan.h"
 #include "conversion.h"
 #ifdef __CUDACC__
@@ -844,56 +843,8 @@ private:
   int nCPU;                    
 
   //
-  // Skeletons
+  // auxiliary Skeletons
   //
-
-  template <typename MapFunctor>
-  void mapInPlace(MapFunctor& f, Int2Type<true>);
-
-  template <typename MapFunctor>
-  void mapInPlace(MapFunctor& f, Int2Type<false>);
-
-  template <typename MapIndexFunctor>
-  void mapIndexInPlace(MapIndexFunctor& f, Int2Type<true>);
-
-  template <typename MapIndexFunctor>
-  void mapIndexInPlace(MapIndexFunctor& f, Int2Type<false>);
-
-  template <typename R, typename MapFunctor>
-  DA<R> map(MapFunctor& f, Int2Type<true>);
-
-  template <typename R, typename MapFunctor>
-  DA<R> map(MapFunctor& f, Int2Type<false>);
-
-  template <typename R, typename MapIndexFunctor>
-  DA<R> mapIndex(MapIndexFunctor& f, Int2Type<true>);
-
-  template <typename R, typename MapIndexFunctor>
-  DA<R> mapIndex(MapIndexFunctor& f, Int2Type<false>);
-
-  template <typename T2, typename ZipFunctor>
-  void zipInPlace(DA<T2>& b, ZipFunctor& f, Int2Type<true>);
-
-  template <typename T2, typename ZipFunctor>
-  void zipInPlace(DA<T2>& b, ZipFunctor& f, Int2Type<false>);
-
-  template <typename T2, typename ZipIndexFunctor>
-  void zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f, Int2Type<true>);
-
-  template <typename T2, typename ZipIndexFunctor>
-  void zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f, Int2Type<false>);
-
-  template <typename R, typename T2, typename ZipFunctor>
-  DA<R> zip(DA<T2>& b, ZipFunctor& f, Int2Type<true>);
-
-  template <typename R, typename T2, typename ZipFunctor>
-  DA<R> zip(DA<T2>& b, ZipFunctor& f, Int2Type<false>);
-
-  template <typename R, typename T2, typename ZipIndexFunctor>
-  DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f, Int2Type<true>);
-
-  template <typename R, typename T2, typename ZipIndexFunctor>
-  DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f, Int2Type<false>);
 
   template <typename FoldFunctor>
   T fold(FoldFunctor& f, Int2Type<true>, bool final_fold_on_cpu);

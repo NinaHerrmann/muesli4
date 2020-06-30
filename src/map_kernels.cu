@@ -67,31 +67,31 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
   }
 }
 
-template <typename T, typename R, typename F>
-__global__ void msl::detail::mapStencilKernel(T* in, R* out,  GPUExecutionPlan<T> plan, PLArray<T>* input, F func, int tile_width)
-{
-  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+//template <typename T, typename R, typename F>
+//__global__ void msl::detail::mapStencilKernel(T* in, R* out,  GPUExecutionPlan<T> plan, PLArray<T>* input, F func, int tile_width)
+//{
+//  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//  if (x < plan.size) {
+//    input->readToSharedMem(x+plan.first, tile_width);
+//    out[x] = func(x + plan.first, *input);
+//  }
+//
+//  __syncthreads();
+//}
 
-  if (x < plan.size) {
-    input->readToSharedMem(x+plan.first, tile_width);
-    out[x] = func(x + plan.first, *input);
-  }
-
-  __syncthreads();
-}
-
-template <typename T, typename R, typename F>
-__global__ void msl::detail::mapStencilKernel(T* in, R* out, GPUExecutionPlan<T> plan, PLMatrix<T>* input, F func, int tile_width)
-{
-  size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (y < plan.nLocal) {
-    if (x < plan.mLocal) {
-      input->readToSharedMem(y+plan.firstRow, x+plan.firstCol, tile_width);
-      out[y * plan.mLocal + x] = func(y + plan.firstRow, x + plan.firstCol, *input);
-    }
-  }
-  __syncthreads();
-}
+//template <typename T, typename R, typename F>
+//__global__ void msl::detail::mapStencilKernel(T* in, R* out, GPUExecutionPlan<T> plan, PLMatrix<T>* input, F func, int tile_width)
+//{
+//  size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+//  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//  if (y < plan.nLocal) {
+//    if (x < plan.mLocal) {
+//      input->readToSharedMem(y+plan.firstRow, x+plan.firstCol, tile_width);
+//      out[y * plan.mLocal + x] = func(y + plan.firstRow, x + plan.firstCol, *input);
+//    }
+//  }
+//  __syncthreads();
+//}
 
