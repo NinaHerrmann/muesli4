@@ -105,12 +105,18 @@ void da_test(int dim) {
   a.broadcastPartition(1);
   a.show("a8");
 
-  DA<int> c = a.mapIndex(pr);
+  DA<int> c = a.mapIndex(pr); //simplified! type error with non-simplified version (see da.cpp)
   c.show("c1");
 
   Sum3 sum3;
   a.zipIndexInPlace(c,sum3);
   a.show("a9");
+
+  DA<int> d = a.zip(c,sum); //simplified! type error with non-simplified version (see da.cpp)
+  d.show("d1");
+
+  DA<int> e = a.zipIndex(c,sum3); //simplified! type error with non-simplified version (see da.cpp)
+  e.show("e1");
 
   return;
 }

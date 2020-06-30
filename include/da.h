@@ -400,8 +400,8 @@ public:
    * @tparam ZipFunctor Functor type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename T2, typename ZipFunctor>
-  DA<R> zip(DA<T2>& b, ZipFunctor& f);
+  template <typename T2, typename ZipFunctor>
+  DA<T> zip(DA<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug
 
   /**
    * \brief Non-inplace variant of the zipIndex skeleton.
@@ -412,8 +412,8 @@ public:
    * @tparam ZipIndexFunctor Functor type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename T2, typename ZipIndexFunctor>
-  DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f);
+  template <typename T2, typename ZipIndexFunctor>
+  DA<T> zipIndex(DA<T2>& b, ZipIndexFunctor& f);
 
   /**
    * \brief fold skeleton.

@@ -595,16 +595,10 @@ void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
 }
 
 template <typename T>
-template <typename R, typename T2, typename ZipFunctor>
-msl::DA<R> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){
-  DA<R> result(n, dist);
-
-  // upload data first (if necessary)
-  // upload();
-  // b.upload();
-  // result.upload(1); // alloc only
-
-  // zip
+template <typename T2, typename ZipFunctor>
+msl::DA<T> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){   // should have result type DA<R>; debug
+  DA<T> result(n);
+  // zip on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -612,28 +606,22 @@ msl::DA<R> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){
     detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
         plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].size, f);
   }
-
+  // zip on CPU cores
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
     result.setLocal(i, f(localPartition[i], b.getLocal(i)));
   }
   // check for errors during gpu computation
   msl::syncStreams();
-
+  result.setCpuMemoryInSync(false);
   return result;
 }
 
 template <typename T>
-template <typename R, typename T2, typename ZipIndexFunctor>
-msl::DA<R> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
-  DA<R> result(n, dist);
-
-  // upload data first (if necessary)
-  // upload();
-  // b.upload();
-  // result.upload(1); // alloc only
-
-  // zip
+template <typename T2, typename ZipIndexFunctor>
+msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
+  DA<T> result(n);
+  // zip on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -642,14 +630,14 @@ msl::DA<R> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
         plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
         plans[i].first, f, false);
   }
-
+  // zip on CPU cores
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
     result.setLocal(i, f(i, localPartition[i], b.getLocal(i)));
   }
   // check for errors during gpu computation
   msl::syncStreams();
-
+  result.setCpuMemoryInSync(false);
   return result;
 }
 
