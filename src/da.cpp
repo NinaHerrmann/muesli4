@@ -206,7 +206,7 @@ bool msl::DA<T>::isLocal(int index) const {
 }
 
 template<typename T>
-T msl::DA<T>::getLocal(int localIndex) const {
+T msl::DA<T>::getLocal(int localIndex) {
   if (localIndex >= nLocal) 
     throws(detail::NonLocalAccessException());
   if ((!cpuMemoryInSync) && (localIndex >= nCPU))
@@ -506,13 +506,9 @@ msl::DA<T> msl::DA<T>::map(F& f) { //preliminary simplification in order to avoi
 }
 
 template <typename T>
-template <typename R, typename MapIndexFunctor>
-msl::DA<R> msl::DA<T>::mapIndex(MapIndexFunctor& f){
-  DA<R> result(n, dist);
-
-  // upload data first (if necessary)
-  upload();
-  result.upload(1); // alloc only
+template <typename MapIndexFunctor>
+msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor& f){
+  DA<T> result(n);
 
   // map
   for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -530,6 +526,8 @@ msl::DA<R> msl::DA<T>::mapIndex(MapIndexFunctor& f){
   }
   // check for errors during gpu computation
   msl::syncStreams();
+  result.setCpuMemoryInSync(false);
+  result.download();
 
   return result;
 }
@@ -554,11 +552,7 @@ msl::DA<R> msl::DA<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
 template <typename T>
 template <typename T2, typename ZipFunctor>
 void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
-  // upload data first (if necessary)
-  // upload();
-  // b.upload();
-
-  // zip
+  // zip on GPU
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -567,7 +561,7 @@ void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
     detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
         plans[i].d_Data, bplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
   }
-
+  // zip on CPU cores
   T* bPartition = b.getLocalPartition();
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
@@ -581,11 +575,7 @@ void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
 void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
-  // upload data first (if necessary)
-  // upload();
-  // b.upload();
-
-  // zip
+  // zip on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -594,13 +584,14 @@ void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
         plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].nLocal,
         plans[i].first, f, false);
   }
-
+  // zip on CPU cores
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
-    setLocal(i, f(i, localPartition[i], b.getLocal(i)));
+    localPartition[i] = f(i, localPartition[i], b.getLocal(i));
   }
   // check for errors during gpu computation
   msl::syncStreams();
+  cpuMemoryInSync = false;
 }
 
 template <typename T>

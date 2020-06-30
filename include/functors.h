@@ -85,4 +85,34 @@ public:
    */
   virtual ~Functor2(){}
 };
+
+/**************************************************************************
+ * \brief Class Functor3 represents a 3ary functor
+ *
+ * @tparam T1 1st input data type.
+ * @tparam T2 2nd input data type.
+ * @tparam T3 3rd input data type.
+ * @tparam R output data type.
+ */
+template <typename T1, typename T2, typename T3, typename R>
+class Functor3{
+
+public:
+  /**
+   * \brief Function call operator has to be implemented by the user. 
+   *
+   * @param x 1st nput for the operator.
+   * @param y 2nd nput for the operator.
+   * @param z 3rd nput for the operator.
+   * @return Output of the operator.
+   */
+  MSL_USERFUNC
+  virtual R operator() (T1 x, T2 y, T3 z) const = 0;
+
+  /**
+   * \brief Destructor.
+   */
+  virtual ~Functor3(){}
+};
+
 } // namespace msl

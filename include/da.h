@@ -249,8 +249,8 @@ public:
    * @tparam R Return type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename MapIndexFunctor>
-  DA<R> mapIndex(MapIndexFunctor& f);
+  template <typename MapIndexFunctor>
+  DA<T> mapIndex(MapIndexFunctor& f);  // should be return type DA<R>; debug
 
   /**
    * \brief Replaces each element a[i] of the distributed array with f(i, a).
@@ -415,171 +415,17 @@ public:
   template <typename R, typename T2, typename ZipIndexFunctor>
   DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f);
 
-#ifndef __CUDACC__
-
-  // SKELETONS / COMPUTATION / ZIP / INPLACE
   /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i], b[i])
-   *        with \em b being another distributed array of the same size.
-   *        Note that this is a <b>CPU only</b> skeleton.
+   * \brief fold skeleton.
    *
-   * @param f The zip functor, must be a 'curried' function pointer.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam F Function type.
-   */
-  template <typename T2, typename F>
-  void zipInPlace(DA<T2>& b, const Fct2<T, T2, T, F>& f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i], b[i])
-   *        with \em b being another distributed array of the same size.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zip function.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   */
-  template <typename T2>
-  void zipInPlace(DA<T2>& b, T(*f)(T, T2));
-
-  // SKELETONS / COMPUTATION / ZIP / INDEXINPLACE
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i], b[i]).
-   *        Note that besides the elements themselves also the index is passed to the
-   *        functor. Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zipIndex functor, must be a 'curried' function pointer.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam F Function type.
-   */
-  template <typename T2, typename F>
-  void zipIndexInPlace(DA<T2>& b, const Fct3<int, T, T2, T, F>& f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i], b[i]).
-   *        Note that besides the elements themselves also the index is passed to the
-   *        functor. Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zipIndex function.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   */
-  template <typename T2>
-  void zipIndexInPlace(DA<T2>& b, T(*f)(int, T, T2));
-
-  // SKELETONS / COMPUTATION / ZIP
-  /**
-   * \brief Non-inplace variant of the zip skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zip functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename T2, typename F>
-  DA<R> zip(DA<T2>& b, const Fct2<T, T2, R, F>& f);
-
-  /**
-   * \brief Non-inplace variant of the zip skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zip function.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename T2>
-  DA<R> zip(DA<T2>& b, R(*f)(T, T2));
-
-  // SKELETONS / COMPUTATION / ZIP / INDEX
-  /**
-   * \brief Non-inplace variant of the zipIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zipIndex functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename T2, typename F>
-  DA<R> zipIndex(DA<T2>& b, const Fct3<int, T, T2, R, F>& f);
-
-  /**
-   * \brief Non-inplace variant of the zipIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The zipIndex function.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename T2>
-  DA<R> zipIndex(DA<T2>& b, R(*f)(int, T, T2));
-#endif
-
-  // SKELETONS / COMPUTATION / FOLD
-
-#ifndef __CUDACC__
-
-  /**
-   * \brief Reduces all elements of the distributed array to a single element by
-   *        successively applying the given functor \em f. Note that \em f needs to
-   *        be a commutative function.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The fold functor, must be of type \em AFoldFunctor.
-   * @param final_fold_on_cpu Specifies whether the final fold steps are done by the CPU.
-   *        Default is true and since this is the CPU version of this skeleton, passing
-   *        false will have no effect.
-   * @tparam FoldFunctor Functor type.
-   * @return The reduced value.
+   * @param f The fold functor
+   * @tparam T Element type of the distributed matrix to zip with.
+   * @tparam ZipIndexFunctor Functor type.
+   * @return the result of combining all elements of the arra by the binary, associative and commutativ 
+   *         operation f
    */
   template <typename FoldFunctor>
-  T fold(FoldFunctor& f, bool final_fold_on_cpu = 1);
-
-  /**
-   * \brief Reduces all elements of the distributed array to a single element by
-   *        successively applying the given functor \em f. Note that \em f needs to
-   *        be a commutative function.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The fold functor, must be a 'curried' function pointer.
-   * @tparam F Function type.
-   * @return The reduced value.
-   */
-  template <typename F>
-  T fold(const Fct2<T, T, T, F>& f);
-
-  /**
-   * \brief Reduces all elements of the distributed array to a single element by
-   *        successively applying the given function \em f. Note that \em f needs to
-   *        be a commutative function.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The fold function.
-   * @return The reduced value.
-   */
-  T fold(T(*f)(T, T));
-
-#else
-
-  /**
-   * \brief Reduces all elements of the distributed array to a single element by
-   *        successively applying the given functor \em f. Note that \em f needs to
-   *        be a commutative function.
-   *
-   * @param f The fold functor, must be of type \em AFoldFunctor.
-   * @param final_fold_on_cpu Specifies whether the final fold steps are done by the CPU.
-   *        Default is false. Passing true may increase performance.
-   * @tparam FoldFunctor Functor type.
-   * @return The reduce value.
-   */
-  template <typename FoldFunctor>
-  T fold(FoldFunctor& f, bool final_fold_on_cpu = 0);
-
-#endif
-
+  T fold(FoldFunctor& f,  bool final_fold_on_cpu);
 
   //
   // SKELETONS / COMMUNICATION
@@ -712,7 +558,7 @@ public:
    *
    * @param index The local index.
    */
-  T getLocal(int localIndex) const;
+  T getLocal(int localIndex);
 
   /**
    * \brief Sets the element at the given local index \em localIndex to the
@@ -842,15 +688,7 @@ private:
   // number of elements on CPU                 
   int nCPU;                    
 
-  //
-  // auxiliary Skeletons
-  //
-
-  template <typename FoldFunctor>
-  T fold(FoldFunctor& f, Int2Type<true>, bool final_fold_on_cpu);
-
-  template <typename FoldFunctor>
-  T fold(FoldFunctor& f, Int2Type<false>, bool final_fold_on_cpu);
+  
 
   //
   // AUXILIARY

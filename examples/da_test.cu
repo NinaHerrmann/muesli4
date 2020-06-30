@@ -63,8 +63,12 @@ class Sum : public Functor2<int, int, int>{
 public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
 };
 
+class Sum3 : public Functor3<int, int, int, int>{
+public: MSL_USERFUNC int operator() (int x, int y, int z) const {return x+y+z;}
+};
+
 void da_test(int dim) {
-  msl::DA<int> a(dim, 2);
+  DA<int> a(dim, 2);
   a.show("a1");
 
   Square sq;
@@ -88,7 +92,7 @@ void da_test(int dim) {
   printf("result: %i\n",result);
   a.show("a5");
 
-  msl::DA<int> b = a.map(sq); //simplified! type error with non-simplified map (see da.cpp)
+  DA<int> b = a.map(sq); //simplified! type error with non-simplified map (see da.cpp)
   b.show("b1");
 
   a.zipInPlace(b,sum);
@@ -100,6 +104,14 @@ void da_test(int dim) {
 
   a.broadcastPartition(1);
   a.show("a8");
+
+  DA<int> c = a.mapIndex(pr);
+  c.show("c1");
+
+  Sum3 sum3;
+  a.zipIndexInPlace(c,sum3);
+  a.show("a9");
+
   return;
 }
 }} // close namespaces
