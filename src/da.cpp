@@ -78,9 +78,6 @@ msl::DA<T>::DA(int size, const T& v)
   upload();
 }
 
-
-//DA<T>& operator=(const DA<T>& rhs);
-
 // auxiliary method init() 
 template<typename T>
 void msl::DA<T>::init() {
@@ -139,6 +136,13 @@ T* msl::DA<T>::getLocalPartition() {
   if (!cpuMemoryInSync)
     download();
   return localPartition;
+}
+
+template<typename T>
+void msl::DA<T>::setLocalPartition(T* elements) {
+  localPartition = elements;
+  upload();
+  return;
 }
 
 template<typename T>
@@ -210,7 +214,7 @@ T msl::DA<T>::getLocal(int localIndex) {
   if (localIndex >= nLocal) 
     throws(detail::NonLocalAccessException());
   if ((!cpuMemoryInSync) && (localIndex >= nCPU))
-    download(); // easy, but inefficient
+    download(); // easy, but inefficient, if random, non-consecutive access of elements
   return localPartition[localIndex];
 }
 
@@ -220,11 +224,20 @@ void msl::DA<T>::setLocal(int localIndex, const T& v) {
     localPartition[localIndex] = v;
   else if (localIndex >= nLocal) 
     throws(detail::NonLocalAccessException());
-  else { // localIndex refers to GPU 
-     if (!cpuMemoryInSync)
-       download();
-     localPartition[localIndex] = v; 
-     upload(); //easy, but inefficient
+  else { // localIndex refers to a GPU 
+     // approach 1: easy, but inefficient
+     // if (!cpuMemoryInSync)
+     //  download();
+     // localPartition[localIndex] = v;
+     // upload(); //easy, but inefficient
+     // approach 2: more efficient, but also more complicated: 
+      int gpuId = (localIndex - nCPU) / nGPU;
+      int idx = localIndex - nCPU - gpuId * nGPU; 
+      printf("setLocal: localIndex: %i, v:, %i, gpuId: %i, idx: %i, size: %i\n", // debug
+             localIndex, v, gpuId, idx, sizeof(T));                              // debug
+      cudaSetDevice(gpuId);
+      CUDA_CHECK_RETURN(
+       cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T), cudaMemcpyHostToDevice));
   }
 }
 
@@ -244,7 +257,6 @@ GPUExecutionPlan<T>* msl::DA<T>::getExecPlans(){
 template<typename T>
 void msl::DA<T>::upload() {
   std::vector<T*> dev_pointers;
-
 #ifdef __CUDACC__
   if (!cpuMemoryInSync) {
     for (int i = 0; i < ng; i++) {
@@ -271,10 +283,6 @@ void msl::DA<T>::download() {
       CUDA_CHECK_RETURN(
           cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data, plans[i].bytes,
               cudaMemcpyDeviceToHost, Muesli::streams[i]));
-
-      // free data on device (deleted, since DA now resides on GPUs)
-      // cudaFree(plans[i].d_Data);
-      // plans[i].d_Data = 0;
     }
     // wait until download is finished
     for (int i = 0; i < ng; i++) {
@@ -287,7 +295,7 @@ void msl::DA<T>::download() {
 
 template<typename T>
 int msl::DA<T>::getGpuId(int index) const {
-  return(index - firstIndex - nCPU) / ng;
+  return(index - firstIndex - nCPU) / nGPU;
 }
 
 // method (only) useful for debbuging
@@ -510,7 +518,7 @@ template <typename MapIndexFunctor>
 msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor& f){
   DA<T> result(n);
 
-  // map
+  // map on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -519,7 +527,7 @@ msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor& f){
               plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
               plans[i].first, f, false);
   }
-
+  // map on CPU cores
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
     result.setLocal(i, f(i, localPartition[i]));

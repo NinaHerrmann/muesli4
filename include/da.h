@@ -498,6 +498,13 @@ public:
   T* getLocalPartition();
 
   /**
+   * \briefs Sets the local partition.
+   *
+   * @param elements for the local partition.
+   */
+   void setLocalPartition(T* elements);
+
+  /**
    * \brief Returns the element at the given global index \em index.
    *
    * @param index The global index.
