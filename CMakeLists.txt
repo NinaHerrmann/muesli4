@@ -44,10 +44,12 @@ set(MUESLI_INCLUDE_DETAIL_INSTALL_DIR ${MUESLI_INCLUDE_INSTALL_DIR}/detail)
 ## install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src DESTINATION ${MUESLI_INSTALL_DIR})
 
 set(Example examples/da_test.cu)
-
+set(Example2 examples/dm_test.cu)
 ### get name of current example
 get_filename_component(example_name ${Example} NAME_WE)
+get_filename_component(example_name2 ${Example2} NAME_WE)
 add_executable(${example_name} ${Example})
+add_executable(${example_name2} ${Example2})
 
 target_compile_features(${example_name} PUBLIC cxx_std_14)
 target_include_directories(${example_name} 
@@ -56,3 +58,10 @@ target_include_directories(${example_name}
 target_compile_definitions(${example_name} PUBLIC ${MPI_CXX_COMPILE_DEFINITIONS})
 target_compile_options(${example_name} PUBLIC )
 target_link_libraries(${example_name} PUBLIC ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
+target_compile_features(${example_name2} PUBLIC cxx_std_14)
+target_include_directories(${example_name2} 
+  PUBLIC ${MPI_CXX_INCLUDE_DIRS} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${PROJECT_SOURCE_DIR}/src
+  PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/detail)
+target_compile_definitions(${example_name2} PUBLIC ${MPI_CXX_COMPILE_DEFINITIONS})
+target_compile_options(${example_name2} PUBLIC )
+target_link_libraries(${example_name2} PUBLIC ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
