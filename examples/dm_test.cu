@@ -42,14 +42,44 @@ class Square : public Functor<int, int> {
 public: MSL_USERFUNC int operator() (int x) const {return x*x;}
 };
 
+class Mult : public Functor<int, int> {
+private: int y;
+public:
+    Mult(int factor):
+        y(factor){}
+
+    MSL_USERFUNC int operator() (int x) const {return x*y;}
+};
+
+struct consti : public Functor2<int, int, int>{ // public msl::AMapIndexFunctor<int, int>{
+    MSL_USERFUNC int operator()(int i, int Ai) const {return i;}
+};
+
+class Sum : public Functor2<int, int, int>{
+public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
+};
+
 void dm_test(int dim) {
   //printf("Starting dm_test...\n");
-  DM<int> a(4,4, 2);
-  /*a.show("a1");
+  DM<int> a(10,10, 2);
+  //a.show("a1");
 
   Square sq;
   a.mapInPlace(sq);
-  a.show("a2");*/
+  //a.show("a2");
+
+  Mult mult(3);
+  a.mapInPlace(mult);
+  //a.show("a3");
+
+  consti pr;
+  a.mapIndexInPlace(pr);
+  a.show("a4");
+
+  Sum sum;
+  int result = a.fold(sum,true);
+  printf("result: %i\n",result);
+  a.show("a5");
 
   return;
 }
