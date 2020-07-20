@@ -44,9 +44,8 @@ msl::DM<T>::DM():                  // distributed array (resides on GPUs until d
       np(0),                       // number of (MPI-) nodes (= Muesli::num_local_procs)
       id(0),                       // id of local node among all nodes (= Muesli::proc_id)
       localPartition(0),           // local partition of the DM
-      cpuMemoryInSync(true),         // is GPU memory in sync with CPU?
-      firstIndexCol(0),               // first global index of the DM on the local partition
-      firstIndexRow(0),               // first global index of the DM on the local partition
+      cpuMemoryInSync(false),         // is GPU memory in sync with CPU?
+      firstIndex(0),               // first global index of the DM on the local partition
       plans(0),                    // GPU execution plans
       dist(Distribution::DIST),    // distribution of DM: DIST (distributed) or COPY (for now: always DIST)
       gpuCopyDistributed(0),       // is GPU copy distributed? (for now: always "false")
@@ -96,11 +95,11 @@ void msl::DM<T>::init() {
   nLocal = n / np;
   nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
   nCPU = nLocal - nGPU * ng;
-  // TODO right now we are assuming there exist only columns.
-  firstIndexCol = id * ncol;
-  firstIndexRow = id * nrow;
+  // TODO right now we are assuming twe split col wise
+  firstIndex = id * nCPU + (nGPU * id * ng);
+  printf("First Index Col %d\n", firstIndex);
   // for debugging:
-  //printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndexCol: %i, firstIndexRow: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndexCol, firstIndexRow);
+  //printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
 }
 
 
@@ -108,20 +107,16 @@ void msl::DM<T>::init() {
 template<typename T>
 void msl::DM<T>::initGPUs() {
 #ifdef __CUDACC__
-  printf("localPartition: %i", &localPartition);
-  printf("nLocal %i sizeofT %i\n", nLocal, sizeof(T));
-  T *h_local;
-  CUDA_CHECK_RETURN(cudaMallocHost(&h_local, nLocal*sizeof(T)));
   plans = new GPUExecutionPlan<T>[ng];
   int gpuBase = nCPU;
   for (int i = 0; i<ng; i++) {
     cudaSetDevice(i);
     plans[i].size = nGPU;
-    plans[i].nLocal = plans[i].size; //verdächtig, HK
+    plans[i].nLocal = plans[i].size;
     plans[i].bytes = plans[i].size * sizeof(T);
-    plans[i].first = gpuBase + firstIndexCol * firstIndexRow;
+    plans[i].first = gpuBase + firstIndex;
     plans[i].h_Data = localPartition + gpuBase;
-    CUDA_CHECK_RETURN(cudaMalloc(&plans[i].d_Data,plans[i].bytes));
+    CUDA_CHECK_RETURN(cudaMalloc(&plans[i].d_Data, plans[i].bytes));
     gpuBase += plans[i].size;
   }
 #endif
@@ -130,7 +125,8 @@ void msl::DM<T>::initGPUs() {
 // destructor removes a DM
 template<typename T>
 msl::DM<T>::~DM() {
-#ifdef __CUDACC__
+  printf("TODO: Destroy Datastructure\n");
+/*#ifdef __CUDACC__
   CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
   for (int i = 0; i < ng; i++) {
     if (plans[i].d_Data != 0) {
@@ -141,6 +137,7 @@ msl::DM<T>::~DM() {
   delete[] plans;
 #endif
   delete[] localPartition;
+*/
 }
 
 // ***************************** auxiliary methods ******************************
@@ -180,10 +177,10 @@ T msl::DM<T>::get(int index) const {
               cudaMemcpyDeviceToHost,
               Muesli::streams[device]));
     } else {  // element is up to date in cpu memory
-      message = localPartition[index-firstIndexCol];
+      message = localPartition[index-firstIndex];
     }
 #else
-    message = localPartition[index - firstIndexCol];
+    message = localPartition[index - firstIndex];
 #endif
     idSource = Muesli::proc_id;
   }
@@ -209,7 +206,7 @@ int msl::DM<T>::getLocalSize() const {
 
 template<typename T>
 int msl::DM<T>::getFirstIndex() const {
-  return firstIndexCol;
+  return firstIndex;
 }
 
 template<typename T>
@@ -219,7 +216,7 @@ void msl::DM<T>::setCpuMemoryInSync(bool b) {
 
 template<typename T>
 bool msl::DM<T>::isLocal(int index) const {
-  return (index >= firstIndexCol) && (index < firstIndexCol + nLocal);
+  return (index >= firstIndex) && (index < firstIndex + nLocal);
 }
 
 template<typename T>
@@ -256,8 +253,8 @@ void msl::DM<T>::setLocal(int localIndex, const T& v) {
 
 template<typename T>
 void msl::DM<T>::set(int globalIndex, const T& v) {
-  if ((globalIndex >= firstIndexCol) && (globalIndex < firstIndexCol + nLocal)) {
-    setLocal(globalIndex - firstIndexCol, v);
+  if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
+    setLocal(globalIndex - firstIndex, v);
   }
 }
 
@@ -308,7 +305,7 @@ void msl::DM<T>::download() {
 
 template<typename T>
 int msl::DM<T>::getGpuId(int index) const {
-  return(index - firstIndexCol - nCPU) / nGPU;
+  return(index - firstIndex - nCPU) / nGPU;
 }
 
 // method (only) useful for debbuging
@@ -345,7 +342,7 @@ void msl::DM<T>::show(const std::string& descr) {
     s << "[";
     for (int i = 0; i < n - 1; i++) {
       s << b[i];
-      s << " ";
+      ((i+1) % ncol == 0) ? s << "\n " : s << " ";;
     }
     s << b[n - 1] << "]" << std::endl;
     s << std::endl;
@@ -381,7 +378,7 @@ void msl::DM<T>::gather(msl::DM<T>& da) {
 
 // SKELETONS / COMMUNICATION / PERMUTE PARTITION
 
-template<typename T>
+/*template<typename T>
 template<typename Functor>
 inline void msl::DM<T>::permutePartition(Functor& f) {
   int i, receiver;
@@ -428,7 +425,7 @@ inline void msl::DM<T>::permutePartition(Functor& f) {
     upload();
   }
 }
-
+*/
 // template<typename T>
 // inline void msl::DM<T>::permutePartition(int (*f)(int)) {
 //  permutePartition(curry(f));
@@ -486,8 +483,8 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
         plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, false);
   }
   // calculate offsets for indices
-  // int offset = f.useLocalIndices() ? 0 : firstIndexCol;
-  int offset = firstIndexCol;
+  // int offset = f.useLocalIndices() ? 0 : firstIndex;
+  int offset = firstIndex;
 
   #pragma omp parallel for
   for (int i = 0; i < nCPU; i++) {
@@ -567,6 +564,168 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
 {
   printf("mapStencil\n");
   throws(detail::NotYetImplementedException());
+}
+// *********** fold *********************************************
+template <typename T>
+template <typename FoldFunctor>
+T msl::DM<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
+  std::vector<int> blocks(Muesli::num_gpus);
+  std::vector<int> threads(Muesli::num_gpus);
+  T* gpu_results = new T[Muesli::num_gpus];
+  int maxThreads = 1024;   // preliminary
+  int maxBlocks = 1024;    // preliminary
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    threads[i] = maxThreads;
+    gpu_results[i] = 0;
+  }
+  T* local_results = new T[np];
+  T** d_odata = new T*[Muesli::num_gpus];
+  upload();
+
+  //
+  // Step 1: local fold
+  //
+
+  // prearrangement: calculate threads, blocks, etc.; allocate device memory
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    threads[i] = (plans[i].size < maxThreads) ? detail::nextPow2((plans[i].size+1)/2) : maxThreads;
+    blocks[i] = plans[i].size / threads[i];
+    if (blocks[i] > maxBlocks) {
+      blocks[i] = maxBlocks;
+    }
+    CUDA_CHECK_RETURN(cudaMalloc((void**) &d_odata[i], blocks[i] * sizeof(T)));
+  }
+
+  // fold on gpus: step 1
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    detail::reduce<T, FoldFunctor>(plans[i].size, plans[i].d_Data, d_odata[i], threads[i], blocks[i], f, Muesli::streams[i], i);
+  }
+
+  // fold local elements on CPU (overlap with GPU computations)
+  T cpu_result = localPartition[0];
+  for (int i = 1; i<nCPU; i++)
+    cpu_result = f(cpu_result, localPartition[i]);
+
+  msl::syncStreams();
+
+  // fold on gpus: step 2
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    if (blocks[i] > 1) {
+      cudaSetDevice(i);
+      int threads = (detail::nextPow2(blocks[i]) == blocks[i]) ? blocks[i] : detail::nextPow2(blocks[i])/2;
+      detail::reduce<T, FoldFunctor>(blocks[i], d_odata[i], d_odata[i], threads, 1, f, Muesli::streams[i], i);
+    }
+  }
+  msl::syncStreams();
+
+  // copy final sum from device to host
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    CUDA_CHECK_RETURN(cudaMemcpyAsync(&gpu_results[i],
+                                      d_odata[i],
+                                      sizeof(T),
+                                      cudaMemcpyDeviceToHost,
+                                      Muesli::streams[i]));
+  }
+  //printf("%d. Cpu Result %d\n"
+        // "1.1 Gpu Result %d\n"
+       //  "1.2 GpuResult %d \n", id, cpu_result, gpu_results[0], gpu_results[1]);
+  msl::syncStreams();
+
+  //
+  // Step 2: global fold
+  //
+
+  T final_result, result;
+  if (final_fold_on_cpu) {
+    // calculate local result for all GPUs and CPU
+    T tmp = cpu_result;
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+      tmp = f(tmp, gpu_results[i]);
+    }
+
+    // gather all local results
+    msl::allgather(&tmp, local_results, 1);
+
+    // calculate global result from local results
+    result = local_results[0];
+    for (int i = 1; i < np; i++) {
+      result = f(result, local_results[i]);
+    }
+    final_result = result;
+  } else {
+    T local_result; T* d_gpu_results;
+    if (Muesli::num_gpus > 1) { // if there is more than 1 GPU
+      cudaSetDevice(0);         // calculate local result on device 0
+
+      // upload data
+      CUDA_CHECK_RETURN(cudaMalloc((void**)&d_gpu_results, Muesli::num_gpus * sizeof(T)));
+      CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results,
+                                        gpu_results,
+                                        Muesli::num_gpus * sizeof(T),
+                                        cudaMemcpyHostToDevice,
+                                        Muesli::streams[0]));
+      CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+
+      // final (local) fold
+      detail::reduce<T, FoldFunctor>(Muesli::num_gpus, d_gpu_results, d_gpu_results, Muesli::num_gpus, 1, f, Muesli::streams[0], 0);
+      CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+
+      // copy result from device to host
+      CUDA_CHECK_RETURN(cudaMemcpyAsync(&local_result,
+                                        d_gpu_results,
+                                        sizeof(T),
+                                        cudaMemcpyDeviceToHost,
+                                        Muesli::streams[0]));
+      CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+      CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+    } else {
+      local_result = gpu_results[0];
+    }
+
+    if (np > 1) {
+      // gather all local results
+      msl::allgather(&local_result, local_results, 1);
+
+      // calculate global result from local results
+      // upload data
+      CUDA_CHECK_RETURN(cudaMalloc((void**)&d_gpu_results, np * sizeof(T)));
+      CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results,
+                                        local_results,
+                                        np * sizeof(T),
+                                        cudaMemcpyHostToDevice,
+                                        Muesli::streams[0]));
+
+      // final fold
+      detail::reduce<T, FoldFunctor>(np, d_gpu_results, d_gpu_results, np, 1, f, Muesli::streams[0], 0);
+      CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+
+      // copy final result from device to host
+      CUDA_CHECK_RETURN(cudaMemcpyAsync(&final_result,
+                                        d_gpu_results,
+                                        sizeof(T),
+                                        cudaMemcpyDeviceToHost,
+                                        Muesli::streams[0]));
+      CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+      CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+    } else {
+      final_result = local_result;
+    }
+  }
+
+  // Cleanup
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
+    CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
+  }
+  delete[] gpu_results;
+  delete[] d_odata;
+  delete[] local_results;
+
+  return final_result;
 }
 
 
