@@ -653,6 +653,7 @@ msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
 template <typename T>
 template <typename FoldFunctor>
 T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
+  // NH I inserted a download() here in dm.cpp.
   std::vector<int> blocks(Muesli::num_gpus);
   std::vector<int> threads(Muesli::num_gpus);
   T* gpu_results = new T[Muesli::num_gpus];

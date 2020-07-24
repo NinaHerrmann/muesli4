@@ -61,9 +61,10 @@ msl::DM<T>::DM(int col, int row)
     : ncol(col), nrow(row), n(col*row){
   init();
 #ifdef __CUDACC__
+  localPartition = new T[nLocal];
+  CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal*sizeof(T)));
   initGPUs();
 #else 
-  localPartition = new T[nLocal];
 #endif
   cpuMemoryInSync = true;
 }
@@ -74,9 +75,10 @@ msl::DM<T>::DM(int col, int row, const T& v)
     : ncol(col), nrow(row), n(col*row){
   init();
 #ifdef __CUDACC__
-  initGPUs();
-#else 
   localPartition = new T[nLocal];
+  CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal*sizeof(T)));
+  initGPUs();
+#else
 #endif
   #pragma omp parallel for
   for (int i=0; i< nLocal; i++) localPartition[i] = v;
@@ -569,6 +571,9 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
 template <typename T>
 template <typename FoldFunctor>
 T msl::DM<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
+  if (!cpuMemoryInSync) {
+    download();
+  }
   std::vector<int> blocks(Muesli::num_gpus);
   std::vector<int> threads(Muesli::num_gpus);
   T* gpu_results = new T[Muesli::num_gpus];
