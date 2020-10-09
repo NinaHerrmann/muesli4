@@ -118,11 +118,17 @@ void da_test(int dim) {
   DA<int> e = a.zipIndex(c,sum3); //simplified! type error with non-simplified version (see da.cpp)
   e.show("e1");
 
+  int localArray[dim];
+  for (int i=0; i<dim; i++) localArray[i] = i;
+  DA<int> g(dim, localArray);
+  g.show("g");
+
   return;
 }
 }} // close namespaces
 
 int main(int argc, char** argv){
+  using namespace msl::test;
   msl::initSkeletons(argc, argv);
   msl::setNumRuns(1);
   msl::setNumGpus(atoi(argv[2]));
