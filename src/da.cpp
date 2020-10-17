@@ -361,9 +361,12 @@ void msl::DA<T>::broadcastPartition(int partitionIndex) {
 // SKELETONS / COMMUNICATION / GATHER
 
 template<typename T>
-void msl::DA<T>::gather(msl::DA<T>& da) {
-  printf("gather\n");
-  throws(detail::NotYetImplementedException());
+void msl::DA<T>::gather(T* res) {
+  if (!cpuMemoryInSync) {  
+    download();
+  }
+  msl::allgather(localPartition, res, nLocal);
+  return;
 }
 
 // SKELETONS / COMMUNICATION / PERMUTE PARTITION

@@ -120,8 +120,8 @@ void da_test(int dim) {
 
   int localArray[dim];
   for (int i=0; i<dim; i++) localArray[i] = i;
-  DA<int> g(dim, localArray);
-  g.show("g");
+//  DA<int> g(dim, localArray);  // not yet implemented
+//  g.show("g");
 
   return;
 }
