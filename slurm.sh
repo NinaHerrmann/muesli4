@@ -11,8 +11,8 @@
 #SBATCH --exclusive
 
 #SBATCH --job-name Muesli-DA-Test
-#SBATCH --output /scratch/tmp/kuchen/output7.txt
-#SBATCH --error /scratch/tmp/kuchen/error7.txt
+#SBATCH --output /scratch/tmp/kuchen/output9.txt
+#SBATCH --error /scratch/tmp/kuchen/error9.txt
 #SBATCH --mail-type ALL
 #SBATCH --mail-user kuchen@uni-muenster.de
 
@@ -30,7 +30,14 @@ export I_MPI_DEBUG=3
 # alternativ: Ethernet statt Infiniband: 
 export I_MPI_FABRICS=shm:tcp
 
-# dim #runs #gpus 
-mpirun /home/k/kuchen/Muesli4/build/da_test 32 2  
+# parameters: array dim #MPI nodes
+# mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
+
+# parameters: area size (needs to be quadratic) #MPI nodes
+# mpirun /home/k/kuchen/Muesli4/build/mandelbrotDA 10000 2 
+ 
+# parameters: #processes (= dim of DA), #throws, #MPI nodes
+mpirun /home/k/kuchen/Muesli4/build/piDA 1000 1000000 2 
+
 # alternativ: mpirun -np 2 <Datei>
 # alternativ: srun <Datei>

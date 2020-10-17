@@ -1,5 +1,5 @@
 /*
- * da_test.cpp
+ *      mandelbrotDA.cu
  *
  *      Author: Herbert Kuchen <kuchen@uni-muenster.de>
  * 
@@ -125,6 +125,7 @@ void mandelbrot(int dim) {
 
    picture.show("Mandelbrot");
 
+   // gather and print on root
    int n = xpixels * ypixels;
    int* pic =  new int[n];
    picture.gather(pic);
