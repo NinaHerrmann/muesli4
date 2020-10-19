@@ -1,0 +1,60 @@
+Matmult: (+)
+========
+- paralleles Arbeiten auf allen Partitionen von DMs, z.B. mit Alg. v. Gentleman
+- mit mapPartition (GPU aware) und permutePartion 
+
+FSS / PSO -
+=========
+bis zu dreistufige Parallelität: kommunizierenden Teams von Partikeln mit vielen Dimensionen
+denkbar: Team verwendet Teil der Knoten, alle Partikel eines Teams per MPI; Dimensionen parallel auf Cores und GPUs
+(z.B. Farm von Prozessen mit geschachtelten DAs; pro Team: Folge von map + fold
+
+ACO -
+===
+abwechselnd:
+  parallele Bearbeitung aller Ants (DA oder geschachteltes DA)
+  parallele Bearbeitung aller Teillösungen (DA?)
+
+Evolutionäre Algorithmen 
+========================
+- parallele Bestimmung der Fitness aller Individuen
+- Auswahl der Überlebenden (filter: -) 
+- paarweise Kreuzung der Überlebenden
+- Aufnahme der Neugeborenen
+- ggf. Inseln und Wanderungsbewegungen
+- Ansatz: Insel pro Knoten; auf Cores und GPUs jedes Knotens: parallele Bearbeitung von Individuen und Paaren
+          mit geschachteltem DA
+
+Mandelbrot: +
+===========
+a) DM 
+b) DA-Simulation von DM wobei jeder Index j = x + c y repräsentiert z = x + i*y
+
+Nbody: 
+======
+abwechselnd  
+  parallele Berechnung aller Kräfte zwischen je zwei Körpern (mapPartition und permutePartition auf DA von struct)
+  parallele Anwendung aller relevanten Kräfte auf jeden Körper
+  
+Raytracing (+?)
+==========
+parallele Bearbeitung aller Bildpunkte  (map auf DM oder DA-Simulation von DM)
+
+Monte-Carlo +
+===========
+- parallele Bearbeitung aller zufällig gewählten Suchraumelemente (map auf DA oder DM)
+- am Ende: fold
+
+******************************************************************************************************
+
+insgesamt nötig:
+================
+- filter und redistribute
+- mapPertition für GPUs
+- geschachtelte(s) DA /DM (denn DA / DM bieten nur ein Level von Parallelität) -> zwei Levels von Parallelität
+   (DA / DM von struct von DA /DM simulierbar durch geschachteltes DA / DM + DA / DM von struct)
+- foldRow für DM (FSS, PSO)   
+
+
+
+
