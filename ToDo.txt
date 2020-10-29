@@ -13,7 +13,7 @@ ACO -
 ===
 abwechselnd:
   parallele Bearbeitung aller Ants (DA oder geschachteltes DA)
-  parallele Bearbeitung aller Teillösungen (DA?)
+  parallele Bearbeitung aller Teill�sungen (DA?)
 
 Evolutionäre Algorithmen 
 ========================

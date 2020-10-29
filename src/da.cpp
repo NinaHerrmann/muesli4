@@ -57,9 +57,8 @@ msl::DA<T>::DA(int size)
   init();
 #ifdef __CUDACC__
   initGPUs(); 
-#else 
-  localPartition = new T[nLocal];
 #endif
+  localPartition = new T[nLocal];
   cpuMemoryInSync = true;
 }
 
@@ -70,9 +69,8 @@ msl::DA<T>::DA(int size, const T& v)
   init();
 #ifdef __CUDACC__
   initGPUs(); 
-#else 
+#endif 
   localPartition = new T[nLocal];
-#endif
   #pragma omp parallel for
   for (int i=0; i< nLocal; i++) localPartition[i] = v; 
   upload();
