@@ -63,19 +63,30 @@ const int BETA = 2;
 //	return (double)i;
 //}
 
+const int multiplier= 1103515245;
+const int maxRand = 1<<31;
+const int increment = 12345;
+MSL_USERFUNC
+int myRand(int state) const {
+  return (multiplier * state + increment) % maxRand;
+
 class Calculate_distance: : public Functor2<int, double, double>{
 public: MSL_USERFUNC double operator() (int i, double y) const
     double result = 0.0;
 	int j = i / ncities;
 	int currentcity = (int) i % ncities;
+	
+	// random generation of distance-matrix entry
+    int state = (j < currentcity) ? i : currentcity * ncities + j; 
+    double x1 = ((state = myRand(state)) / (double) maxRand) * ncities;
+    double y1 = ((state = myRand(state)) / (double) maxRand) * ncities;
+    double x2 = ((state = myRand(state)) / (double) maxRand) * ncities;
+    double y2 = ((state = myRand(state)) / (double) maxRand) * ncities;
+	
 	if (j != currentcity) {
-		double difference = cities[j*2] - cities[currentcity*2];                 // problem?!
-		if (difference < 0) {difference = difference * (-1) ;}
-		double nextdifference = cities[(j*2) + 1] - cities[(currentcity*2) + 1]; // problem?!
-		if (nextdifference < 0) { nextdifference = nextdifference * (-1) ;}
-		double first =  difference * difference;
-		double second = nextdifference * nextdifference;
-		result = sqrt(first + second);
+		double diffx = x1 - x2;
+		double diffy = y1 - y2;
+		result = sqrt(diffx*diffx + diffy*diffy);
 	}
 	return result;
 }
@@ -90,7 +101,7 @@ public: MSL_USERFUNC int operator() (int cityindex, int value) const
 		for(int j = 0 ;j<ncities;j++){
 			bool check = true;
 			for(int k = 0 ; k < i ; k++){
-				if(d_iroulette[c_index * IROULETE + k] == j){check = false;	}
+				if(d_iroulette[c_index * IROULETE + k] == j){check = false;	} // problem?!
 			}
 			if(c_index != j){
 				if (check == true) {
@@ -108,11 +119,7 @@ public: MSL_USERFUNC int operator() (int cityindex, int value) const
 }
 
 class Route_kernel2: public Functor2<int, int, int>{
-private
-  const int multiplier= 1103515245;
-  const int maxRand = 1<<31;
-  const int increment = 12345;
-  
+ 
 public: 
   MSL_USERFUNC int operator() (int index, int value) const
 	int newroute = 0;
@@ -197,11 +204,6 @@ public:
 	}
 	return value;
   }
-
-  MSL_USERFUNC
-  int myRand(int state) const {
-     return (multiplier * state + increment) % maxRand;
-  }
 }
 
 class Update_best_sequence_kernel: public Functor2<int, int, int>{
@@ -272,34 +274,29 @@ public: MSL_USERFUNC int operator() (int index, int value) const
 }
 
 void tsp(){
-  DA<double>> cities(2*ncities);   // #cities * 2
-  DA<int> city(ncities);           // #cities 
   DA<int> antss(ncities);          // pseudo array
 
   DA<double> phero(ncities*ncities);         // #cities squared
   DA<double> phero_new(ncities*ncities);     // #cities squared
 
-  DA<double> distance(ncities*ncities);      // cities squared
   DA<int> best_sequence(2*ncities,0);
 
   DA<double> d_delta_phero(ncities*ncities); // cities squared
   DA<double> d_routes_distance(ants);        // n_ants ? TODO ask change in model
   DA<double> d_probabilities(ants*ncities);  //#ants*#cities
-
-  DA<int> d_iroulette(IROULETTE*ncities);    // IROULETTE * #cities
-  DA<int> d_routes(ants*ncities);            //#ants*#cities
+  DA<int> d_routes(ants*ncities);            // #ants*#cities
   
-  auto writeIndex = [] (int i) {return i+0.0;};
-  cities.mapIndexInPlace(writeIndex);
-  cities.show("cities");
-  
+  // calculate random symmetric distance matrix
+  DA<double> distance(ncities*ncities);     
   Calculate_distance calc_d;
   distance.mapIndexInPlace(calc_d);
   distance.show("distance");
   
+  // calculate for each city the IROULETTE nearest cities
+  DA<int> iroulette(ncities*IROULETTE);    // #cities * IROULETTE matrix
   Calculate_iroulette calc_i
-  city.mapIndexInPlace(calc_i);
-  city.show("city");
+  iroulette.zipIndexInPlace(distance,calc_i);
+  city.show("iroulette");
   
   for (int i = 0; i < iterations; i++){
     Route_kernel2 kernel2;
