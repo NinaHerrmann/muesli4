@@ -84,6 +84,7 @@ int main(int argc, char** argv){  // #processes, #throws, #mpi_nodes
   msl::setNumRuns(1);
   msl::setNumGpus(atoi(argv[3]));
   msl::test::compute_pi(atoi(argv[1]), atoi(argv[2]));
+  printf("after compute_pi\n");
   msl::terminateSkeletons();
   return EXIT_SUCCESS;
 }
