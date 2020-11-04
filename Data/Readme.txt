@@ -1,4 +1,4 @@
-These data files (pictures, ...) are in input or output of the example programs.
+These data files (pictures, ...) are an input or output of the example programs.
 The input files have to be moved to the above directory, if the corresponding
 examples shall be executed.
 
