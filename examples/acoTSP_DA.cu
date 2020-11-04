@@ -3,6 +3,7 @@
  *
  *      Author: Herbert Kuchen <kuchen@uni-muenster.de>
  *              angelehnt an Musket-Programm von Nina Hermann
+ *       NOT YET WORKING; waiting for DMs; side effects of skeletons have to be eliminated
  * 
  * -------------------------------------------------------------------------------
  *
