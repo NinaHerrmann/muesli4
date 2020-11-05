@@ -22,7 +22,7 @@ module load CMake/3.15.3
 
 cd /home/k/kuchen/Muesli4
 
-./build.sh $1
+./build.sh 
 export OMP_NUM_THREADS=4
 
 # vorläufig, bis MPI über Infiniband funktioniert
@@ -31,9 +31,9 @@ export I_MPI_DEBUG=3
 # alternativ: Ethernet statt Infiniband: 
 export I_MPI_FABRICS=shm:tcp
 
-mpirun /home/k/kuchen/Muesli4/build/$1 $2 $3
+# mpirun /home/k/kuchen/Muesli4/build/$1 $2 $3
 # parameters: array dim #MPI nodes
-# mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
+mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
 
 # parameters: area size (needs to be quadratic) #MPI nodes
 # mpirun /home/k/kuchen/Muesli4/build/mandelbrotDA 10000 2 

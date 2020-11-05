@@ -107,12 +107,12 @@ void msl::terminateSkeletons()
   std::ostringstream s_time;
 
   MPI_Barrier(MPI_COMM_WORLD);
-  printf("debug: behind barrier\n"); // debug
+  printf("debug: terminating skeletons\n);
+
   if (Muesli::use_timer) {
     double total_time = timer->totalTime();
     s_time << "Total time: " << total_time << "s" << std::endl;
   }
-  printf("debug: behind if (Muesli::use_timer)\n"); // debug
 
   if (isRootProcess()) {
     s << std::endl << "Name: " << Muesli::program_name << std::endl;
@@ -135,15 +135,13 @@ void msl::terminateSkeletons()
 
     printf("%s", s.str().c_str());
   }
-  printf("debug: behind if (isRootProcess())\n"); // debug
-  
 
 #ifdef _CUDACC__
   for (auto it = Muesli::streams.begin(); it != Muesli::streams.end(); ++it) {
     CUDA_CHECK_RETURN(cudaStreamDestroy(*it));
   }
 #endif
-  printf("debug: behind ifdef _CUDACC\n"); // debug
+
   MPI_Finalize();
   Muesli::running_proc_no = 0;
 }
