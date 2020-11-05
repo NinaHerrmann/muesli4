@@ -1,10 +1,10 @@
 Building example(s)
 ===================
-./build.sh
+./build.sh <example (without path prefix)>
 
 Running new examples for testing Distributed Arrays (DA) using MPI, OpenMP and CUDA
 ============================================================0======================
-sbatch slurm.sh  (includes build)
+sbatch slurm.sh  <example> <parameter1> <parameter2>     (includes build)
 
   new example(s): da_test.cu  (in directory examples)
 

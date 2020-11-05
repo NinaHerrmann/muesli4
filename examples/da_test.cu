@@ -42,13 +42,13 @@ class Square : public Functor<int, int> {
 public: MSL_USERFUNC int operator() (int x) const {return x*x;}
 };
 
-class Mult : public Functor<int, int> {
+class Add : public Functor<int, int> {
 private: int y;
 public: 
-Mult(int factor):
-  y(factor){}
+Add(int value):
+  y(value){};
 
-MSL_USERFUNC int operator() (int x) const {return x*y;}
+MSL_USERFUNC int operator() (int x) const {return x+y;}
 };
 
 //class Project1 : public Functor2<int, int, int>{  // class funktioniert nicht; nur struct !?
@@ -79,8 +79,8 @@ void da_test(int dim) {
 //  a.mapInPlace(inc);
 //  a.show("a2b");
 
-  Mult mult(3);
-  a.mapInPlace(mult);
+  Add add(3);
+  a.mapInPlace(add);
   a.show("a3");
 
   consti pr;
@@ -118,8 +118,8 @@ void da_test(int dim) {
   DA<int> e = a.zipIndex(c,sum3); //simplified! type error with non-simplified version (see da.cpp)
   e.show("e1");
 
-  int localArray[dim];
-  for (int i=0; i<dim; i++) localArray[i] = i;
+//  int localArray[dim];
+//  for (int i=0; i<dim; i++) localArray[i] = i;
 //  DA<int> g(dim, localArray);  // not yet implemented
 //  g.show("g");
 

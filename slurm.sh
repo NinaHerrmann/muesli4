@@ -4,16 +4,16 @@
 #SBATCH --nodes 2
 #SBATCH --ntasks-per-node 1
 #SBATCH --cpus-per-task 2
-#SBATCH --gres=gpu:2
-# alternativ: 4 auf gpu2080
-#SBATCH --partition gpuk20
-# alternativ: gpu2080
+#SBATCH --gres=gpu:4
+# alternativ: 2 auf gpuk20
+#SBATCH --partition gpu2080
+# alternativ: gpuk20
 #SBATCH --time 00:05:00
 #SBATCH --exclusive
 
-#SBATCH --job-name Muesli-pi
-#SBATCH --output /scratch/tmp/kuchen/output9.txt
-#SBATCH --error /scratch/tmp/kuchen/error9.txt
+#SBATCH --job-name $1
+#SBATCH --output /scratch/tmp/kuchen/output.txt
+#SBATCH --error /scratch/tmp/kuchen/error.txt
 #SBATCH --mail-type ALL
 #SBATCH --mail-user kuchen@uni-muenster.de
 
@@ -22,7 +22,7 @@ module load CMake/3.15.3
 
 cd /home/k/kuchen/Muesli4
 
-./build.sh
+./build.sh $1
 export OMP_NUM_THREADS=4
 
 # vorläufig, bis MPI über Infiniband funktioniert
@@ -31,8 +31,9 @@ export I_MPI_DEBUG=3
 # alternativ: Ethernet statt Infiniband: 
 export I_MPI_FABRICS=shm:tcp
 
+mpirun /home/k/kuchen/Muesli4/build/$1 $2 $3
 # parameters: array dim #MPI nodes
-mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
+# mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
 
 # parameters: area size (needs to be quadratic) #MPI nodes
 # mpirun /home/k/kuchen/Muesli4/build/mandelbrotDA 10000 2 

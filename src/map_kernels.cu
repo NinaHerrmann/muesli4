@@ -35,8 +35,7 @@ __global__ void msl::detail::mapKernel(T* in, R* out, size_t size, F func) {
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
   if (x < size) {
     out[x] = func(in[x]);
-//    int y = x;
-//    printf("x: %i, in[x]: %i, out[x]: %i\n",y,in[x],out[x]);
+    printf("debug GPU: x: %i, in[x]: %i, out[x]: %i\n",x,in[x],out[x]);
   }
 }
 

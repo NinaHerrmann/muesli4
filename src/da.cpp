@@ -55,9 +55,7 @@ template<typename T>
 msl::DA<T>::DA(int size)
     : n(size) {
   init();
-#ifdef __CUDACC__
   initGPUs(); 
-#endif
   localPartition = new T[nLocal];
   cpuMemoryInSync = true;
 }
@@ -67,9 +65,7 @@ template<typename T>
 msl::DA<T>::DA(int size, const T& v)
     : n(size) {
   init();
-#ifdef __CUDACC__
   initGPUs(); 
-#endif 
   localPartition = new T[nLocal];
   #pragma omp parallel for
   for (int i=0; i< nLocal; i++) localPartition[i] = v; 
@@ -89,13 +85,14 @@ void msl::DA<T>::init() {
   nCPU = nLocal - nGPU * ng;
   firstIndex = id * nLocal;
   // for debugging:
-  printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
+  printf("debug: id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
 }
 
 // auxiliary method initGPUs
 template<typename T>
 void msl::DA<T>::initGPUs() {
 #ifdef __CUDACC__
+  printf("debug: initGPUs\n");
   CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal*sizeof(T)));
   plans = new GPUExecutionPlan<T>[ng];
   int gpuBase = nCPU;
@@ -116,7 +113,7 @@ void msl::DA<T>::initGPUs() {
 template<typename T>
 msl::DA<T>::~DA() {
 #ifdef __CUDACC__
-  CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
+//  CUDA_CHECK_RETURN(cudaFreeHost(localPartition)); // line causes unexplanable error message; thus commented out
   for (int i = 0; i < ng; i++) {
     if (plans[i].d_Data != 0) {
       cudaSetDevice(i);
@@ -248,7 +245,7 @@ void msl::DA<T>::set(int globalIndex, const T& v) {
 
 template<typename T>
 GPUExecutionPlan<T>* msl::DA<T>::getExecPlans(){
-  //std::vector<GPUExecutionPlan<T> > ret(plans, plans + Muesli::num_gpus);
+  //std::vector<GPUExecutionPlan<T> > ret(plans, plans + ng);
   return plans;
 }
 
@@ -256,6 +253,7 @@ template<typename T>
 void msl::DA<T>::upload() {
   std::vector<T*> dev_pointers;
 #ifdef __CUDACC__
+  printf("debug: uploading to GPUs\n");
   if (!cpuMemoryInSync) {
     for (int i = 0; i < ng; i++) {
       cudaSetDevice(i);
@@ -444,7 +442,7 @@ void msl::DA<T>::freeDevice() {
 template <typename T>
 template <typename MapFunctor>
 void msl::DA<T>::mapInPlace(MapFunctor& f){
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -462,11 +460,8 @@ void msl::DA<T>::mapInPlace(MapFunctor& f){
 template <typename T>
 template <typename MapIndexFunctor>
 void msl::DA<T>::mapIndexInPlace(MapIndexFunctor& f){
-  // upload data first (if necessary)
-  // upload();
-
   // map
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i <ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -492,7 +487,7 @@ msl::DA<T> msl::DA<T>::map(F& f) { //preliminary simplification in order to avoi
   DA<T> result(n);                 // should be: DA<R>
 
   // map
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -520,7 +515,7 @@ msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor& f){
   DA<T> result(n);
 
   // map on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -562,7 +557,7 @@ template <typename T>
 template <typename T2, typename ZipFunctor>
 void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
   // zip on GPU
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -585,7 +580,7 @@ template <typename T>
 template <typename T2, typename ZipIndexFunctor>
 void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -608,7 +603,7 @@ template <typename T2, typename ZipFunctor>
 msl::DA<T> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){   // should have result type DA<R>; debug
   DA<T> result(n);
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -631,7 +626,7 @@ template <typename T2, typename ZipIndexFunctor>
 msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
   DA<T> result(n);
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -655,17 +650,17 @@ template <typename T>
 template <typename FoldFunctor>
 T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   // NH I inserted a download() here in dm.cpp.
-  std::vector<int> blocks(Muesli::num_gpus);
-  std::vector<int> threads(Muesli::num_gpus);
-  T* gpu_results = new T[Muesli::num_gpus];
+  std::vector<int> blocks(ng);
+  std::vector<int> threads(ng);
+  T* gpu_results = new T[ng];
   int maxThreads = 1024;   // preliminary
   int maxBlocks = 1024;    // preliminary
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     threads[i] = maxThreads;
     gpu_results[i] = 0;
   }
   T* local_results = new T[np];
-  T** d_odata = new T*[Muesli::num_gpus];
+  T** d_odata = new T*[ng];
 
   upload();
 
@@ -674,7 +669,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   //
 
   // prearrangement: calculate threads, blocks, etc.; allocate device memory
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     threads[i] = (plans[i].size < maxThreads) ? detail::nextPow2((plans[i].size+1)/2) : maxThreads;
     blocks[i] = plans[i].size / threads[i];
@@ -685,7 +680,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   }
 
   // fold on gpus: step 1
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     detail::reduce<T, FoldFunctor>(plans[i].size, plans[i].d_Data, d_odata[i], threads[i], blocks[i], f, Muesli::streams[i], i);
   }
@@ -698,7 +693,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   msl::syncStreams();
 
   // fold on gpus: step 2
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     if (blocks[i] > 1) {
       cudaSetDevice(i);
       int threads = (detail::nextPow2(blocks[i]) == blocks[i]) ? blocks[i] : detail::nextPow2(blocks[i])/2;
@@ -708,7 +703,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   msl::syncStreams();
 
   // copy final sum from device to host
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     CUDA_CHECK_RETURN(cudaMemcpyAsync(&gpu_results[i],
                                       d_odata[i],
@@ -726,7 +721,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   if (final_fold_on_cpu) {
     // calculate local result for all GPUs and CPU
     T tmp = cpu_result;
-    for (int i = 0; i < Muesli::num_gpus; i++) {
+    for (int i = 0; i < ng; i++) {
       tmp = f(tmp, gpu_results[i]);
     }
 
@@ -741,20 +736,20 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
     final_result = result;
   } else {
     T local_result; T* d_gpu_results;
-    if (Muesli::num_gpus > 1) { // if there is more than 1 GPU
+    if (ng > 1) { // if there is more than 1 GPU
       cudaSetDevice(0);         // calculate local result on device 0
 
       // upload data
-      CUDA_CHECK_RETURN(cudaMalloc((void**)&d_gpu_results, Muesli::num_gpus * sizeof(T)));
+      CUDA_CHECK_RETURN(cudaMalloc((void**)&d_gpu_results, ng * sizeof(T)));
       CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results,
                                         gpu_results,
-                                        Muesli::num_gpus * sizeof(T),
+                                        ng * sizeof(T),
                                         cudaMemcpyHostToDevice,
                                         Muesli::streams[0]));
       CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
 
       // final (local) fold
-      detail::reduce<T, FoldFunctor>(Muesli::num_gpus, d_gpu_results, d_gpu_results, Muesli::num_gpus, 1, f, Muesli::streams[0], 0);
+      detail::reduce<T, FoldFunctor>(ng, d_gpu_results, d_gpu_results, ng, 1, f, Muesli::streams[0], 0);
       CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
 
       // copy result from device to host
@@ -800,7 +795,7 @@ T msl::DA<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   }
 
   // Cleanup
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
     CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
