@@ -63,7 +63,7 @@ namespace msl {
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
           DM<int> a(10,10, 2);
-          //a.show("a1");
+          a.show("a1");
 
           Square sq;
           a.mapInPlace(sq);
@@ -73,11 +73,20 @@ namespace msl {
           a.mapInPlace(mult);
           a.show("a3");
 
+          DM<int> b(10,10, 1);
+          b.show("b1");
+
+          Sum sum;
+          b.zipInPlace(a,sum);
+          b.show("b2");
+
+          DM<int> c = a.zip(b,sum); 
+          c.show("c1");
+
           consti pr;
           a.mapIndexInPlace(pr);
           a.show("a4");
 
-          Sum sum;
           int result = a.fold(sum,true);
           printf("result: %i\n",result);
           a.show("a5");

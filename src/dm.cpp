@@ -58,7 +58,7 @@ msl::DM<T>::DM():                  // distributed array (resides on GPUs until d
 
 // constructor creates a non-initialized DM
 template<typename T>
-msl::DM<T>::DM(int col, int row)
+msl::DM<T>::DM(int row, int col)
     : ncol(col), nrow(row), n(col*row){
   init();
 #ifdef __CUDACC__
@@ -72,7 +72,7 @@ msl::DM<T>::DM(int col, int row)
 
 // constructor creates a DM, initialized with v
 template<typename T>
-msl::DM<T>::DM(int col, int row, const T& v)
+msl::DM<T>::DM(int row, int col, const T& v)
     : ncol(col), nrow(row), n(col*row){
   init();
 #ifdef __CUDACC__
@@ -568,6 +568,102 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
   printf("mapStencil\n");
   throws(detail::NotYetImplementedException());
 }
+
+// ************************************ zip ***************************************
+template <typename T>
+template <typename T2, typename ZipFunctor>
+void msl::DM<T>::zipInPlace(DM<T2>& b, ZipFunctor& f){
+  // zip on GPU
+  for (int i = 0; i < ng; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    auto bplans = b.getExecPlans();
+    detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, bplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+  }
+  // zip on CPU cores
+  T* bPartition = b.getLocalPartition();
+  #pragma omp parallel for
+  for (int i = 0; i < nCPU; i++) {
+    localPartition[i] = f(localPartition[i], bPartition[i]); 
+  }
+  // check for errors during gpu computation
+  msl::syncStreams();
+  cpuMemoryInSync = false;
+}
+
+template <typename T>
+template <typename T2, typename ZipFunctor>
+msl::DM<T> msl::DM<T>::zip(DM<T2>& b, ZipFunctor& f){   // should have result type DA<R>; debug
+  DM<T> result(nrow,ncol);
+  // zip on GPUs
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].size, f);
+  }
+  // zip on CPU cores
+  #pragma omp parallel for
+  for (int i = 0; i < nCPU; i++) {
+    result.setLocal(i, f(localPartition[i], b.getLocal(i)));
+  }
+  // check for errors during gpu computation
+  msl::syncStreams();
+  result.setCpuMemoryInSync(false);
+  return result;
+}
+
+/* taken from DA.cpp but not yet adapted
+template <typename T>
+template <typename T2, typename ZipIndexFunctor>
+void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
+  // zip on GPUs
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].nLocal,
+        plans[i].first, f, false);
+  }
+  // zip on CPU cores
+  #pragma omp parallel for
+  for (int i = 0; i < nCPU; i++) {
+    localPartition[i] = f(i, localPartition[i], b.getLocal(i));
+  }
+  // check for errors during gpu computation
+  msl::syncStreams();
+  cpuMemoryInSync = false;
+}
+
+template <typename T>
+template <typename T2, typename ZipIndexFunctor>
+msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
+  DA<T> result(n);
+  // zip on GPUs
+  for (int i = 0; i < Muesli::num_gpus; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
+        plans[i].first, f, false);
+  }
+  // zip on CPU cores
+  #pragma omp parallel for
+  for (int i = 0; i < nCPU; i++) {
+    result.setLocal(i, f(i, localPartition[i], b.getLocal(i)));
+  }
+  // check for errors during gpu computation
+  msl::syncStreams();
+  result.setCpuMemoryInSync(false);
+  return result;
+}
+*/
+
 // *********** fold *********************************************
 template <typename T>
 template <typename FoldFunctor>
