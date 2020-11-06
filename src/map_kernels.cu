@@ -39,6 +39,18 @@ __global__ void msl::detail::mapKernel(T* in, R* out, size_t size, F func) {
   }
 }
 
+// new kernel for distributed matrices (DM) 
+template <typename T, typename R, typename F>
+__global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t first, F func, int ncols) {
+  size_t k = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = (k + first) / ncols;
+  int j = (k + first) % ncols;
+  if (k < size) {
+    out[k] = func(i,j, in[k]);
+  }
+}
+
+
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t first, F func, bool localIndices) {
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;

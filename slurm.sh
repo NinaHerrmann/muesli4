@@ -4,16 +4,15 @@
 #SBATCH --nodes 2
 #SBATCH --ntasks-per-node 1
 #SBATCH --cpus-per-task 2
-#SBATCH --gres=gpu:4
-# alternativ: 2 auf gpuk20
-#SBATCH --partition gpu2080
-# alternativ: gpuk20
+#SBATCH --gres=gpu:2
+# alternativ: bis zu 4 auf gpu2080
+#SBATCH --partition gpuk20
 #SBATCH --time 00:05:00
 #SBATCH --exclusive
 
-#SBATCH --job-name $1
-#SBATCH --output /scratch/tmp/kuchen/output.txt
-#SBATCH --error /scratch/tmp/kuchen/error.txt
+#SBATCH --job-name dm_test
+#SBATCH --output /scratch/tmp/kuchen/output3.txt
+#SBATCH --error /scratch/tmp/kuchen/error3.txt
 #SBATCH --mail-type ALL
 #SBATCH --mail-user kuchen@uni-muenster.de
 
@@ -33,13 +32,16 @@ export I_MPI_FABRICS=shm:tcp
 
 # mpirun /home/k/kuchen/Muesli4/build/$1 $2 $3
 # parameters: array dim #MPI nodes
-mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
+# mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
 
 # parameters: area size (needs to be quadratic) #MPI nodes
 # mpirun /home/k/kuchen/Muesli4/build/mandelbrotDA 10000 2 
  
 # parameters: #processes (= dim of DA), #throws, #MPI nodes
-# mpirun /home/k/kuchen/Muesli4/build/piDA 1000 1000000 2 
+## mpirun /home/k/kuchen/Muesli4/build/piDA 1000 1000000 2 
+
+# parameters: #processes (= dim of DM), #throws, #MPI nodes
+ mpirun /home/k/kuchen/Muesli4/build/dm_test 32 2
 
 # alternativ: mpirun -np 2 <Datei>
 # alternativ: srun <Datei>

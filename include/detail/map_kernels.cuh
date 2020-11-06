@@ -54,6 +54,15 @@ __global__ void mapIndexKernel(T* in,
                                F func,
                                bool localIndices);
 
+// new kernel for DM, HK 06.11.2020
+template <typename T, typename R, typename F>
+__global__ void mapIndexKernel(T* in,
+                               R* out,
+                               size_t size,
+                               size_t first,
+                               F func,
+                               int ncols);
+
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T* in,
                                R* out,

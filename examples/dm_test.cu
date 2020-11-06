@@ -1,7 +1,8 @@
 /*
- * da_test.cpp
+ * dm_test.cpp
  *
- *      Author: Herbert Kuchen <kuchen@uni-muenster.de>
+ *      Author: Nina Hermann,
+ *  		Herbert Kuchen <kuchen@uni-muenster.de>
  * 
  * -------------------------------------------------------------------------------
  *
@@ -51,8 +52,8 @@ namespace msl {
             MSL_USERFUNC int operator() (int x) const {return x*y;}
         };
 
-        struct consti : public Functor2<int, int, int>{ // public msl::AMapIndexFunctor<int, int>{
-            MSL_USERFUNC int operator()(int i, int Ai) const {return i;}
+        struct consti : public Functor3<int, int, int, int>{ // before: public msl::AMapIndexFunctor<int, int>{
+            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return i*100 + j;}
         };
 
         class Sum : public Functor2<int, int, int>{

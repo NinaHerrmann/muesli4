@@ -43,9 +43,10 @@ set(MUESLI_INCLUDE_DETAIL_INSTALL_DIR ${MUESLI_INCLUDE_INSTALL_DIR}/detail)
 
 ## install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src DESTINATION ${MUESLI_INSTALL_DIR})
 
-set(Example examples/da_test.cu)
+## set(Example examples/da_test.cu)
 ## set(Example examples/mandelbrotDA.cu)
 ## set(Example examples/piDA.cu)
+set(Example examples/dm_test.cu)
 
 ### get name of current example
 get_filename_component(example_name ${Example} NAME_WE)

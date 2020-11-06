@@ -1,5 +1,5 @@
 /*
- * da.cu
+ * dm.cpp
  *
  *      Author: Herbert Kuchen <kuchen@uni-muenster.de>, 
  *              Steffen Ernsting <s.ernsting@uni-muenster.de>,
@@ -44,8 +44,9 @@ msl::DM<T>::DM():                  // distributed array (resides on GPUs until d
       np(0),                       // number of (MPI-) nodes (= Muesli::num_local_procs)
       id(0),                       // id of local node among all nodes (= Muesli::proc_id)
       localPartition(0),           // local partition of the DM
-      cpuMemoryInSync(false),         // is GPU memory in sync with CPU?
+      cpuMemoryInSync(false),      // is GPU memory in sync with CPU?
       firstIndex(0),               // first global index of the DM on the local partition
+      firstRow(0),                 // first golbal row index of the DM on the local partition
       plans(0),                    // GPU execution plans
       dist(Distribution::DIST),    // distribution of DM: DIST (distributed) or COPY (for now: always DIST)
       gpuCopyDistributed(0),       // is GPU copy distributed? (for now: always "false")
@@ -94,14 +95,15 @@ void msl::DM<T>::init() {
   np = Muesli::num_local_procs;
   ng = Muesli::num_gpus;
   n = ncol * nrow;
-  nLocal = n / np;
+  nLocal = n / np; 
   nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
   nCPU = nLocal - nGPU * ng;
-  // TODO right now we are assuming twe split col wise
+  // TODO right now we are assuming to split row wise
   firstIndex = id * nCPU + (nGPU * id * ng);
-  printf("First Index Col %d\n", firstIndex);
+  firstRow = id * nrow / np; // assuming np divides nrow
+  printf("First index %d, first row: %d\n", firstIndex, firstRow);
   // for debugging:
-  //printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
+  printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
 }
 
 
@@ -473,24 +475,23 @@ void msl::DM<T>::mapInPlace(MapFunctor& f){
 template <typename T>
 template <typename MapIndexFunctor>
 void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
-  // upload data first (if necessary)
-  // upload();
-
-  // map
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
     detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, false);
+        plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, ncol);
   }
   // calculate offsets for indices
   // int offset = f.useLocalIndices() ? 0 : firstIndex;
-  int offset = firstIndex;
+  int i; // row index
+  int j; // column index
 
   #pragma omp parallel for
-  for (int i = 0; i < nCPU; i++) {
-    localPartition[i] = f(i+offset, localPartition[i]);
+  for (int k = 0; k < nCPU; k++){
+      i = (k + firstIndex) / ncol;
+      j = (k + firstIndex) % ncol;
+      localPartition[k] = f(i, j, localPartition[k]);
   }
   // check for errors during gpu computation
   msl::syncStreams();
@@ -500,7 +501,7 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
 template <typename T>
 template <typename F>
 msl::DM<T> msl::DM<T>::map(F& f) { //preliminary simplification in order to avoid type error
-  DM<T> result(n);                 // should be: DA<R>
+  DM<T> result(n);                 // should be: DM<R>
 
   // map
   for (int i = 0; i < Muesli::num_gpus; i++) {

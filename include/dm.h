@@ -627,6 +627,8 @@ private:
   int nLocal;
   // first (global) index of local partition
   int firstIndex;
+  // first (global) row in local partition
+  int firstRow;
   // total number of MPI processes
   int np;
   // tells, whether data is up to date in main (cpu) memory; true := up-to-date, false := newer data on GPU
