@@ -620,7 +620,7 @@ template <typename T>
 template <typename T2, typename ZipIndexFunctor>
 void msl::DM<T>::zipIndexInPlace(DM<T2>& b, ZipIndexFunctor& f){
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -642,31 +642,33 @@ void msl::DM<T>::zipIndexInPlace(DM<T2>& b, ZipIndexFunctor& f){
   cpuMemoryInSync = false;
 }
 
-/* taken from DA.cpp but not yet adapted
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
-msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
-  DA<T> result(n);
+msl::DM<T> msl::DM<T>::zipIndex(DM<T2>& b, ZipIndexFunctor& f){
+  DM<T> result(nrow,ncol);
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
     detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
         plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
-        plans[i].first, f, false);
+        plans[i].first, f, ncol);
   }
   // zip on CPU cores
+  int i; // row index
+  int j; // column index
   #pragma omp parallel for
-  for (int i = 0; i < nCPU; i++) {
-    result.setLocal(i, f(i, localPartition[i], b.getLocal(i)));
+  for (int k = 0; k < nCPU; k++){
+      i = (k + firstIndex) / ncol;
+      j = (k + firstIndex) % ncol;
+      result.setLocal(k, f(i, j, localPartition[k], b.getLocal(k)));
   }
   // check for errors during gpu computation
   msl::syncStreams();
   result.setCpuMemoryInSync(false);
   return result;
 }
-*/
 
 // *********** fold *********************************************
 template <typename T>

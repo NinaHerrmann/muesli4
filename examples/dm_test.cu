@@ -92,6 +92,9 @@ namespace msl {
           c.zipIndexInPlace(b,sum4); 
           c.show("c2");
 
+          DM<int> d = a.zipIndex(b,sum4); 
+          c.show("d1");
+
           consti pr;
           a.mapIndexInPlace(pr);
           a.show("a4");
