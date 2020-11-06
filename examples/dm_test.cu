@@ -60,6 +60,11 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
         };
 
+        class Sum3 : public Functor3<int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int i, int j, int x) const {return i+j+x;}
+        };
+
+
         class Sum4 : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
         };
@@ -98,6 +103,10 @@ namespace msl {
           consti pr;
           a.mapIndexInPlace(pr);
           a.show("a4");
+
+          Sum3 sum3;
+          DM<int> e = a.mapIndex(sum3);
+          a.show("e1");
 
           int result = a.fold(sum,true);
           printf("result: %i\n",result);

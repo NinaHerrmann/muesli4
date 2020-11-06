@@ -528,7 +528,7 @@ msl::DM<T> msl::DM<T>::map(F& f) { //preliminary simplification in order to avoi
 template <typename T>
 template <typename MapIndexFunctor>
 msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor& f){
-  DM<T> result(n);
+  DM<T> result(nrow,ncol);
 
   // map on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -537,13 +537,19 @@ msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor& f){
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
     detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
               plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
-              plans[i].first, f, false);
+              plans[i].first, f, ncol);
   }
   // map on CPU cores
+  int i; // row index
+  int j; // column index
+
   #pragma omp parallel for
-  for (int i = 0; i < nCPU; i++) {
-    result.setLocal(i, f(i, localPartition[i]));
+  for (int k = 0; k < nCPU; k++){
+      i = (k + firstIndex) / ncol;
+      j = (k + firstIndex) % ncol;
+      result.setLocal(k, f(i, j, localPartition[k]));
   }
+
   // check for errors during gpu computation
   msl::syncStreams();
   result.setCpuMemoryInSync(false);
