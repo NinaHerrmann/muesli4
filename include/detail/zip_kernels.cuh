@@ -46,6 +46,17 @@ zipKernel(T1* in1,
 		  size_t n,
 		  FCT2 func);
 
+// new kernel for DM
+template<typename T1, typename T2, typename R, typename FCT3>
+__global__ void
+zipIndexKernel(T1* in1,
+		  	   T2* in2,
+		  	   R* out,
+		  	   size_t n,
+		  	   int first,
+		  	   FCT3 func,
+		  	   int ncols);
+
 template<typename T1, typename T2, typename R, typename FCT3>
 __global__ void
 zipIndexKernel(T1* in1,

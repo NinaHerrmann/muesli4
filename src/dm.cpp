@@ -482,8 +482,7 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
     detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
         plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, ncol);
   }
-  // calculate offsets for indices
-  // int offset = f.useLocalIndices() ? 0 : firstIndex;
+
   int i; // row index
   int j; // column index
 
@@ -616,10 +615,10 @@ msl::DM<T> msl::DM<T>::zip(DM<T2>& b, ZipFunctor& f){   // should have result ty
   return result;
 }
 
-/* taken from DA.cpp but not yet adapted
+
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
-void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
+void msl::DM<T>::zipIndexInPlace(DM<T2>& b, ZipIndexFunctor& f){
   // zip on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
@@ -627,18 +626,23 @@ void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
     detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
         plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].nLocal,
-        plans[i].first, f, false);
+        plans[i].first, f, ncol);
   }
   // zip on CPU cores
+  int i; // row index
+  int j; // column index
   #pragma omp parallel for
-  for (int i = 0; i < nCPU; i++) {
-    localPartition[i] = f(i, localPartition[i], b.getLocal(i));
+  for (int k = 0; k < nCPU; k++){
+      i = (k + firstIndex) / ncol;
+      j = (k + firstIndex) % ncol;
+      localPartition[k] = f(i, j, localPartition[k], b.getLocal(k));
   }
   // check for errors during gpu computation
   msl::syncStreams();
   cpuMemoryInSync = false;
 }
 
+/* taken from DA.cpp but not yet adapted
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
 msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){

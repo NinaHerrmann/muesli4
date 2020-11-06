@@ -31,45 +31,35 @@
  */
 
 template <typename T1, typename T2, typename R, typename FCT2>
-__global__ void msl::detail::zipKernel(T1* in1,
-									   T2* in2,
-									   R* out,
-									   size_t n,
-									   FCT2 func)
-{
+__global__ void msl::detail::zipKernel(T1* in1, T2* in2, R* out, size_t n, FCT2 func){
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-
   if (x < n) {
     out[x] = func(in1[x], in2[x]);
   }
 }
 
+// new kernel for DM, HK 06.11.2020
 template <typename T1, typename T2, typename R, typename FCT3>
-__global__ void msl::detail::zipIndexKernel(T1* in1,
-											T2* in2,
-											R* out,
-											size_t n,
-											int first,
-											FCT3 func,
-											bool localIndices)
-{
+__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,size_t n,int first,FCT3 func,int ncols){
+  size_t k = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = (k + first) / ncols;
+  int j = (k + first) % ncols;
+  if (k < n) {
+    out[k] = func(i,j, in1[k], in2[k]);
+  }
+}
+
+template <typename T1, typename T2, typename R, typename FCT3>
+__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,size_t n,int first,FCT3 func,bool localIndices){
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-
   int offset = localIndices ? 0 : first;
-
   if (x < n) {
     out[x] = func(x + offset, in1[x], in2[x]);
   }
 }
 
 template <typename T1, typename T2, typename R, typename FCT4>
-__global__ void msl::detail::zipIndexKernel(T1* in1,
-		                              	    T2* in2,
-		                              	    R* out,
-		                              	    GPUExecutionPlan<T1> plan,
-		                              	    FCT4 func,
-		                              	    bool localIndices)
-{
+__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,GPUExecutionPlan<T1> plan,FCT4 func,bool localIndices){
   size_t y = blockIdx.y * blockDim.y + threadIdx.y;
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
 

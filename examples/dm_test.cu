@@ -60,6 +60,11 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
         };
 
+        class Sum4 : public Functor4<int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
+        };
+
+
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
           DM<int> a(10,10, 2);
@@ -82,6 +87,10 @@ namespace msl {
 
           DM<int> c = a.zip(b,sum); 
           c.show("c1");
+
+          Sum4 sum4;
+          c.zipIndexInPlace(b,sum4); 
+          c.show("c2");
 
           consti pr;
           a.mapIndexInPlace(pr);
