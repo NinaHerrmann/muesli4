@@ -107,7 +107,7 @@ void msl::terminateSkeletons()
   std::ostringstream s_time;
 
   MPI_Barrier(MPI_COMM_WORLD);
-  printf("debug: terminating skeletons\n);
+  printf("debug: terminating skeletons\n");
 
   if (Muesli::use_timer) {
     double total_time = timer->totalTime();
