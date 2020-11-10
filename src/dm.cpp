@@ -92,13 +92,13 @@ void msl::DM<T>::init() {
   if (Muesli::proc_entrance == UNDEFINED) {
     throws(detail::MissingInitializationException());}
   id = Muesli::proc_id;
-  np = Muesli::num_local_procs;
+  np = Muesli::num_total_procs;
   ng = Muesli::num_gpus;
   n = ncol * nrow;
   nLocal = n / np; 
   nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
   nCPU = nLocal - nGPU * ng;
-  // TODO right now we are assuming to split row wise
+  // TODO: Instead of splitting rowwise Split n rows for each node and m columns depending on cpu fraction.
   firstIndex = id * nCPU + (nGPU * id * ng);
   firstRow = id * nrow / np; // assuming np divides nrow
   printf("First index %d, first row: %d\n", firstIndex, firstRow);
@@ -267,6 +267,15 @@ GPUExecutionPlan<T>* msl::DM<T>::getExecPlans(){
   //std::vector<GPUExecutionPlan<T> > ret(plans, plans + Muesli::num_gpus);
   return plans;
 }
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+  if (code != cudaSuccess)
+  {
+    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if (abort) exit(code);
+  }
+}
 
 template<typename T>
 void msl::DM<T>::upload() {
@@ -281,7 +290,7 @@ void msl::DM<T>::upload() {
                         cudaMemcpyHostToDevice, Muesli::streams[i]));
     }
     cpuMemoryInSync = true;
-  } 
+  }
 #endif
   return;
 }
@@ -337,7 +346,7 @@ void msl::DM<T>::show(const std::string& descr) {
   std::ostringstream s;
   if (descr.size() > 0)
     s << descr << ": " << std::endl;
-  if (!cpuMemoryInSync) {  
+  if (!cpuMemoryInSync) {
     download();
   }
   msl::allgather(localPartition, b, nLocal);
@@ -356,7 +365,6 @@ void msl::DM<T>::show(const std::string& descr) {
 
   if (msl::isRootProcess()) printf("%s", s.str().c_str());
 }
-
 
 // SKELETONS / COMMUNICATION / BROADCAST PARTITION
 

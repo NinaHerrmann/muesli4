@@ -44,9 +44,10 @@ public: MSL_USERFUNC int operator() (int x) const {return x*x;}
 
 class Add : public Functor<int, int> {
 private: int y;
-public: 
+public:
 Add(int value):
   y(value){};
+
 
 MSL_USERFUNC int operator() (int x) const {return x+y;}
 };
@@ -129,6 +130,8 @@ void da_test(int dim) {
 
 int main(int argc, char** argv){
   using namespace msl::test;
+  msl::Muesli::num_total_procs = 2;
+
   msl::initSkeletons(argc, argv);
   msl::setNumRuns(1);
   msl::setNumGpus(atoi(argv[2]));

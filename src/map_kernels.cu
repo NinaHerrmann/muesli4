@@ -105,4 +105,9 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
 //  }
 //  __syncthreads();
 //}
-
+template <typename T>
+__global__ void msl::detail::ninaprint(T* A)
+{
+  int i = threadIdx.x;
+  printf("i:%d; A[%d]\n", i, A[i]);
+}

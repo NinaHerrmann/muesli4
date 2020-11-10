@@ -285,7 +285,6 @@ operator<<(std::ostream& os, const Exception& e)
 
   return os;
 }
-
-}
+    }
 
 }
