@@ -644,8 +644,9 @@ private:
   // number of elements per GPU (all the same!)                   
   int nGPU;  
   // number of elements on CPU                 
-  int nCPU;                    
-
+  int nCPU;
+  // firstIndex caclulated by GPU
+  int indexGPU;
   
 
   //

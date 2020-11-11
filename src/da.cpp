@@ -91,7 +91,7 @@ void msl::DA<T>::init() {
   nCPU = nLocal - nGPU * ng;
   firstIndex = id * nLocal;
   // for debugging:
-  // printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
+  printf("id: %i, n: %i, ng: %i, nLocal: %i, nGPU: %i, nCPU: %i, firstIndex: %i\n", id, n, ng, nLocal, nGPU, nCPU, firstIndex);
 }
 
 // auxiliary method initGPUs

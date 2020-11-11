@@ -53,7 +53,7 @@ namespace msl {
         };
 
         struct consti : public Functor3<int, int, int, int>{ // before: public msl::AMapIndexFunctor<int, int>{
-            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return i*100 + j;}
+            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * 10) + j;}
         };
 
         class Sum : public Functor2<int, int, int>{
@@ -73,34 +73,35 @@ namespace msl {
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
           DM<int> a(10,10, 2);
+          //DM<int> b(10,10, 1);
+          Sum sum;
           a.show("a1");
 
-          Square sq;
-          a.mapInPlace(sq);
-          a.show("a2");
-
-          Mult mult(3);
-          a.mapInPlace(mult);
-          a.show("a3");
-
-          DM<int> b(10,10, 1);
-          b.show("b1");
-
-          Sum sum;
-          b.zipInPlace(a,sum);
-          b.show("b2");
-
-          DM<int> c = a.zip(b,sum); 
-          c.show("c1");
-
-          Sum4 sum4;
-          c.zipIndexInPlace(b,sum4); 
-          c.show("c2");
-
-          DM<int> d = a.zipIndex(b,sum4); 
-          c.show("d1");
-
           consti pr;
+          a.mapIndexInPlace(pr);
+          a.show("a4");
+
+          //Mult mult(3);
+          //a.mapInPlace(mult);
+          //a.show("a3");
+
+          //b.show("b1");
+
+          //b.zipInPlace(a,sum);
+          //b.show("b2");
+
+          //DM<int> c = a.zip(b,sum);
+          //c.show("c1");
+
+          /*Sum4 sum4;
+          c.zipIndexInPlace(b,sum4); 
+          c.show("c2");*/
+
+          //c.showLocal("c2");
+          /*DM<int> d = a.zipIndex(b,sum4);
+          c.show("d1");*/
+
+          /*consti pr;
           a.mapIndexInPlace(pr);
           a.show("a4");
 
@@ -110,7 +111,7 @@ namespace msl {
 
           int result = a.fold(sum,true);
           printf("result: %i\n",result);
-          a.show("a5");
+          a.show("a5");*/
 
           return;
         }
@@ -118,9 +119,11 @@ namespace msl {
 
 int main(int argc, char** argv){
   //printf("Starting Main...\n");
-  msl::initSkeletons(argc, argv);
   msl::setNumRuns(1);
-  msl::setNumGpus(atoi(argv[2]));
+  msl::setNumGpus(2);
+  msl::initSkeletons(argc, argv);
+  printf("Starting Program %c with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
+         msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
   msl::test::dm_test(16);
   msl::terminateSkeletons();
   return EXIT_SUCCESS;
