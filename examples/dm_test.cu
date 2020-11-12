@@ -81,6 +81,8 @@ namespace msl {
           a.mapIndexInPlace(pr);
           a.show("a4");
 
+          int result = a.fold(sum,true);
+          printf("result: %i\n",result);
           //Mult mult(3);
           //a.mapInPlace(mult);
           //a.show("a3");
@@ -123,7 +125,7 @@ int main(int argc, char** argv){
   msl::setNumGpus(2);
   msl::initSkeletons(argc, argv);
   printf("Starting Program %c with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
-         msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
+  msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
   msl::test::dm_test(16);
   msl::terminateSkeletons();
   return EXIT_SUCCESS;

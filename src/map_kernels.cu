@@ -41,13 +41,17 @@ __global__ void msl::detail::mapKernel(T* in, R* out, size_t size, F func) {
 
 // new kernel for distributed matrices (DM) 
 template <typename T, typename R, typename F>
-__global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t first, F func, int ncols) {
+__global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t first,
+                                            F func, int colGPU, int firstCol, int firstRow) {
   size_t k = blockIdx.x * blockDim.x + threadIdx.x;
-  int i = (k + first) / ncols;
-  int j = (k + first) % ncols;
+  // Colum Index
+  int j = (k) % colGPU + firstCol;
+  // RowIndex
+  int i = firstRow + (k) / colGPU;
   if (k < size) {
-    out[k] = func(i,j, in[k]);
+    out[k] = func(i, j, in[k]);
   }
+
 }
 
 
@@ -106,7 +110,7 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
 //  __syncthreads();
 //}
 template <typename T>
-__global__ void msl::detail::ninaprint(T* A)
+__global__ void msl::detail::printFromGPU(T* A)
 {
   int i = threadIdx.x;
   printf("i:%d; A[%d]\n", i, A[i]);

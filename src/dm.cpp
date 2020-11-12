@@ -129,7 +129,7 @@ void msl::DM<T>::initGPUs() {
     plans[i].size = nGPU;
     plans[i].nLocal = plans[i].size;
     plans[i].bytes = plans[i].size * sizeof(T);
-    plans[i].first = gpubase + firstIndex;
+    plans[i].first = nCPU + (nGPU * i) + firstIndex;
     plans[i].firstCol = gpuCol;
     plans[i].firstRow = gpuBaseRow;
     plans[i].h_Data = localPartition + gpuCol;
@@ -303,13 +303,14 @@ void msl::DM<T>::upload() {
       // Foreach row copy data to the suitable host data
       int rowshandle = nrow / np;
       int byteshandle = plans[i].bytes / rowshandle;
-
+      int rowoffset = 0;
+      int gpucolumns = (ncol * (1-Muesli::cpu_fraction) ) / ng;
       for (int j = 0; j < rowshandle; j++) {
-        int rowoffset = (j*n/nrow) + i * ((ncol * (1 - Muesli::cpu_fraction))/ng);
         CUDA_CHECK_RETURN(
-            cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data+rowoffset, byteshandle,
+            cudaMemcpyAsync(plans[i].d_Data + (j*gpucolumns), plans[i].h_Data+rowoffset, byteshandle,
                             cudaMemcpyHostToDevice, Muesli::streams[i]));
 
+        rowoffset += (n/nrow);
       }
     }
     cpuMemoryInSync = true;
@@ -326,13 +327,14 @@ void msl::DM<T>::download() {
       cudaSetDevice(i);
       int rowshandle = nrow / np;
       int byteshandle = plans[i].bytes / rowshandle;
+      int rowoffset = 0;
+      int gpucolumns = (ncol * (1-Muesli::cpu_fraction) ) / ng;
       for (int j = 0; j < rowshandle; j++) {
-        int rowoffset = (j*n/nrow) ;
-        printf("Write to %d\n", rowoffset);
         // download data from device
         CUDA_CHECK_RETURN(
-            cudaMemcpyAsync(plans[i].h_Data+rowoffset, plans[i].d_Data, byteshandle,
+            cudaMemcpyAsync(plans[i].h_Data+rowoffset, plans[i].d_Data + (j*gpucolumns), byteshandle,
                             cudaMemcpyDeviceToHost, Muesli::streams[i]));
+        rowoffset += (n/nrow);
       }
 
     }
@@ -517,25 +519,31 @@ void msl::DM<T>::mapInPlace(MapFunctor& f){
 template <typename T>
 template <typename MapIndexFunctor>
 void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
+
+  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;
   for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
     detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, ncol);
+        plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, colGPU, plans[i].firstCol, plans[i].firstRow);
   }
+
 
   int i; // row index
   int j; // column index
-  #pragma omp parallel for
+  // TODO: undefined behaviour when sufficient big number of threads is set
+  // all necessary calculations are performed otherwise some are skipped.
+  #pragma omp parallel for num_threads(n)
   for (int k = 0; k < nCPU; k++){
       j = (k + firstIndex) / ncol;
       i = (k + firstIndex) % ncol;
       localPartition[(i * n / nrow) + j] = f(i, j, localPartition[(i * n / nrow) + j]);
   }
-
+  #pragma omp barrier
   // check for errors during gpu computation
   msl::syncStreams();
+
   cpuMemoryInSync = false;
 }
 

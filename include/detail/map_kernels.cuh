@@ -61,7 +61,9 @@ __global__ void mapIndexKernel(T* in,
                                size_t size,
                                size_t first,
                                F func,
-                               int ncols);
+                               int colGPU,
+                               int firstCol,
+                               int firstRow);
 
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T* in,
@@ -71,7 +73,7 @@ __global__ void mapIndexKernel(T* in,
                                bool localIndices);
 
 template <typename T>
-__global__ void ninaprint(T* A);
+__global__ void printFromGPU(T* A);
 //template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,
 //                                 R* out,
