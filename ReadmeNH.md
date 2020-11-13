@@ -1,11 +1,13 @@
 # Building example(s)
 
-===================
+____________________________________
+
 ./build.sh
 
 Running new examples for testing Distributed Matrices (DM)
 using MPI, OpenMP and CUDA.
-============================================================0======================
+__________________________________________________________
+
 sbatch slurm.sh  (includes build)
 new example(s): dm_test.cu  (in directory examples)
 
@@ -16,31 +18,36 @@ NH, 03.08.2020
 
 The skeletons need to be updated to a new distribution for the datastructure to be efficient. To see the proposed distribution look at the .pdf file in this repository called Dm_distribution.pdf. 
 
-Currently running:
+### Currently running:
 * mapIndexInPlace
-
-Test:
-* Map (should be fine since it does not require indices)
 * mapIndex -> requires adjustments since new Index calculation is required
 * MapInPlace -> CPU adjustments GPU should be fine due to download() and upload() implementation
+* fold
 
-Next:
-* MapVariants
-* MapStencil for Endis Masterthesis
-* Fold -> Fix
+### Test:
+* map
+* mapFold
 
-inefficiently implemented, but working:
+### Next:
+* mapStencil for Endis Masterthesis
+* zip and all Variants
+
+
+### inefficiently implemented, but working:
 * getLocal()
 * setLocal()
 
-still causing problems:
+### still causing problems:
 * lambda as parameter of a skeleton (if __device__ __host__)
 * mapIndexInPlace with object rather than struct as parameter
 * map
 
-rest not yet tested
-* zip and all Variants
+### rest not yet tested
+
 * broadcastPartition
 * permutePartition (even with lambda as argument)
+
+### Might require checks in DA:
+*   `#pragma omp parallel for` had undefined behaviour fixed by defining number of threads to be started (`num_threads(nCPU)`)
 
 NH, 12.11.2020

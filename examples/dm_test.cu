@@ -40,7 +40,12 @@ namespace msl {
     namespace test {
 
         class Square : public Functor<int, int> {
-        public: MSL_USERFUNC int operator() (int x) const {return x*x;}
+        private: int y;
+        public:
+            Square(int i):
+                 y(i){}
+
+            MSL_USERFUNC int operator() () const {return y*y;}
         };
 
         class Mult : public Functor<int, int> {
@@ -52,7 +57,7 @@ namespace msl {
             MSL_USERFUNC int operator() (int x) const {return x*y;}
         };
 
-        struct consti : public Functor3<int, int, int, int>{ // before: public msl::AMapIndexFunctor<int, int>{
+        struct Produkt : public Functor3<int, int, int, int>{ // before: public msl::AMapIndexFunctor<int, int>{
             MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * 10) + j;}
         };
 
@@ -73,47 +78,32 @@ namespace msl {
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
           DM<int> a(10,10, 2);
-          //DM<int> b(10,10, 1);
+          DM<int> b(10,10, 1);
           Sum sum;
           a.show("a1");
 
-          consti pr;
+          Produkt pr;
           a.mapIndexInPlace(pr);
           a.show("a4");
 
           int result = a.fold(sum,true);
           printf("result: %i\n",result);
-          //Mult mult(3);
-          //a.mapInPlace(mult);
-          //a.show("a3");
 
-          //b.show("b1");
+          b.zipInPlace(a,sum);
+          b.show("b2");
 
-          //b.zipInPlace(a,sum);
-          //b.show("b2");
+          DM<int> c = a.zip(b,sum);
+          c.show("c1");
 
-          //DM<int> c = a.zip(b,sum);
-          //c.show("c1");
+          Sum4 sum4;
+          c.zipIndexInPlace(b,sum4);
+          c.show("c2");
+          DM<int> d = a.zipIndex(b,sum4);
+          c.show("d1");
 
-          /*Sum4 sum4;
-          c.zipIndexInPlace(b,sum4); 
-          c.show("c2");*/
-
-          //c.showLocal("c2");
-          /*DM<int> d = a.zipIndex(b,sum4);
-          c.show("d1");*/
-
-          /*consti pr;
-          a.mapIndexInPlace(pr);
-          a.show("a4");
-
-          Sum3 sum3;
-          DM<int> e = a.mapIndex(sum3);
-          a.show("e1");
-
-          int result = a.fold(sum,true);
-          printf("result: %i\n",result);
-          a.show("a5");*/
+          Mult mult(3);
+          a.mapInPlace(mult);
+          a.show("a3");
 
           return;
         }

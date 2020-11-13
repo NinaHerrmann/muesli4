@@ -82,6 +82,7 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
   }
 }
 
+
 //template <typename T, typename R, typename F>
 //__global__ void msl::detail::mapStencilKernel(T* in, R* out,  GPUExecutionPlan<T> plan, PLArray<T>* input, F func, int tile_width)
 //{
@@ -113,5 +114,5 @@ template <typename T>
 __global__ void msl::detail::printFromGPU(T* A)
 {
   int i = threadIdx.x;
-  printf("i:%d; A[%d]\n", i, A[i]);
+  printf("i:%d; A[%d];", i, A[i]);
 }

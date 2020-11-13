@@ -302,7 +302,6 @@ void msl::detail::reduce(uint size, T* d_idata, T* d_odata, int threads,
   // worth of shared memory so that we don't index shared memory out of bounds
   int smemSize =
       (threads <= 32) ? 2 * threads * sizeof(T) : threads * sizeof(T);
-
   if (isPow2(size)) {
     switch (threads) {
       case 1024:
