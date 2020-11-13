@@ -23,6 +23,7 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 * mapIndex -> requires adjustments since new Index calculation is required
 * MapInPlace -> CPU adjustments GPU should be fine due to download() and upload() implementation
 * fold
+* zip, zipIndex, zipIndexInPlace, zipInPlace
 
 ### Test:
 * map
@@ -30,7 +31,6 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 
 ### Next:
 * mapStencil for Endis Masterthesis
-* zip and all Variants
 
 
 ### inefficiently implemented, but working:
