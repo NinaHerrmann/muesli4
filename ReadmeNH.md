@@ -26,7 +26,6 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 * zip, zipIndex, zipIndexInPlace, zipInPlace
 
 ### Test:
-* map
 * mapFold
 
 ### Next:
@@ -42,12 +41,9 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 * mapIndexInPlace with object rather than struct as parameter
 * map
 
-### rest not yet tested
-
+### rest not yet implemented
 * broadcastPartition
 * permutePartition (even with lambda as argument)
 
-### Might require checks in DA:
-*   `#pragma omp parallel for` had undefined behaviour fixed by defining number of threads to be started (`num_threads(nCPU)`)
 
-NH, 12.11.2020
+NH, 17.11.2020
