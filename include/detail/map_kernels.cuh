@@ -61,9 +61,7 @@ __global__ void mapIndexKernel(T* in,
                                size_t size,
                                size_t first,
                                F func,
-                               int colGPU,
-                               int firstCol,
-                               int firstRow);
+                               int ncols);
 
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T* in,
