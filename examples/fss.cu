@@ -242,9 +242,9 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
   conf->init(fitness_function, dimensions);
 
   // **** create data structures and variables  *****************
-  DMatrix<double> fishes(number_of_fishes, dimensions);
+  DM<double> fishes(number_of_fishes, dimensions);
 
-  DMatrix<double> best_fishes(number_of_fishes, dimensions);
+  DM<double> best_fishes(number_of_fishes, dimensions);
 
   // initial value for minimization problem
   double best_fitness = std::numericLimits<double>::max(); 
@@ -323,7 +323,7 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
     candidate_fitness = candidate_fishes.foldRows(calc_fitness);
 
     CopyCandidates copy_candidates;
-    fishes.zipInPlace4(fitness,candidate_fitness,
+    fishes.zipInPlaceAAM(fitness,candidate_fitness,
                        candidate_fishes,copy_candidates);
     fitness = fishes.foldRows(calc_fitness);
 
@@ -334,7 +334,7 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
 /////////////////////////////////////////////////////////////////////////////////
 // feeding; required for volitive movement
     CalcFitnessVariation calc_fitness_variation;
-    fitness_variation.zipInPlace4(fitness,last_fitness,calc_fitness_variation);
+    fitness_variation.zipInPlaceAA(fitness,last_fitness,calc_fitness_variation);
 
     MaxArray calc_max_fitness_variation;
     double max_fitness_variation = fitness_variation.fold(
@@ -350,7 +350,7 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
     double sum_fitness_variation = fitness_variation.fold(sum_array_functor,true);
     
     CalcDisplacement calc_displacement_functor;
-    displacement.zipInPlace3(fishes,fishes_last_iteration,calc_displacement);
+    displacement.zipInPlaceMM(fishes,fishes_last_iteration,calc_displacement);
 
     CalcDisplacementFitnessVector calc_displacement_fitness_vector;
     displacement.zipInPlace(fitness_variation,calc_displacement_fitness_vector);  // delta x * delta f
@@ -371,7 +371,7 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
     double sum_weight = weight.fold(sum_array_functor, true);
     
     CalcWeightedFishes calc_weighted_fishes;
-    weighted_fishes.zipInPlace3(fishes, weight,calc_weighted_fishes);
+    weighted_fishes.zipInPlaceAA(fishes, weight,calc_weighted_fishes);
 
     barycenter = weighted_fishes.foldCols(sum_matrix_functor);
 
@@ -386,7 +386,7 @@ double fss(size_t number_of_fishes, size_t dimensions, size_t iterations,
       conf->getStepSizeVolitiveInitial(), conf->getStepSizeVolitiveFinal(),
       iterations, number_of_fishes);
     volitive_movement.nextIteration(sum_weight);
-    fishes.zipInPlace(barycneter_copy, distances_fishes_barycenter,volitive_movement);
+    fishes.zipInPlace(barycenter_copy, distances_fishes_barycenter,volitive_movement);
   }  // end of fss iteration loop
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
