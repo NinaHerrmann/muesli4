@@ -381,7 +381,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipFunctor>
-  msl::DA<R> zip(DA<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug!
+  msl::DA<T> zip(DA<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug!
 
   /**
    * \brief Non-inplace variant of the zipIndex skeleton.
@@ -393,7 +393,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipIndexFunctor>
-  msl::DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f);  // should be return type DA<R>; debug!
+  msl::DA<T> zipIndex(DA<T2>& b, ZipIndexFunctor& f);  // should be return type DA<R>; debug!
 
   /**
     * \brief Replaces each element a[i] of the distributed array by f(a[i], b[i], c[i])

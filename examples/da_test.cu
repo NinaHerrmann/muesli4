@@ -119,6 +119,9 @@ void da_test(int dim) {
   DA<int> e = a.zipIndex(c,sum3); //simplified! type error with non-simplified version (see da.cpp)
   e.show("e1");
 
+  a.zipInPlace2(b,c,sum3);
+  a.show("a10"); 
+
 //  int localArray[dim];
 //  for (int i=0; i<dim; i++) localArray[i] = i;
 //  DA<int> g(dim, localArray);  // not yet implemented

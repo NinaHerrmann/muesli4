@@ -44,7 +44,7 @@ template <typename T1, typename T2, typename T3, typename R, typename FCT3>
 __global__ void msl::detail::zipKernel(T1* in1, T2* in2, T3* in3, R* out, size_t n, FCT3 func){
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
   if (x < n) {
-    out[x] = func(in1[x], in2[x], in3[i]);
+    out[x] = func(in1[x], in2[x], in3[x]);
   }
 }
 

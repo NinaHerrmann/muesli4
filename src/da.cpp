@@ -562,9 +562,9 @@ msl::DA<R> msl::DA<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
 // ************************************ zip ***************************************
 template <typename T>
 template <typename T2, typename ZipFunctor>
-void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
+void msl::DA<T>::zipInPlace(msl::DA<T2>& b, ZipFunctor& f){
   // zip on GPU
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -585,7 +585,7 @@ void msl::DA<T>::zipInPlace(DA<T2>& b, ZipFunctor& f){
 
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
-void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
+void msl::DA<T>::zipIndexInPlace(msl::DA<T2>& b, ZipIndexFunctor& f){
   // zip on GPUs
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
@@ -608,10 +608,10 @@ void msl::DA<T>::zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f){
 
 template <typename T>
 template <typename T2, typename ZipFunctor>
-msl::DA<T> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){   // should have result type DA<R>; debug
-  DA<T> result(n);
+msl::DA<T> msl::DA<T>::zip(msl::DA<T2>& b, ZipFunctor& f){   // should have result type DA<R>; debug type error!
+  msl::DA<T> result(n);
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -632,10 +632,10 @@ msl::DA<T> msl::DA<T>::zip(DA<T2>& b, ZipFunctor& f){   // should have result ty
 
 template <typename T>
 template <typename T2, typename ZipIndexFunctor>
-msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
-  DA<T> result(n);
+msl::DA<T> msl::DA<T>::zipIndex(msl::DA<T2>& b, ZipIndexFunctor& f){  // should be return type DA<R>; debug type error!
+  msl::DA<T> result(n);
   // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+  for (int i =0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
     dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
@@ -657,7 +657,7 @@ msl::DA<T> msl::DA<T>::zipIndex(DA<T2>& b, ZipIndexFunctor& f){
 
 template <typename T>
 template <typename T2, typename T3, typename ZipFunctor>
-void msl::DA<T>::zipInPlace2(DA<T2>& b, DA<T3>& c, ZipFunctor& f){
+void msl::DA<T>::zipInPlace2(DA<T2>& b, DA<T3>& c, ZipFunctor& f){  // should be return type DA<R>; debug type error!
   // zip on GPU
   for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
