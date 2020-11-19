@@ -1,13 +1,14 @@
 /*
  * zip_kernels.cu
  *
- *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *      Authors: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *               Herbert Kuchen <kuchen@uni-muenster.de.
  * 
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2014 Steffen Ernsting <s.ernsting@uni-muenster.de>,
+ * Copyright 2020 Steffen Ernsting <s.ernsting@uni-muenster.de>,
  *                Herbert Kuchen <kuchen@uni-muenster.de.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,6 +38,16 @@ __global__ void msl::detail::zipKernel(T1* in1, T2* in2, R* out, size_t n, FCT2 
     out[x] = func(in1[x], in2[x]);
   }
 }
+
+// new kernel for zipInPlace2, HK 19.11.2020
+template <typename T1, typename T2, typename T3, typename R, typename FCT3>
+__global__ void msl::detail::zipKernel(T1* in1, T2* in2, T3* in3, R* out, size_t n, FCT3 func){
+  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+  if (x < n) {
+    out[x] = func(in1[x], in2[x], in3[i]);
+  }
+}
+
 
 // new kernel for DM, HK 06.11.2020
 template <typename T1, typename T2, typename R, typename FCT3>
