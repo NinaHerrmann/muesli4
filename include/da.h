@@ -308,15 +308,6 @@ public:
   template <typename F>
   void mapIndexInPlace(const msl::Fct2<int, T, T, F>& f);
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor. Also note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapIndexInPlace(T(*f)(int, T));
-
   // SKELETONS / COMPUTATION / MAP
   /**
    * \brief Non-inplace variant of the map skeleton.
@@ -330,15 +321,6 @@ public:
   template <typename R, typename F>
   msl::DA<R> map(const msl::Fct1<T, R, F>& f);
 
-  /**
-   * \brief Non-inplace variant of the map skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map function.
-   * @tparam R Return type.
-   */
-  template <typename R>
-  msl::DA<R> map(R(*f)(T));
 
   // SKELETONS / COMPUTATION / MAP / INDEX
   /**
@@ -351,7 +333,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename R, typename F>
-  DA<R> mapIndex(const msl::Fct2<int, T, R, F>& f);
+  msl::DA<R> mapIndex(const msl::Fct2<int, T, R, F>& f);
 
   /**
    * \brief Non-inplace variant of the mapIndex skeleton.
@@ -362,31 +344,29 @@ public:
    * @return The newly created distributed array.
    */
   template <typename R>
-  DA<R> mapIndex(R(*f)(int, T));
+  msl::DA<R> mapIndex(R(*f)(int, T));
 
 #endif
 
-  // SKELETONS / COMPUTATION / ZIP
+  // SKELETONS / COMPUTATION / ZIP ****************************************
 
   /**
    * \brief Replaces each element a[i] of the distributed array with f(a[i], b[i])
    *        with \em b being another distributed array of the same size.
    *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipFunctor Functor type.
+   * @param f The zip functor, must be of type Functor2.
+   * @tparam T2 Element type of the distributed array to zip with.
+   * @tparam ZipFunctor Functor2 type.
    */
   template <typename T2, typename ZipFunctor>
   void zipInPlace(DA<T2>& b, ZipFunctor& f);
 
   /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i], b[i]).
-   *        Note that besides the elements themselves also the index is passed to the
-   *        functor.
+   * \brief Replaces each element a[i] of the distributed array by f(i, a[i], b[i]).
    *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipIndexFunctor Functor type.
+   * @param f The zipIndex functor, must be of type Functor3
+   * @tparam T2 Element type of the distributed array to zip with.
+   * @tparam ZipIndexFunctor Functor3 type.
    */
   template <typename T2, typename ZipIndexFunctor>
   void zipIndexInPlace(DA<T2>& b, ZipIndexFunctor& f);
@@ -394,27 +374,40 @@ public:
   /**
    * \brief Non-inplace variant of the zip skeleton.
    *
-   * @param f The zip functor, must be of type \em AZipFunctor.
+   * @param f The zip functor, must be of type Functor2
    * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipFunctor Functor type.
+   * @tparam T2 Element type of the distributed array to zip with.
+   * @tparam ZipFunctor Functor2 type.
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipFunctor>
-  DA<T> zip(DA<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug
+  msl::DA<R> zip(DA<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug!
 
   /**
    * \brief Non-inplace variant of the zipIndex skeleton.
    *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+   * @param f The zipIndex functor, must be of type Functor3
    * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
+   * @tparam T2 Element type of the distributed array to zip with.
    * @tparam ZipIndexFunctor Functor type.
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipIndexFunctor>
-  DA<T> zipIndex(DA<T2>& b, ZipIndexFunctor& f);
+  msl::DA<R> zipIndex(DA<T2>& b, ZipIndexFunctor& f);  // should be return type DA<R>; debug!
 
+  /**
+    * \brief Replaces each element a[i] of the distributed array by f(a[i], b[i], c[i])
+    *        with \em b and \em c being other distributed arrays of the same size.
+    *
+    * @param f The zip functor, must be of type Functor3.
+    * @tparam T2 Element type of the distributed array to zip with.
+    * @tparam ZipFunctor Functor3 type.
+    */
+   template <typename T2, typename T3, typename ZipFunctor>
+   void zipInPlace2(DA<T2>& b, DA<T3>& c, ZipFunctor& f);
+
+
+  // ******************************* fold **************************************
   /**
    * \brief fold skeleton.
    *
@@ -424,6 +417,7 @@ public:
    * @return the result of combining all elements of the arra by the binary, associative and commutativ 
    *         operation f
    */
+
   template <typename FoldFunctor>
   T fold(FoldFunctor& f,  bool final_fold_on_cpu);
 

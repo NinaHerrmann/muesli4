@@ -1,14 +1,15 @@
 /*
  * zip_kernels.h
  *
- *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *      Authors: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *               Herbert Kuchen <kuchen@uni-muenster.de>
  * 
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2014 Steffen Ernsting <s.ernsting@uni-muenster.de>,
- *                Herbert Kuchen <kuchen@uni-muenster.de.
+ * Copyright 2020 Steffen Ernsting <s.ernsting@uni-muenster.de>,
+ *                Herbert Kuchen <kuchen@uni-muenster.de>.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +46,15 @@ zipKernel(T1* in1,
 		  R* out,
 		  size_t n,
 		  FCT2 func);
+		  
+template<typename T1, typename T2, typename T3, typename R, typename FCT3>
+__global__ void
+zipKernel(T1* in1,
+		  T2* in2,
+		  T3* in3,
+		  R* out,
+		  size_t n,
+		  FCT3 func);
 
 // new kernel for DM
 template<typename T1, typename T2, typename R, typename FCT3>
