@@ -70,6 +70,8 @@ __global__ void mapIndexKernel(T* in,
                                F func,
                                bool localIndices);
 
+template <typename T>
+__global__ void printFromGPU(T* A);
 //template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,
 //                                 R* out,

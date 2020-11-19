@@ -51,6 +51,7 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t f
 }
 
 
+
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T* in, R* out, size_t size, size_t first, F func, bool localIndices) {
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -77,6 +78,7 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
     }
   }
 }
+
 
 //template <typename T, typename R, typename F>
 //__global__ void msl::detail::mapStencilKernel(T* in, R* out,  GPUExecutionPlan<T> plan, PLArray<T>* input, F func, int tile_width)
@@ -105,4 +107,9 @@ __global__ void msl::detail::mapIndexKernel(T* in, R* out, GPUExecutionPlan<T> p
 //  }
 //  __syncthreads();
 //}
-
+template <typename T>
+__global__ void msl::detail::printFromGPU(T* A)
+{
+  int i = threadIdx.x;
+  printf("i:%d; A[%d];", i, A[i]);
+}

@@ -68,6 +68,15 @@ public:
   }
 };
 
+class IllegalDistributionException: public Exception
+{
+public:
+    std::string tostring() const
+    {
+      return "IllegalDistributionException";
+    }
+};
+
 class UndefinedSourceException: public Exception
 {
 
@@ -285,7 +294,6 @@ operator<<(std::ostream& os, const Exception& e)
 
   return os;
 }
-
-}
+    }
 
 }
