@@ -66,6 +66,12 @@ zipIndexKernel(T1* in1,
 		  	   int first,
 		  	   FCT3 func,
 		  	   int ncols);
+		  	   
+// new kernel for zipping a DM, two DAs and a DM		  	   	  	   
+template <typename T1, typename T2, typename T3, typename T4, typename R, typename FCT3>
+__global__ void 
+zipKernelAAM(T1* in1, T2* in2, T3* in3, T4*in4,
+             R* out, size_t n, int first, int first2, FCT3 func, int ncols);
 
 template<typename T1, typename T2, typename R, typename FCT3>
 __global__ void

@@ -35,6 +35,7 @@
 #include <cmath>
 
 #include "muesli.h"
+#include "da.h"
 #include "dm.h"
 
 namespace msl {
@@ -70,6 +71,11 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
         };
 
+        class CopyCond : public Functor4<int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const 
+                   {if (v1*v1 > v2 + 50) return x else return y;}
+        };
+
 
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
@@ -94,6 +100,7 @@ namespace msl {
           Sum4 sum4;
           c.zipIndexInPlace(b,sum4);
           c.show("c2");
+          
           DM<int> d = a.zipIndex(b,sum4);
           c.show("d1");
 
@@ -104,6 +111,17 @@ namespace msl {
           Sum3 sum3;
           a.zipInPlace3(b,c,sum3);
           a.show("a4");
+          
+          DA<int> d(0);
+          d.mapIndexInPlace(sum);
+          d.show("d1");
+          
+          Square sqr;
+          DA<int> e = d.map(sqr);
+          e.show("e1");
+          
+          CopyCond copyCond;
+          a.zipInPlace(d,d,b,copyCond);
 
           return;
         }

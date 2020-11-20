@@ -34,6 +34,7 @@
  */
 #include <iostream>
 #include "muesli.h"
+#include "da.h"
 
 template<typename T>
 msl::DM<T>::DM():                  // distributed array (resides on GPUs until deleted!)
@@ -696,7 +697,8 @@ void msl::DM<T>::zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f){
     auto bplans = b.getExecPlans();
     auto cplans = c.getExecPlans();
     detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data,
+		plans[i].nLocal, plans[i].first, f);
   }
 
   T2* bPartition = b.getLocalPartition();
@@ -704,6 +706,34 @@ void msl::DM<T>::zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f){
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     localPartition[k] = f(localPartition[k], bPartition[k], cPartition[k]);
+  }
+
+  // check for errors during gpu computation
+  msl::syncStreams();
+  cpuMemoryInSync = false;
+}
+
+template <typename T>
+template <typename T2, typename T3, typename T4, typename ZipFunctor>
+void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
+  // zip on GPU
+  for (int i = 0; i < ng; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    auto bplans = b.getExecPlans();
+    auto cplans = c.getExecPlans();
+    auto dplans = d.getExecPlans();
+    detail::zipKernelAAM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, d.plans[i].d_Data, plans[i].d_Data,
+		plans[i].nLocal, plans[i].first, bplans[i].first, f, ncol);
+  }
+
+  T4* dPartition = d.getLocalPartition();
+  #pragma omp parallel for
+  for (int k = 0; k < nCPU; k++) {
+    int i = (k + firstIndex) / ncol; // (global) row index
+    localPartition[k] = f(localPartion[k], b.get(i), c.get(i), dPartition[k]);
   }
 
   // check for errors during gpu computation
