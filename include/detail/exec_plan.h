@@ -35,22 +35,31 @@
 template <typename T>
 struct GPUExecutionPlan
 {
+  // Number of elements per GPU
   int size;
 
+  // Number of byte stored on the GPU
   size_t bytes;
 
+  // Number of rows on the GPU
   int nLocal;
 
+  // Number of columns on the GPU
   int mLocal;
 
+  // Index of the first element processed in the GPU. If data structure is a matrix, then this is the row major index.
   int first;
 
+  // First row where the GPU processing starts
   int firstRow;
 
+  // First column where the GPU processing starts
   int firstCol;
 
+  // Host copy of the data stored in the GPU
   T* h_Data;
 
+  // Data stored in the GPU
   T* d_Data;
 };
 

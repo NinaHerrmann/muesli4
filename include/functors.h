@@ -2,7 +2,7 @@
  * functors.h
  *
  *      Author: Herbert Kuchen <kuchen@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -39,25 +39,23 @@ namespace msl {
  * @tparam T Input data type.
  * @tparam R Output data type.
  */
-template <typename T, typename R>
-class Functor{
+template <typename T, typename R> class Functor {
 
 public:
   /**
-   * \brief Function call operator has to be implemented by the user. 
+   * \brief Function call operator has to be implemented by the user.
    *
    * @param value Input for the operator.
    * @return Output of the operator.
    */
   MSL_USERFUNC
-  virtual R operator() (T value) const = 0;
+  virtual R operator()(T value) const = 0;
 
   /**
    * \brief Destructor.
    */
-  virtual ~Functor(){}
+  virtual ~Functor() {}
 };
-
 
 /**************************************************************************
  * \brief Class Functor2 represents a binary functor
@@ -66,24 +64,23 @@ public:
  * @tparam T2 2nd input data type.
  * @tparam R output data type.
  */
-template <typename T1, typename T2, typename R>
-class Functor2{
+template <typename T1, typename T2, typename R> class Functor2 {
 
 public:
   /**
-   * \brief Function call operator has to be implemented by the user. 
+   * \brief Function call operator has to be implemented by the user.
    *
    * @param x 1st nput for the operator.
    * @param y 2nd nput for the operator.
    * @return Output of the operator.
    */
   MSL_USERFUNC
-  virtual R operator() (T1 x, T2 y) const = 0;
+  virtual R operator()(T1 x, T2 y) const = 0;
 
   /**
    * \brief Destructor.
    */
-  virtual ~Functor2(){}
+  virtual ~Functor2() {}
 };
 
 /**************************************************************************
@@ -94,12 +91,11 @@ public:
  * @tparam T3 3rd input data type.
  * @tparam R output data type.
  */
-template <typename T1, typename T2, typename T3, typename R>
-class Functor3{
+template <typename T1, typename T2, typename T3, typename R> class Functor3 {
 
 public:
   /**
-   * \brief Function call operator has to be implemented by the user. 
+   * \brief Function call operator has to be implemented by the user.
    *
    * @param x 1st nput for the operator.
    * @param y 2nd nput for the operator.
@@ -107,12 +103,12 @@ public:
    * @return Output of the operator.
    */
   MSL_USERFUNC
-  virtual R operator() (T1 x, T2 y, T3 z) const = 0;
+  virtual R operator()(T1 x, T2 y, T3 z) const = 0;
 
   /**
    * \brief Destructor.
    */
-  virtual ~Functor3(){}
+  virtual ~Functor3() {}
 };
 
 /**************************************************************************
@@ -125,11 +121,11 @@ public:
  * @tparam R output data type.
  */
 template <typename T1, typename T2, typename T3, typename T4, typename R>
-class Functor4{
+class Functor4 {
 
 public:
   /**
-   * \brief Function call operator has to be implemented by the user. 
+   * \brief Function call operator has to be implemented by the user.
    *
    * @param x 1st input for the operator.
    * @param y 2nd input for the operator.
@@ -138,12 +134,34 @@ public:
    * @return Output of the operator.
    */
   MSL_USERFUNC
-  virtual R operator() (T1 x, T2 y, T3 z, T4 v) const = 0;
+  virtual R operator()(T1 x, T2 y, T3 z, T4 v) const = 0;
 
   /**
    * \brief Destructor.
    */
-  virtual ~Functor4(){}
+  virtual ~Functor4() {}
+};
+
+/**
+ * Represents a functor that takes an array of arguments and produces one
+ * output.
+ * @tparam I Type of elements in the input array
+ * @tparam O Type of elements int the output array
+ */
+template <typename I, typename O> class FunctorCollection {
+  /**
+   * \brief Function call operator has to be implemented by the user.
+   *
+   * @param x 1st input for the operator.
+   * @return Output of the operator.
+   */
+  MSL_USERFUNC
+  virtual O operator()(I *x) const = 0;
+
+  /**
+   * \brief Destructor.
+   */
+  virtual ~FunctorCollection() {}
 };
 
 } // namespace msl

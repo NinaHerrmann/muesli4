@@ -577,7 +577,7 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor& f, T neutral_value)
 
 template <typename T>
 template <typename R, typename MapStencilFunctor>
-msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
+msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value, float cpu_percentage)
 {
   printf("mapStencil\n");
   throws(detail::NotYetImplementedException());
