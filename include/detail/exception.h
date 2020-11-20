@@ -68,6 +68,15 @@ public:
   }
 };
 
+class NotSameSizeException: public Exception
+{
+public:
+  std::string tostring() const
+  {
+    return "NotSameSizeException";
+  }
+};
+
 class IllegalDistributionException: public Exception
 {
 public:
@@ -121,6 +130,40 @@ public:
   std::string tostring() const
   {
     return "MissingInitializationException";
+  }
+
+};
+
+class RotateRowCompleteNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating when datastructure is not row complete ist not implemented yet.";
+  }
+
+};
+class RotateColCompleteNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating when datastructure is not row complete ist not implemented yet.";
+  }
+
+};
+class RotateRowManyNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating more rows than allocated to one node ist not implemented yet.";
   }
 
 };
@@ -286,7 +329,14 @@ public:
 };
 
 // ***************** Various *************
-
+class DeviceOutOfMemory: public Exception
+    {
+    public:
+        std::string tostring() const
+        {
+            return "Device is out of Memory";
+        }
+    };
 inline std::ostream&
 operator<<(std::ostream& os, const Exception& e)
 {

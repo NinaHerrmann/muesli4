@@ -1,8 +1,9 @@
+
 /*
- * conversion.h
+ * argtype.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -32,59 +33,36 @@
 
 #pragma once
 
-// liefert true, wenn U oeffentlich von T erbt oder wenn T und U den gleichen Typ besitzen
-#define MSL_IS_SUPERCLASS(T, U) (MSL_Conversion<const U*, const T*>::exists && !MSL_Conversion<const T*, const void*>::sameType)
+namespace msl {
 
-// MSL_Conversion erkennt zur Compilezeit, ob sich T nach U konvertieren laesst.
-// exists = true, wenn sich T nach U konvertieren laesst, sonst false
-template<class T, class U>
-class MSL_Conversion {
-
-private:
-
-  // sizeof(Small) = 1
-  typedef char Small;
-
-  // sizeof(Big) > 1
-  class Big {
-    char dummy[2];
-  };
-
-  static Small Test(U);     // Compiler waehlt diese Funktion, wenn er eine Umwandlung von T nach U findet
-  static Big Test(...);       // sonst nimmer er diese
-  static T MakeT();         // Erzeugt ein Objekt vom Typ T, selbst wenn der Konstruktor als private deklariert wurde
-
+/**
+ * \brief Base class for argument types of functors.
+ *
+ * Arguments to functors are added in terms of data members. The types (except
+ * for POD types) of these data members must inherit from this class. This is
+ * necessary in a hybrid (and/or in a multi-GPU) setting. Pointer members need
+ * to point to the correct memory: when dereferenced by the CPU the pointer must
+ * point to some location in host main memory, when dereferenced by GPU 1 it
+ * must point to some location in GPU 1 main memory and so on.
+ */
+class ArgumentType {
 public:
+  /**
+   * \brief Updates all pointer members to point to the correct memory.
+   */
+  virtual void update() = 0;
 
-  enum {
-    exists = sizeof(Test(MakeT())) == sizeof(Small)
-  };
+  virtual int getSmemSize() const { return 0; }
 
-  enum {
-    sameType = false
-  };
+  virtual void setTileWidth(int tw) { tile_width = tw; }
 
+  /**
+   * \brief Virtual destructor.
+   */
+  virtual ~ArgumentType() {}
+
+protected:
+  int tile_width;
 };
 
-// Überladung von MSL_Conversion, um den Fall T = U zu erkennen
-template<class T>
-class MSL_Conversion<T, T> {
-
-public:
-
-  enum {
-    exists = true, sameType = true
-  };
-
-};
-
-// MSL_Int2Type erzeugt aus ganzzahligen Konstanten einen eigenen Typ.
-// wird benoetigt, damit der Compiler zur Compilezeit die korrekte MSL_Send Methode auswaehlen kann.
-template<int v>
-struct Int2Type {
-
-  enum {
-    value = v
-  };
-
-};
+} // namespace msl

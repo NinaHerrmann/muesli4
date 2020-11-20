@@ -1,4 +1,4 @@
-# Building example(s)
+# Muesli Building example(s)
 
 ____________________________________
 
@@ -9,7 +9,7 @@ using MPI, OpenMP and CUDA.
 __________________________________________________________
 
 sbatch slurm.sh  (includes build)
-new example(s): dm_test.cu  (in directory examples)
+new example(s): dm_test.cu/dc_test.cu  (in directory examples)
 
 NH, 03.08.2020
 ******************************************************
@@ -28,9 +28,12 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 ### Test:
 * mapFold
 
-### Next:
-* mapStencil for Endis Masterthesis
+NH, 17.11.2020
 
+# Implementation Remarks
+### Next:
+* mapStencil for DM
+* Subsume to DS?
 
 ### inefficiently implemented, but working:
 * getLocal()
@@ -45,5 +48,3 @@ The skeletons need to be updated to a new distribution for the datastructure to 
 * broadcastPartition
 * permutePartition (even with lambda as argument)
 
-
-NH, 17.11.2020

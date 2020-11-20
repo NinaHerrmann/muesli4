@@ -2,7 +2,7 @@
  * shared_mem.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -32,40 +32,32 @@
 
 #pragma once
 
-template <class T>
-struct SharedMemory
-{
+template <class T> struct SharedMemory {
 #ifdef __CUDACC__
-  __device__ inline operator T*()
-  {
+  __device__ inline operator T *() {
     extern __shared__ int __smem[];
-    return (T*) __smem;
+    return (T *)__smem;
   }
 
-  __device__ inline operator const T*() const
-  {
+  __device__ inline operator const T *() const {
     extern __shared__ int __smem[];
-    return (T*) __smem;
+    return (T *)__smem;
   }
 #endif
 };
 
 // specialize for double to avoid unaligned memory
 // access compile errors
-template<>
-struct SharedMemory<double>
-{
+template <> struct SharedMemory<double> {
 #ifdef __CUDACC__
-  __device__ inline operator       double *()
-  {
-      extern __shared__ double __smem_d[];
-      return (double *)__smem_d;
+  __device__ inline operator double *() {
+    extern __shared__ double __smem_d[];
+    return (double *)__smem_d;
   }
 
-  __device__ inline operator const double *() const
-  {
-      extern __shared__ double __smem_d[];
-      return (double *)__smem_d;
+  __device__ inline operator const double *() const {
+    extern __shared__ double __smem_d[];
+    return (double *)__smem_d;
   }
 #endif
 };

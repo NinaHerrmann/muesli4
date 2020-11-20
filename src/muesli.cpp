@@ -1,9 +1,9 @@
 /*
  * muesli.cpp
  *
- *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>, 
+ *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>,
  *              Herbert Kuchen <kuchen@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -35,9 +35,10 @@ int msl::Muesli::proc_id;
 int msl::Muesli::proc_entrance;
 int msl::Muesli::running_proc_no = 0;
 int msl::Muesli::num_total_procs;
-int msl::Muesli::num_local_procs; // equals numOfTotalProcs except when nesting DP into TP skeletons
+int msl::Muesli::num_local_procs; // equals numOfTotalProcs except when nesting
+                                  // DP into TP skeletons
 double msl::Muesli::start_time;
-char* msl::Muesli::program_name;
+char *msl::Muesli::program_name;
 int msl::Muesli::distribution_mode;
 int msl::Muesli::task_group_size;
 int msl::Muesli::num_conc_kernels;
@@ -45,27 +46,28 @@ int msl::Muesli::num_threads;
 int msl::Muesli::num_runs;
 int msl::Muesli::num_gpus;
 int msl::Muesli::max_gpus;
-double msl::Muesli::cpu_fraction = 0.2; // fraction of each DA partition handled by CPU cores (rather than GPUs)
+double msl::Muesli::cpu_fraction = 0.2; // fraction of each DA partition handled
+                                        // by CPU cores (rather than GPUs)
+int msl::Muesli::elem_per_thread = 1;
 int msl::Muesli::threads_per_block;
 int msl::Muesli::tpb_x;
 int msl::Muesli::tpb_y;
-bool msl::Muesli::debug_communication;
+int msl::Muesli::reps;
+bool msl::Muesli::debug = false;
 bool msl::Muesli::use_timer;
-bool msl::Muesli::farm_statistics = false;
 #ifdef __CUDACC__
 std::vector<cudaStream_t> msl::Muesli::streams;
 #endif
-msl::Timer* timer;
+msl::Timer *timer;
 
-void msl::initSkeletons(int argc, char** argv, bool debug_communication)
-{
+void msl::initSkeletons(int argc, char **argv, bool debug) {
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &Muesli::num_total_procs);
   MPI_Comm_rank(MPI_COMM_WORLD, &Muesli::proc_id);
-  
-  #ifdef _OPENMP
-    omp_set_nested(1);
-  #endif
+
+#ifdef _OPENMP
+  omp_set_nested(1);
+#endif
 
   if (1 <= argc) {
     Muesli::program_name = argv[0];
@@ -86,37 +88,34 @@ void msl::initSkeletons(int argc, char** argv, bool debug_communication)
   Muesli::task_group_size = DEFAULT_TASK_GOUP_SIZE;
   Muesli::num_conc_kernels = DEFAULT_NUM_CONC_KERNELS;
 
-  #ifdef _OPENMP
-    Muesli::num_threads = omp_get_max_threads();
-  #else
-    Muesli::num_threads = 1;
-  #endif
+#ifdef _OPENMP
+  Muesli::num_threads = omp_get_max_threads();
+#else
+  Muesli::num_threads = 1;
+#endif
 
-  Muesli::debug_communication = debug_communication;
+  Muesli::debug = debug;
+  Muesli::reps = 1;
   Muesli::num_runs = DEFAULT_NUM_RUNS;
   Muesli::num_local_procs = Muesli::num_total_procs;
   Muesli::proc_entrance = 0;
-  setThreadsPerBlock(512); // default for one dimensional thread blocks
+  setThreadsPerBlock(512);    // default for one dimensional thread blocks
   setThreadsPerBlock(16, 16); // default for two dimensional thread blocks
   Muesli::start_time = MPI_Wtime();
 }
 
-void msl::terminateSkeletons()
-{
+void msl::terminateSkeletons() {
   std::ostringstream s;
   std::ostringstream s_time;
-  if (isRootProcess())
-    printf("debug: terminating skeletons\n");
   MPI_Barrier(MPI_COMM_WORLD);
-  if (isRootProcess())
-    printf("debug: behind barrier\n");
+  msl::printv("\n");
 
   if (Muesli::use_timer) {
     double total_time = timer->totalTime();
     s_time << "Total time: " << total_time << "s" << std::endl;
   }
 
-  if (isRootProcess()) {
+/*  if (isRootProcess()) {
     s << std::endl << "Name: " << Muesli::program_name << std::endl;
     s << "Proc: " << Muesli::num_total_procs << std::endl;
 #ifdef __CUDACC__
@@ -132,58 +131,51 @@ void msl::terminateSkeletons()
       s << s_time.str();
       delete timer;
     } else {
-      s << "Total time: " << MPI_Wtime() - Muesli::start_time << "s" << std::endl;
+      s << "Total time: " << MPI_Wtime() - Muesli::start_time << "s"
+        << std::endl;
     }
 
     printf("%s", s.str().c_str());
-  }
-  if (isRootProcess())
-    printf("debug: behind output of run time statistics\n");
+  }*/
+
 
 #ifdef _CUDACC__
   for (auto it = Muesli::streams.begin(); it != Muesli::streams.end(); ++it) {
     CUDA_CHECK_RETURN(cudaStreamDestroy(*it));
   }
 #endif
-
   MPI_Finalize();
   Muesli::running_proc_no = 0;
 }
 
-void msl::printv(const char* format, ...) {
+void msl::printv(const char *format, ...) {
   va_list argp;
   va_start(argp, format);
 
-  if(isRootProcess()) {
+  if (isRootProcess()) {
     vprintf(format, argp);
   }
 
   va_end(argp);
 }
 
-void msl::setNumThreads(int threads)
-{
-  #ifdef _OPENMP
-    Muesli::num_threads = threads;
-    omp_set_num_threads(threads);
-  #else
-    Muesli::num_threads = 1;
-  #endif
+void msl::setNumThreads(int threads) {
+#ifdef _OPENMP
+  Muesli::num_threads = threads;
+  omp_set_num_threads(threads);
+#else
+  Muesli::num_threads = 1;
+#endif
 }
 
-void msl::setNumRuns(int runs)
-{
-  Muesli::num_runs = runs;
-}
+void msl::setNumRuns(int runs) { Muesli::num_runs = runs; }
 
-void msl::setNumGpus(int num_gpus)
-{
+void msl::setNumGpus(int num_gpus) {
   if (num_gpus > 0 && num_gpus <= Muesli::max_gpus)
     Muesli::num_gpus = num_gpus;
 }
 
-void msl::setThreadsPerBlock(int tpb)
-{
+void msl::setThreadsPerBlock(int tpb) {
   int threads = tpb;
   if (threads > 1024) {
     std::cout << "Warning: threadsPerBlock > 1024." << std::endl
@@ -193,8 +185,7 @@ void msl::setThreadsPerBlock(int tpb)
   Muesli::threads_per_block = threads;
 }
 
-void msl::setThreadsPerBlock(int tpbX, int tpbY)
-{
+void msl::setThreadsPerBlock(int tpbX, int tpbY) {
   if (tpbX * tpbY > 1024) {
     std::cout << "Warning: threadsPerBlock > 1024." << std::endl
               << "Setting to 32x32." << std::endl;
@@ -204,18 +195,13 @@ void msl::setThreadsPerBlock(int tpbX, int tpbY)
   Muesli::tpb_y = tpbY;
 }
 
-void msl::setNumConcurrentKernels(int num_kernels)
-{
+void msl::setNumConcurrentKernels(int num_kernels) {
   Muesli::num_conc_kernels = num_kernels;
 }
 
-void msl::setTaskGroupSize(int size)
-{
-  Muesli::task_group_size = size;
-}
+void msl::setTaskGroupSize(int size) { Muesli::task_group_size = size; }
 
-void msl::syncStreams()
-{
+void msl::syncStreams() {
 #ifdef __CUDACC__
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
@@ -223,48 +209,69 @@ void msl::syncStreams()
   }
 #endif
 }
+#ifdef __CUDACC__
+void msl::printDevProps() {
+    int nDevices;
+    cudaGetDeviceCount(&nDevices);
+    for (int i = 0; i < nDevices; i++) {
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, i);
+        printf("Device Number: %d\n", i);
+        printf("  Device name: %s\n", prop.name);
+        printf("  Memory Clock Rate (KHz): %d\n",
+               prop.memoryClockRate);
+        printf("  Memory Bus Width (bits): %d\n",
+               prop.memoryBusWidth);
+        printf("  Peak Memory Bandwidth (GB/s): %f\n",
+               2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+        printf("  total Global Memory (MB): %d\n\n",
+               prop.totalGlobalMem/1000000);
+    }
+}
+#endif
 
-void msl::startTiming()
-{
+void msl::startTiming() {
   Muesli::use_timer = 1;
   MPI_Barrier(MPI_COMM_WORLD);
   timer = new Timer();
 }
 
-void msl::splitTime(int run)
-{
-  double result = timer->splitTime();
+void msl::splitTime(int run) {
+  timer->splitTime();
   if (isRootProcess()) {
-    std::cout << "Run " << run << ": " << result << "s" << std::endl;
+    //std::cout << "Run " << run << ": " << result << "s" << std::endl;
   }
 }
 
-double msl::stopTiming()
-{
+double msl::stopTiming() {
   int runs = timer->getNumSplits();
   double total_time = timer->stop();
-  msl::printv("\nTime/run: %fs\n", total_time/runs);
+  msl::printv("%f;", total_time / runs);
   return total_time;
 }
 
-bool msl::isRootProcess()
-{
-  return Muesli::proc_id == 0;
+void msl::printTimeToFile(const char *id, const char *file_name) {
+  int runs = timer->getNumSplits();
+  double time = msl::stopTiming();
+  if (msl::Muesli::proc_id == 0) {
+    std::ofstream outputFile;
+    outputFile.open(file_name, std::ios_base::app);
+    outputFile << id << "" << (time / runs) << "\n";
+    outputFile.close();
+  }
 }
 
-void msl::setFarmStatistics(bool val)
-{
-  Muesli::farm_statistics = val;
-}
+bool msl::isRootProcess() { return Muesli::proc_id == 0; }
 
-void msl::fail_exit()
-{
+void msl::setDebug(bool val) { Muesli::debug = val; }
+void msl::setReps(int val) { Muesli::reps = val; }
+
+void msl::fail_exit() {
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   exit(EXIT_FAILURE);
 }
 
-void msl::throws(const detail::Exception& e)
-{
+void msl::throws(const detail::Exception &e) {
   std::cout << Muesli::proc_id << ": " << e << std::endl;
 }
