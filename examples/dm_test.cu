@@ -81,8 +81,13 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return x;}
         };
 
+
         class Proj2 : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return v1;}
+        };
+
+        class Proj4 : public Functor4<int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return y;}
         };
 
         void dm_test(int dim) {
@@ -129,13 +134,17 @@ namespace msl {
           ar2.show("ar2");
           
  //         CopyCond copyCond;
- //         Proj1 pr1;
-          a.zipInPlaceAAM(ar1,ar2,b,sum4);
+          Proj1 pr1;
+          a.zipInPlaceAAM(ar1,ar2,b,pr1);
           a.show("a5");
 
- //         Proj2 pr2;
- //         a.zipInPlaceAAM(ar1,ar2,b,pr2);
- //         a.show("a6");
+          Proj2 pr2;
+          a.zipInPlaceAAM(ar1,ar2,b,pr1);
+          a.show("a6");
+
+          Proj4 pr4;
+          a.zipInPlaceAAM(ar1,ar2,b,pr4);
+          a.show("a7");
 
           return;
         }

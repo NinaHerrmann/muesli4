@@ -729,11 +729,14 @@ void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
 		plans[i].nLocal, plans[i].first, bplans[i].first, f, ncol);
   }
 
+  T2* bPartition = b.getLocalPartition(); 
+  T3* cPartition = c.getLocalPartition();
   T4* dPartition = d.getLocalPartition();
+  int bfirst = b.getFirstIndex();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
-    int i = (k + firstIndex) / ncol; // (global) row index
-    localPartition[k] = f(localPartition[k], b.get(i), c.get(i), dPartition[k]);
+    int i = ((k + firstIndex) / ncol) - bfirst;
+    localPartition[k] = f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
   }
 
   // check for errors during gpu computation
