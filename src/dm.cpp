@@ -597,7 +597,7 @@ void msl::DM<T>::zipInPlace(DM<T2>& b, ZipFunctor& f){
         plans[i].d_Data, bplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
   }
 
-  T* bPartition = b.getLocalPartition();
+  T2* bPartition = b.getLocalPartition();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     localPartition[k] = f(localPartition[k], bPartition[k]);
@@ -621,9 +621,10 @@ msl::DM<T> msl::DM<T>::zip(DM<T2>& b, ZipFunctor& f){   // should have result ty
         plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].size, f);
   }
   // zip on CPU cores
+  T2* bPartition = b.getLocalPartition();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
-    result.setLocal(k, f(localPartition[k], b.getLocal(k)));
+    result.setLocal(k, f(localPartition[k], bPartition[k]));
   }
   // check for errors during gpu computation
   msl::syncStreams();
@@ -645,11 +646,12 @@ void msl::DM<T>::zipIndexInPlace(DM<T2>& b, ZipIndexFunctor& f){
         plans[i].first, f, ncol);
   }
 
+  T2* bPartition = b.getLocalPartition();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++){
       int i = (k + firstIndex) / ncol;
       int j = (k + firstIndex) % ncol;
-      localPartition[k] = f(i, j, localPartition[k], b.getLocal(k));
+      localPartition[k] = f(i, j, localPartition[k], bPartition[k]);
   }
   // check for errors during gpu computation
   msl::syncStreams();
@@ -670,16 +672,43 @@ msl::DM<T> msl::DM<T>::zipIndex(DM<T2>& b, ZipIndexFunctor& f){
         plans[i].first, f, ncol);
   }
   // zip on CPU cores
+  T2* bPartition = b.getLocalPartition();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++){
       int i = (k + firstIndex) / ncol;
       int j = (k + firstIndex) % ncol;
-      result.setLocal(k, f(i, j, localPartition[k], b.getLocal(k)));
+      result.setLocal(k, f(i, j, localPartition[k], bPartition[k]));
   }
   // check for errors during gpu computation
   msl::syncStreams();
   result.setCpuMemoryInSync(false);
   return result;
+}
+
+template <typename T>
+template <typename T2, typename T3, typename ZipFunctor>
+void msl::DM<T>::zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f){
+  // zip on GPU
+  for (int i = 0; i < ng; i++) {
+    cudaSetDevice(i);
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+    auto bplans = b.getExecPlans();
+    auto cplans = c.getExecPlans();
+    detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+  }
+
+  T2* bPartition = b.getLocalPartition();
+  T3* bPartition = c.getLocalPartition();
+  #pragma omp parallel for
+  for (int k = 0; k < nCPU; k++) {
+    localPartition[k] = f(localPartition[k], bPartition[k], cPartition[k]);
+  }
+
+  // check for errors during gpu computation
+  msl::syncStreams();
+  cpuMemoryInSync = false;
 }
 
 // *********** fold *********************************************

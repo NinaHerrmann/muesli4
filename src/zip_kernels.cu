@@ -39,7 +39,7 @@ __global__ void msl::detail::zipKernel(T1* in1, T2* in2, R* out, size_t n, FCT2 
   }
 }
 
-// new kernel for zipInPlace2, HK 19.11.2020
+// new kernel for zipInPlace3, HK 19.11.2020
 template <typename T1, typename T2, typename T3, typename R, typename FCT3>
 __global__ void msl::detail::zipKernel(T1* in1, T2* in2, T3* in3, R* out, size_t n, FCT3 func){
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;

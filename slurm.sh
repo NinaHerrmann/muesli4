@@ -10,9 +10,9 @@
 #SBATCH --time 00:05:00
 #SBATCH --exclusive
 
-#SBATCH --job-name da_test
-#SBATCH --output /scratch/tmp/kuchen/output3.txt
-#SBATCH --error /scratch/tmp/kuchen/error3.txt
+#SBATCH --job-name dm_test
+#SBATCH --output /scratch/tmp/kuchen/output4.txt
+#SBATCH --error /scratch/tmp/kuchen/error4.txt
 #SBATCH --mail-type ALL
 #SBATCH --mail-user kuchen@uni-muenster.de
 
@@ -24,15 +24,15 @@ cd /home/k/kuchen/Muesli4
 ./build.sh 
 export OMP_NUM_THREADS=4
 
-# vorlÃ¤ufig, bis MPI Ã¼ber Infiniband funktioniert
+# vorläufig, bis MPI über Infiniband funktioniert
 export I_MPI_DEBUG=3
-# export I_MPI_FABRICS=shm:ofa   nicht verfÃ¼gbar
+# export I_MPI_FABRICS=shm:ofa   nicht verfügbar
 # alternativ: Ethernet statt Infiniband: 
 export I_MPI_FABRICS=shm:tcp
 
 # mpirun /home/k/kuchen/Muesli4/build/$1 $2 $3
 # parameters: array dim #MPI nodes
-mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
+# mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
 
 # parameters: area size (needs to be quadratic) #MPI nodes
 # mpirun /home/k/kuchen/Muesli4/build/mandelbrotDA 10000 2 
@@ -41,7 +41,7 @@ mpirun /home/k/kuchen/Muesli4/build/da_test 32 2
 # mpirun /home/k/kuchen/Muesli4/build/piDA 1000 1000000 2 
 
 # parameters: #processes (= dim of DM), #throws, #MPI nodes
-# mpirun /home/k/kuchen/Muesli4/build/dm_test 32 2
+mpirun /home/k/kuchen/Muesli4/build/dm_test 32 2
 
 # alternativ: mpirun -np 2 <Datei>
 # alternativ: srun <Datei>

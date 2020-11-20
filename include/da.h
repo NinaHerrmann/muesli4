@@ -404,7 +404,7 @@ public:
     * @tparam ZipFunctor Functor3 type.
     */
    template <typename T2, typename T3, typename ZipFunctor>
-   void zipInPlace2(DA<T2>& b, DA<T3>& c, ZipFunctor& f);
+   void zipInPlace3(DA<T2>& b, DA<T3>& c, ZipFunctor& f);
 
 
   // ******************************* fold **************************************

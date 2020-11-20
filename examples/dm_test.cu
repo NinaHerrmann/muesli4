@@ -2,13 +2,14 @@
  * dm_test.cpp
  *
  *      Author: Nina Hermann,
- *  		Herbert Kuchen <kuchen@uni-muenster.de>
+ *  		    Herbert Kuchen <kuchen@uni-muenster.de>
  * 
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2020  Herbert Kuchen <kuchen@uni-muenster.de.
+ * Copyright 2020  Herbert Kuchen <kuchen@uni-muenster.de>,
+ *                 Nina Hermann
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -104,6 +105,9 @@ namespace msl {
           Mult mult(3);
           a.mapInPlace(mult);
           a.show("a3");
+          
+          a.zipInPlace3(b,c,mult);
+          a.show("a4");
 
           return;
         }
