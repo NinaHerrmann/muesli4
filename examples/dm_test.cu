@@ -2,7 +2,7 @@
  * dm_test.cpp
  *
  *      Author: Nina Hermann,
- *  		    Herbert Kuchen <kuchen@uni-muenster.de>
+ *  	        Herbert Kuchen <kuchen@uni-muenster.de>
  * 
  * -------------------------------------------------------------------------------
  *
@@ -40,13 +40,8 @@
 namespace msl {
     namespace test {
 
-        class Square : public Functor<int, int> {
-        private: int y;
-        public:
-            Square(int i):
-                 y(i){}
-
-            MSL_USERFUNC int operator() () const {return y*y;}
+        class Square : public Functor<int, int> {     
+          MSL_USERFUNC int operator() (int y) const {return y*y;}
         };
 
         class Mult : public Functor<int, int> {
@@ -58,7 +53,7 @@ namespace msl {
             MSL_USERFUNC int operator() (int x) const {return x*y;}
         };
 
-        struct Produkt : public Functor3<int, int, int, int>{ // before: public msl::AMapIndexFunctor<int, int>{
+        struct Produkt : public Functor3<int, int, int, int>{ 
             MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * 10) + j;}
         };
 
@@ -106,7 +101,8 @@ namespace msl {
           a.mapInPlace(mult);
           a.show("a3");
           
-          a.zipInPlace3(b,c,mult);
+          Sum3 sum3;
+          a.zipInPlace3(b,c,sum3);
           a.show("a4");
 
           return;

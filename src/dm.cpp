@@ -37,9 +37,9 @@
 
 template<typename T>
 msl::DM<T>::DM():                  // distributed array (resides on GPUs until deleted!)
-      n(0),                        // number of elements of distributed array
-      ncol(0),
-      nrow(0),
+      n(0),                        // number of elements of distributed matrix
+      ncol(0),                     // number of columns of distributed matrix
+      nrow(0),                     // number of rows of distributed matrix
       nLocal(0),                   // number of local elements on a node    
       np(0),                       // number of (MPI-) nodes (= Muesli::num_local_procs)
       id(0),                       // id of local node among all nodes (= Muesli::proc_id)
@@ -487,7 +487,7 @@ template <typename T>
 template <typename MapIndexFunctor>
 void msl::DM<T>::mapIndexInPlace(MapIndexFunctor& f){
 
-  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;
+//  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;  // is not used, HK
   for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
@@ -700,7 +700,7 @@ void msl::DM<T>::zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f){
   }
 
   T2* bPartition = b.getLocalPartition();
-  T3* bPartition = c.getLocalPartition();
+  T3* cPartition = c.getLocalPartition();
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     localPartition[k] = f(localPartition[k], bPartition[k], cPartition[k]);
