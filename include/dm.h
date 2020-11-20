@@ -385,7 +385,7 @@ public:
    * @tparam ZipFunctor Functor type.
    */
   template <typename T2, typename T3, typename T4, typename ZipFunctor>
-  void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f);
+  void zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f);
 
 
   /**

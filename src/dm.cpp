@@ -697,8 +697,8 @@ void msl::DM<T>::zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f){
     auto bplans = b.getExecPlans();
     auto cplans = c.getExecPlans();
     detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data,
-		plans[i].nLocal, plans[i].first, f);
+                plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data,
+		plans[i].nLocal, f);
   }
 
   T2* bPartition = b.getLocalPartition();
@@ -733,7 +733,7 @@ void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     int i = (k + firstIndex) / ncol; // (global) row index
-    localPartition[k] = f(localPartion[k], b.get(i), c.get(i), dPartition[k]);
+    localPartition[k] = f(localPartition[k], b.get(i), c.get(i), dPartition[k]);
   }
 
   // check for errors during gpu computation

@@ -42,7 +42,7 @@ namespace msl {
     namespace test {
 
         class Square : public Functor<int, int> {     
-          MSL_USERFUNC int operator() (int y) const {return y*y;}
+          public: MSL_USERFUNC int operator() (int y) const {return y*y;}
         };
 
         class Mult : public Functor<int, int> {
@@ -73,9 +73,17 @@ namespace msl {
 
         class CopyCond : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const 
-                   {if (v1*v1 > v2 + 50) return x else return y;}
+                   {if (v1+50 > v2) return x; else return y;}
         };
 
+ 
+        class Proj1 : public Functor4<int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return x;}
+        };
+
+        class Proj2 : public Functor4<int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return v1;}
+        };
 
         void dm_test(int dim) {
           //printf("Starting dm_test...\n");
@@ -102,7 +110,7 @@ namespace msl {
           c.show("c2");
           
           DM<int> d = a.zipIndex(b,sum4);
-          c.show("d1");
+          d.show("d1");
 
           Mult mult(3);
           a.mapInPlace(mult);
@@ -112,16 +120,22 @@ namespace msl {
           a.zipInPlace3(b,c,sum3);
           a.show("a4");
           
-          DA<int> d(0);
-          d.mapIndexInPlace(sum);
-          d.show("d1");
+          DA<int> ar1(10,0);
+          ar1.mapIndexInPlace(sum);
+          ar1.show("ar1");
           
           Square sqr;
-          DA<int> e = d.map(sqr);
-          e.show("e1");
+          DA<int>  ar2 = ar1.map(sqr);
+          ar2.show("ar2");
           
-          CopyCond copyCond;
-          a.zipInPlace(d,d,b,copyCond);
+ //         CopyCond copyCond;
+ //         Proj1 pr1;
+          a.zipInPlaceAAM(ar1,ar2,b,sum4);
+          a.show("a5");
+
+ //         Proj2 pr2;
+ //         a.zipInPlaceAAM(ar1,ar2,b,pr2);
+ //         a.show("a6");
 
           return;
         }
