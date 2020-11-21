@@ -102,10 +102,10 @@ namespace msl {
           a.mapIndexInPlace(pr);
           a.show("a2");
 
+          Sum sum;
           int result = a.fold(sum,true);
           printf("result: %i\n",result);
 
-          Sum sum;
           b.zipInPlace(a,sum);
           b.show("b2");
 
