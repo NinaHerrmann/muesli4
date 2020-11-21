@@ -46,7 +46,7 @@ msl::DM<T>::DM():                  // distributed array (resides on GPUs until d
       id(0),                       // id of local node among all nodes (= Muesli::proc_id)
       localPartition(0),           // local partition of the DM
       cpuMemoryInSync(false),      // is GPU memory in sync with CPU?
-      firstIndex(0),               // first global index of the DM on the local partition
+      firstIndex(0),               // first global index of the DM in the local partition
       firstRow(0),                 // first golbal row index of the DM on the local partition
       plans(0),                    // GPU execution plans
       dist(Distribution::DIST),    // distribution of DM: DIST (distributed) or COPY (for now: always DIST)
@@ -101,8 +101,8 @@ void msl::DM<T>::init() {
   nLocal = n / np; 
   nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
   nCPU = nLocal - nGPU * ng;
-  firstIndex =  id * nCPU;
-  //printf("loc prozesses %d , First index %d, firstRowGpu %d\n", Muesli::num_local_procs, firstIndex, indexGPU);
+  firstIndex =  id * nLocal;
+  printf("loc prozesses %d , First index %d, firstRowGpu %d\n", Muesli::num_local_procs, firstIndex, indexGPU);
   printf("Building datastructure with %d nodes %d cpus and %d gpus\n", msl::Muesli::num_total_procs,
          msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
 }
@@ -736,6 +736,8 @@ void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     int i = ((k + firstIndex) / ncol) - bfirst;
+    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d, bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d, bfirst=%d\n",
+            k, i, firstIndex, ncol, localPartition[k], bPartition[i], cPartition[i], dPartition[k], bfirst); // debug
     localPartition[k] = f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
   }
 
