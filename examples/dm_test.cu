@@ -73,7 +73,7 @@ namespace msl {
 
         class CopyCond : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const 
-                   {if (v1+50 > v2) return x; else return y;}
+                   {if ((v1 * v2) % 2 == 0) return x; else return y;}
         };
 
  
@@ -135,7 +135,6 @@ namespace msl {
           DA<int>  ar2 = ar1.map(sqr);
           ar2.show("ar2");
           
- //         CopyCond copyCond;
           Proj1 pr1;
           a.zipInPlaceAAM(ar1,ar2,b,pr1);
           a.show("a5");
@@ -147,6 +146,10 @@ namespace msl {
           Proj4 pr4;
           a.zipInPlaceAAM(ar1,ar2,b,pr4);
           a.show("a7");
+
+          CopyCond copyCond;
+          a.zipInPlaceAAM(ar1,ar2,c,copyCond);
+          a.show("a8");
 
           return;
         }

@@ -736,8 +736,9 @@ void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
   #pragma omp parallel for
   for (int k = 0; k < nCPU; k++) {
     int i = ((k + firstIndex) / ncol) - bfirst;
-    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d, bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d, bfirst=%d\n",
-            k, i, firstIndex, ncol, localPartition[k], bPartition[i], cPartition[i], dPartition[k], bfirst); // debug
+//    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d, 
+//            bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d, bfirst=%d\n",
+//            k, i, firstIndex, ncol, localPartition[k], bPartition[i], cPartition[i], dPartition[k], bfirst); // debug
     localPartition[k] = f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
   }
 
