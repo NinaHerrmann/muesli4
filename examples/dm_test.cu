@@ -91,19 +91,21 @@ namespace msl {
         };
 
         void dm_test(int dim) {
-          //printf("Starting dm_test...\n");
+          printf("Starting dm_test...\n");
           DM<int> a(10,10, 2);
-          DM<int> b(10,10, 1);
-          Sum sum;
           a.show("a1");
-
+          
+          DM<int> b(10,10, 1);
+          b.show("b1");
+ 
           Produkt pr;
           a.mapIndexInPlace(pr);
-          a.show("a4");
+          a.show("a2");
 
           int result = a.fold(sum,true);
           printf("result: %i\n",result);
 
+          Sum sum;
           b.zipInPlace(a,sum);
           b.show("b2");
 
@@ -139,7 +141,7 @@ namespace msl {
           a.show("a5");
 
           Proj2 pr2;
-          a.zipInPlaceAAM(ar1,ar2,b,pr1);
+          a.zipInPlaceAAM(ar1,ar2,b,pr2);
           a.show("a6");
 
           Proj4 pr4;

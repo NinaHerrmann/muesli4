@@ -67,7 +67,7 @@ __global__ void msl::detail::zipKernelAAM(T1* in1, T2* in2, T3* in3, T4*in4,
   size_t k = blockIdx.x * blockDim.x + threadIdx.x;
   int i = ((k + first) / ncols) - first2;
   if (k < n) {
-    out[k] = func(in1[k], in2[i], in3[i], in2[k]);
+    out[k] = func(in1[k], in2[i], in3[i], in4[k]);
   }
 }
 
