@@ -2,7 +2,7 @@
  * map_kernels.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -41,38 +41,30 @@ namespace msl {
 namespace detail {
 
 template <typename T, typename R, typename F>
-__global__ void mapKernel(T* in,
-                          R* out,
-                          size_t size,
-                          F func);
+__global__ void mapKernel(T *in, R *out, size_t size, F func);
 
 template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T* in,
-                               R* out,
-                               size_t size,
-                               size_t first,
-                               F func,
+__global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
                                bool localIndices);
 
 // new kernel for DM, HK 06.11.2020
 template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T* in,
-                               R* out,
-                               size_t size,
-                               size_t first,
-                               F func,
+__global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
                                int ncols);
 
 template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T* in,
-                               R* out,
-                               GPUExecutionPlan<T> plan,
-                               F func,
+__global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
 
-template <typename T>
-__global__ void printFromGPU(T* A);
-//template <typename T, typename R, typename F>
+template <typename T, typename R, typename MapStencilFunctor,
+          typename NeutralValueFunctor>
+__global__ void mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
+                                 MapStencilFunctor func,
+                                 NeutralValueFunctor neutral_value_func,
+                                 int tile_width, int tile_height);
+
+template <typename T> __global__ void printFromGPU(T *A);
+// template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,
 //                                 R* out,
 //                                 GPUExecutionPlan<T> plan,
@@ -80,7 +72,7 @@ __global__ void printFromGPU(T* A);
 //                                 F func,
 //                                 int tile_width);
 
-//template <typename T, typename R, typename F>
+// template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,
 //                                 R* out,
 //                                 GPUExecutionPlan<T> plan,
@@ -88,8 +80,7 @@ __global__ void printFromGPU(T* A);
 //                                 F func,
 //                                 int tile_width);
 
-}
-}
+} // namespace detail
+} // namespace msl
 
 #include "../../src/map_kernels.cu"
-

@@ -1,5 +1,6 @@
+
 /*
- * exec_plan.h
+ * argtype.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
  *
@@ -32,38 +33,36 @@
 
 #pragma once
 
-template <typename T> struct GPUExecutionPlan {
-  // Number of elements per GPU
-  int size;
+namespace msl {
 
-  // Number of byte stored on the GPU
-  size_t bytes;
+/**
+ * \brief Base class for argument types of functors.
+ *
+ * Arguments to functors are added in terms of data members. The types (except
+ * for POD types) of these data members must inherit from this class. This is
+ * necessary in a hybrid (and/or in a multi-GPU) setting. Pointer members need
+ * to point to the correct memory: when dereferenced by the CPU the pointer must
+ * point to some location in host main memory, when dereferenced by GPU 1 it
+ * must point to some location in GPU 1 main memory and so on.
+ */
+class ArgumentType {
+public:
+  /**
+   * \brief Updates all pointer members to point to the correct memory.
+   */
+  virtual void update() = 0;
 
-  // Number of rows on the GPU
-  int nLocal;
+  virtual int getSmemSize() const { return 0; }
 
-  // Number of columns on the GPU
-  int mLocal;
+  virtual void setTileWidth(int tw) { tile_width = tw; }
 
-  // Index of the first element processed in the GPU. If data structure is a
-  // matrix, then this is the row major index.
-  int first;
+  /**
+   * \brief Virtual destructor.
+   */
+  virtual ~ArgumentType() {}
 
-  // First row where the GPU processing starts
-  int firstRow;
-
-  // First column where the GPU processing starts
-  int firstCol;
-
-  // Last row where the GPU processing ends (Local)
-  int lastRow;
-
-  // Last column where the GPU processing ends. (Local)
-  int lastCol;
-
-  // Host copy of the data stored in the GPU
-  T *h_Data;
-
-  // Data stored in the GPU
-  T *d_Data;
+protected:
+  int tile_width;
 };
+
+} // namespace msl

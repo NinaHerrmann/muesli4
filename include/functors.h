@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include "argtype.h"
+#include "functor_base.h"
 namespace msl {
 
 /**************************************************************************
@@ -142,26 +144,109 @@ public:
   virtual ~Functor4() {}
 };
 
+template <typename T> class PLMatrix;
+
 /**
- * Represents a functor that takes an array of arguments and produces one
- * output.
- * @tparam I Type of elements in the input array
- * @tparam O Type of elements int the output array
+ * \brief Class MMapStencilFunctor represents a functor for the mapStencil
+ * skeleton of the distributed matrix.
+ *
+ * @tparam T Input data type.
+ * @tparam R Output data type.
  */
-template <typename I, typename O> class FunctorCollection {
+template <typename T, typename R>
+class MMapStencilFunctor : public detail::MatrixFunctorBase {
+public:
   /**
-   * \brief Function call operator has to be implemented by the user.
+   * \brief Default Constructor.
    *
-   * @param x 1st input for the operator.
-   * @return Output of the operator.
+   * Sets a default stencil size of 1.
+   */
+  MMapStencilFunctor() : stencil_size(1) {
+    this->setTileWidth(msl::DEFAULT_TILE_WIDTH);
+  }
+
+  /**
+   * \brief Function call operator has to be implemented by the user. Here,
+   *        the actual function is implemented.
+   *
+   * @param rowIndex Global row index of the input value.
+   * @param colIndex Global column index of the input value.
+   * @param input Input for the map stencil function.
+   * @return Output of the map stencil function.
    */
   MSL_USERFUNC
-  virtual O operator()(I *x) const = 0;
+  virtual R operator()(int rowIndex, int colIndex,
+                       const PLMatrix<T> &input) const = 0;
+
+  /**
+   * \brief Returns the stencil size.
+   *
+   * @return The stencil size.
+   */
+  int getStencilSize() { return stencil_size; }
+
+  /**
+   * \brief Sets the stencil size.
+   *
+   * @param value The new stencil size.
+   */
+  void setStencilSize(int value) { stencil_size = value; }
 
   /**
    * \brief Destructor.
    */
-  virtual ~FunctorCollection() {}
+  virtual ~MMapStencilFunctor() {}
+
+protected:
+  int stencil_size;
 };
+
+// /**
+//  * Represents a functor that takes an array of arguments and produces one
+//  * output.
+//  * @tparam I Type of elements in the input array
+//  * @tparam O Type of elements int the output array
+//  */
+// template <typename I, typename O> class StencilFunctor {
+
+//   // Radius of the stencil. This is the number of elements from the center of
+//   // the stencil up to the edge in each direction.
+// public:
+//   int stencil_radius_;
+
+//   /**
+//    * @brief Construct a new Stencil Functor object
+//    *
+//    * @param stencil_radius
+//    */
+//   StencilFunctor(int stencil_radius) : stencil_radius_(stencil_radius) {}
+
+//   /**
+//    * @brief Function call operator has to be implemented by the user.
+//    *
+//    * @param row row for the center of the stencil
+//    * @param col col for the center of the stencil
+//    * @param tile_cols Number of columns that are part of the tile. This
+//    includes
+//    * halo columns
+//    * @param tile_rows Number of rows that are part of the tile. This includes
+//    * halo rows
+//    * @param tile_elements elements in the tile that contains the stencil.
+//    Tile
+//    * MUST include the halo cells as well
+//    * @return A value of type O
+//    */
+//   MSL_USERFUNC virtual O operator()(int tile_local_row, int tile_local_col,
+//                                     int tile_cols, int tile_rows,
+//                                     I *tile_elements) const = 0;
+
+//   /**
+//    * \brief Destructor.
+//    */
+//   virtual ~StencilFunctor() {}
+
+// public:
+//   const int GetStencilRadius() { return stencil_radius_; }
+// };
 
 } // namespace msl

@@ -93,6 +93,17 @@ public:
   DM(int col, int row, const T &initial_value);
 
   /**
+   * @brief Creates a distributed matrix with \em size elements equal to
+   *        \em initial_value.
+   * @param col number or columns
+   * @param row Number of rows
+   * @param initial_value Initial value of the matrix
+   * @param rowComplete if true, the matrix will be distributed between nodes in
+   * full rows. If mapStencil will be used, this option needs to be set to true.
+   */
+  DM(int col, int row, const T &initial_value, bool rowComplete);
+
+  /**
    * \brief Destructor.
    */
   ~DM();
@@ -215,7 +226,22 @@ public:
    * @return The newly created distributed array.
    */
   template <typename R, typename MapStencilFunctor>
-  DM<R> mapStencil(MapStencilFunctor &f, T neutral_value, float cpu_percentage);
+  DM<R> mapStencil(MapStencilFunctor &f, T neutral_value);
+
+  /**
+   * @brief Non-inplace variant of the mapStencil skeleton.
+   *
+   * @tparam R type of the resulting matrix
+   * @tparam MapStencilFunctor
+   * @tparam NeutralValueFunctor
+   * @param f
+   * @param neutral_value_functor
+   * @return DM<R>
+   */
+  template <typename R, typename MapStencilFunctor,
+            typename NeutralValueFunctor>
+  DM<R> mapStencil(MapStencilFunctor &f,
+                   NeutralValueFunctor &neutral_value_functor);
 
 #ifndef __CUDACC__
 
@@ -607,14 +633,18 @@ private:
   T *localPartition;
   // position of processor in data parallel group of processors; zero-base
   int id;
+
   // number of elements
   int n;
+
   // number of local elements
-  int ncol;
-  // number of cols
-  int nrow;
-  // number of rows
   int nLocal;
+
+  // number of cols
+  int ncol;
+  // number of rows
+  int nrow;
+
   // first (global) index of local partition
   int firstIndex;
   // first (global) row in local partition
@@ -639,6 +669,10 @@ private:
   // firstIndex caclulated by GPU
   int indexGPU;
 
+  // Indicates whether the matrix should be distributed in full rows between
+  // the nodes. The map stencil functor needs this type of distribution
+  bool rowComplete;
+
   //
   // AUXILIARY
   //
@@ -651,6 +685,8 @@ private:
 
   // returns the GPU id that locally stores the element at index index.
   int getGpuId(int index) const;
+
+  int getFirstGpuRow() const;
 };
 
 } // namespace msl
