@@ -64,15 +64,14 @@ public:
    * stencil to the edge
    * @param tw Width of the data tile without the padding
    * @param th Height of the data tile without the padding
-   * @param gr Row idx where the GPU calculation should start
    * @param nv_functor Functor with two input params of type int that should
    * return neutral values for a specific position in the matrix
    */
-  PLMatrix(int n, int m, int r, int c, int ss, int tw, int th, int gr,
+  PLMatrix(int n, int m, int r, int c, int ss, int tw, int th,
            NeutralValueFunctor &nv_functor)
       : ArgumentType(), current_data(0), shared_data(0), n(n), m(m), rows(r),
         cols(c), stencil_size(ss), firstRow(Muesli::proc_id * r),
-        firstRowGPU(gr), tile_width(tw), width(2 * stencil_size + tile_width),
+        tile_width(tw), width(2 * stencil_size + tile_width),
         neutral_value_functor(nv_functor) {}
 
   /**
@@ -153,22 +152,33 @@ public:
   }
 
 #ifdef __CUDACC__
+
   /**
-   * \brief Each thread block (on the GPU) reads elements from the padded local
+   * @brief Each thread block (on the GPU) reads elements from the padded local
    *        matrix to shared memory. Called by the mapStencil skeleton kernel.
+   * Note that in this case, current_data will point to the GPU memory it was
+   * pointing to at the moment this object was copied to the GPU memory.
+   *
+   * @param r Global Row
+   * @param c Global Col
+   * @param tile_width
+   * @return __device__
    */
-  __device__ void readToSharedMem(int r, int c, int tile_width) {
+  __device__ void readToSharedMem(int r, int c, int tile_width, tile_height) {
     int tx = threadIdx.x;
     int ty = threadIdx.y;
-    int row = r - firstRow;
+    int row = r - firstRow; // Get the local row
     T *smem = SharedMemory<T>();
 
     // read assigned value into shared memory
     smem[(ty + stencil_size) * width + tx + stencil_size] =
-        current_data[(row + stencil_size) * cols + c];
+        current_data[(row + stencil_size) * cols +
+                     c]; // the current data does not have padding on the left
+                         // and right
 
     // read halo values
     // first row of tile needs to read upper stencil_size rows of halo values
+    // corner will be skipped here because it will be read further down the line
     if (ty == 0) {
       for (int i = 0; i < stencil_size; i++) {
         smem[i * width + stencil_size + tx] =
@@ -189,7 +199,7 @@ public:
     if (tx == 0) {
       for (int i = 0; i < stencil_size; i++) {
         if (c + i - stencil_size < 0) {
-          smem[(ty + stencil_size) * width + i] = neutral_value(row, col);
+          smem[(ty + stencil_size) * width + i] = neutral_value(r, c);
         } else
           smem[(ty + stencil_size) * width + i] =
               current_data[(row + stencil_size) * cols + c + i - stencil_size];

@@ -84,33 +84,25 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
 
 template <typename T, typename R, typename MapStencilFunctor,
           typename NeutralValueFunctor>
-__global__ void msl::detail::mapStencilKernel(
-    T *in, R *out, GPUExecutionPlan<T> plan, MapStencilFunctor func,
-    NeutralValueFunctor neutral_value_func, int tile_width, int tile_height,
-    int stencil_radius) {
+__global__ void
+msl::detail::mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
+                              PLMatrix<T> *input, MapStencilFunctor func,
+                              NeutralValueFunctor neutral_value_func,
+                              int tile_width, int tile_height) {
 
-  extern __shared__ T shared[];
-  size_t gpu_local_col = blockIdx.x * blockDim.x + threadIdx.x;
-  size_t gpu_local_row = blockIdx.y * blockDim.y + threadIdx.y;
+  size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (gpu_local_col >= plan.mLocal || gpu_local_row >= plan.nLocal) {
-    return;
-  }
-  size_t global_row = plan.firstRow + gpu_local_row;
-  size_t global_col = plan.firstCol + gpu_local_col;
-  size_t block_local_row = threadIdx.y;
-  size_t block_local_col = threadIdx.x;
-  size_t smem_width = tile_width + stencil_radius * 2;
-  size_t smem_height = tile_height + stencil_radius * 2;
-
-  shared[(block_local_row + stencil_radius) * smem_width + block_local_col +
-         stencil_radius];
-  if (block_local_row == 0) {
-    // need to load halo to shared memory
-    for (int i = 0; i < stencil_radius; i++) {
-      // shared[i]
+  if (y < plan.gpuRows) {
+    if (x < plan.gpuCols) {
+      // Global indexes are passed to the shared memory function.
+      input->readToSharedMem(y + plan.firstRow, x + plan.firstCol, tile_width,
+                             tile_height);
+      out[y * plan.mLocal + x] =
+          func(y + plan.firstRow, x + plan.firstCol, *input);
     }
   }
+  __syncthreads();
 }
 
 // template <typename T, typename R, typename F>

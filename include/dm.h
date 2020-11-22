@@ -83,6 +83,8 @@ public:
    */
   DM(int col, int row);
 
+  DM(int col, int row, bool rowComplete);
+
   /**
    * \brief Creates a distributed matrix with \em size elements equal to
    *        \em initial_value.
@@ -639,6 +641,11 @@ private:
 
   // number of local elements
   int nLocal;
+
+  // Number of local rows. If the distribution is not row complete, a row will
+  // be counted if one or more elements from that row are part of this
+  // partition.
+  int nlocalRows;
 
   // number of cols
   int ncol;

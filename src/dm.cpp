@@ -71,6 +71,20 @@ msl::DM<T>::DM(int row, int col) : ncol(col), nrow(row), n(col * row) {
   cpuMemoryInSync = true;
 }
 
+template <typename T>
+msl::DM<T>::DM(int row, int col, bool rowComplete)
+    : ncol(col), nrow(row), n(col * row), rowComplete(rowComplete) {
+  init();
+
+#ifdef __CUDACC__
+  CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+  initGPUs();
+#else
+  localPartition = new T[nLocal];
+#endif
+  cpuMemoryInSync = true;
+}
+
 // constructor creates a DM, initialized with v
 template <typename T>
 msl::DM<T>::DM(int row, int col, const T &v)
@@ -93,12 +107,13 @@ template <typename T>
 msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
     : ncol(col), nrow(row), n(col * row), rowComplete(rowComplete) {
   init();
-  localPartition = new T[nLocal];
+
 #ifdef __CUDACC__
   // TODO die CPU Elemente brauchen wir nicht unbedingt.
   CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
   initGPUs();
 #else
+  localPartition = new T[nLocal];
 #endif
 #pragma omp parallel for
   for (int i = 0; i < nLocal; i++)
@@ -124,6 +139,8 @@ template <typename T> void msl::DM<T>::init() {
     }
     nLocal = nLocalRows * ncol;
   }
+
+  nlocalRows = nLocal % ncol == 0 ? nLocal / ncol : nLocal / ncol + 1;
 
   // TODO (endizhupani@uni-muenster.de): This could result in rows being split
   // between GPUs. Can be problematic for stencil ops.
@@ -154,6 +171,8 @@ template <typename T> void msl::DM<T>::initGPUs() {
     plans[i].firstCol = plans[i].first % ncol;
     plans[i].lastRow = (plans[i].first + plans[i].nLocal) / ncol;
     plans[i].lastCol = (plans[i].first + plans[i].nLocal) % ncol;
+    plans[i].gpuRows = plans[i].lastRow - plans[i].firstRow + 1;
+    plans[i].gpuCols = plans[i].lastCol - plans[i].firstCol + 1;
     plans[i].h_Data = localPartition + gpuBase;
     CUDA_CHECK_RETURN(cudaMalloc(&plans[i].d_Data, plans[i].bytes));
     gpuBase += plans[i].size;
@@ -341,7 +360,7 @@ template <typename T> int msl::DM<T>::getGpuId(int index) const {
 }
 
 template <typename T> int msl::DM<T>::getFirstGpuRow() const {
-  return nCPU / ncol;
+  return indexGPU / ncol;
 }
 
 // method (only) useful for debbuging
@@ -622,7 +641,7 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
 
   // Obtain stencil size.
   int stencil_size = f.getStencilSize();
-  int size = (nLocal + 2 * stencil_size) * mLocal;
+  int size = (nLocal + 2 * stencil_size) * ncol;
   // Prepare padded local partition. We need additional 2*stencil_size rows.
   T *padded_local_matrix;
   cudaMallocHost(&padded_local_matrix, size * sizeof(T));
@@ -638,17 +657,17 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   // Gather border regions.
   MPI_Status stat;
   MPI_Request req;
-  int padding_size = stencil_size * mLocal;
+  int padding_size = stencil_size * ncol;
   // Top down (send last stencil_size rows to successor):
   // Non-blocking send.
   if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-    T *buffer = localPartition + (nLocal - stencil_size) * mLocal;
+    T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
     MSL_ISend(Muesli::proc_id + 1, buffer, req, padding_size, msl::MYTAG);
   }
 
   // Copy localPartition to padded_local_matrix
-  std::copy(localPartition, localPartition + localsize,
-            padded_local_matrix + (stencil_size * mLocal));
+  std::copy(localPartition, localPartition + nLocal,
+            padded_local_matrix + padding_size);
 
   // Blocking receive.
   if (Muesli::proc_id > 0) {
@@ -670,7 +689,7 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
 
   // Blocking receive.
   if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-    T *buffer = padded_local_matrix + (nLocal + stencil_size) * mLocal;
+    T *buffer = padded_local_matrix + (nlocalRows + stencil_size) * ncol;
     MSL_Recv(Muesli::proc_id + 1, buffer, stat, padding_size, msl::MYTAG);
   }
 
@@ -686,19 +705,18 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   // process n-1 need to fill upper (lower) border regions with neutral value.
   if (Muesli::proc_id == 0) {
 #pragma omp parallel for default(none)                                         \
-    firstprivate(stencil_size, mLocal, neutral_value_functor)                  \
+    firstprivate(stencil_size, ncol, neutral_value_functor)                    \
         shared(padded_local_matrix)
-    for (int i = 0; i < stencil_size * mLocal; i++) {
-      padded_local_matrix[i] =
-          neutral_value_functor(i / stencil_size, i % stencil_size);
+    for (int i = 0; i < padding_size; i++) {
+      padded_local_matrix[i] = neutral_value_functor(i / ncol, i % ncol);
     }
   }
   if (Muesli::proc_id == Muesli::num_local_procs - 1) {
 #pragma omp parallel for default(none)                                         \
-    firstprivate(stencil_size, mLocal, neutral_value_functor)                  \
+    firstprivate(stencil_size, ncol, neutral_value_functor)                    \
         shared(padded_local_matrix
-    for (int i = (nLocal + stencil_size) * mLocal;
-         i < (nLocal + 2 * stencil_size) * mLocal; i++) {
+    for (int i = (nLocal + stencil_size) * ncol;
+         i < (nLocal + 2 * stencil_size) * ncol; i++) {
       padded_local_matrix[i] =
           neutral_value_functor(i / stencil_size, i % stencil_size);
     }
@@ -708,23 +726,32 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   padding_time += (MPI_Wtime() - t);
   t = MPI_Wtime();
 
-  // Upload buffers.
+  // Device data for the padded local matrix
   std::vector<T *> d_padded_local_matrix(Muesli::num_gpus);
   // Create padded local matrix.
-  msl::PLMatrix<T> plm(n, m, nLocal, mLocal, stencil_size, tile_width,
-                       tile_width, getFirstGpuRow(), neutral_value);
+  msl::PLMatrix<T> plm(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width,
+                       tile_width, getFirstGpuRow(), neutral_value_functor);
   for (int i = 0; i < Muesli::num_gpus; i++) {
+    int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
     cudaSetDevice(i);
-    CUDA_CHECK_RETURN(
-        cudaMalloc((void **)&d_padded_local_matrix[i], sizeof(T) * size));
+    CUDA_CHECK_RETURN(cudaMalloc((void **)&d_padded_local_matrix[i],
+                                 sizeof(T) * (gpu_elements)));
+
+    int firstLocalGpuRow = plans[i].firstRow - firstRow;
+    // in this case, because of the top padding the copy will start from
+    // firstRow - stencilSize rows, which is what we want.
     CUDA_CHECK_RETURN(cudaMemcpyAsync(
-        d_padded_local_matrix[i], padded_local_matrix, sizeof(T) * size,
-        cudaMemcpyHostToDevice, Muesli::streams[i]));
+        d_padded_local_matrix[i],
+        padded_local_matrix + (plans[i].firstRow * ncol),
+        sizeof(T) * gpu_elements, cudaMemcpyHostToDevice, Muesli::streams[i]));
     plm.addDevicePtr(d_padded_local_matrix[i]);
   }
 
-  // Upload data (this).
-  // upload(1);
+  // Add the CPU Data as a pointer
+  plm.addDevicePtr(padded_local_matrix);
+
+  // // Upload data (this).
+  // // upload(1);
 
   // Upload padded local partitions.
   std::vector<PLMatrix<T> *> d_plm(Muesli::num_gpus);
@@ -739,26 +766,37 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   }
 
   // Map stencil
-  DM<R> result(n, m, blocksInCol, blocksInRow, dist);
-  result.upload(1); // alloc only
+  DM<R> result(ncol, nrow, rowComplete);
+  // result.upload(1); // no longer needed becasue the allocation is done during
+  // construction
   upload_time += (MPI_Wtime() - t);
   t = MPI_Wtime();
 
   int smem_size = (tile_width + 2 * stencil_size) *
                   (tile_width + 2 * stencil_size) * sizeof(T);
   for (int i = 0; i < Muesli::num_gpus; i++) {
-    f.init(plans[i].nLocal, plans[i].mLocal, plans[i].firstRow,
+    f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
            plans[i].firstCol);
     f.notify();
 
     cudaSetDevice(i);
+    // TODO (endizhupani@uni-muenster.de): Add logic to enable nonsquare tiles.
     dim3 dimBlock(tile_width, tile_width);
-    dim3 dimGrid((plans[i].mLocal + dimBlock.x - 1) / dimBlock.x,
-                 (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);
+    // What des this calculation mean???
+    dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
+                 (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
+    // TODO (endizhupani@uni-muenster.de): The GPUExecPlan did not get allocated
+    // in the GPU whereas the PLM did. Difference between classes and
+    // structures?
     detail::
         mapStencilKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
             plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i],
-            d_plm[i], f, tile_width);
+            d_plm[i], f, tile_width, tile_width);
+  }
+
+#pragma omp parallel for firstprivate(nCPU, f, ncol, firstRow, plm, result)
+  for (int i = 0; i < nCPU; i++) {
+    result.setLocal(i / ncol, i % ncol, f(i / ncol + firstRow, i % ncol, plm));
   }
 
   // Check for errors during gpu computation.

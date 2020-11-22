@@ -40,19 +40,27 @@ template <typename T> struct GPUExecutionPlan {
   size_t bytes;
 
   // Number of rows on the GPU
+  // On the new DM data structure this has been repurposed to hold the number of
+  // elements.
   int nLocal;
 
-  // Number of columns on the GPU
+  // Number of columns on the GPU. Obsolete on the new data structure
   int mLocal;
+
+  // Number of rows on the GPU (relevant for the new Data structures only)
+  int gpuRows;
+
+  // Number of columns on the GPU (relevant on the new data structures only)
+  int gpuCols;
 
   // Index of the first element processed in the GPU. If data structure is a
   // matrix, then this is the row major index.
   int first;
 
-  // First row where the GPU processing starts
+  // First row where the GPU processing starts (local)
   int firstRow;
 
-  // First column where the GPU processing starts
+  // First column where the GPU processing starts (local)
   int firstCol;
 
   // Last row where the GPU processing ends (Local)
