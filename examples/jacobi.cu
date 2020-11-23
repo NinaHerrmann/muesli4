@@ -15,49 +15,13 @@ namespace msl {
 
 namespace jacobi {
 
-/**
- * @brief Averages the top, bottom, left and right neighbours of a specific
- * element
- *
- */
-class JacobiSweepFunctor : public MMapStencilFunctor<float, float> {
-  MSL_USERFUNC
-  float operator()(int rowIndex, int colIndex,
-                   const msl::PLMatrix<float> &input) const {
-    float sum = 0;
-    for (int i = -stencil_radius_; i <= stencil_radius_; i++) {
-      if (i == 0)
-        continue;
-      sum += input.get(row + i, col);
-    }
-
-    for (int i = -stencil_radius_; i <= stencil_radius_; i++) {
-      if (i == 0)
-        continue;
-      sum += input.get(row, col + i);
-    }
-    return sum / (4 * stencil_radius_);
-  }
-}
-
-class AbsoluteDifference : public Functor2<float, float, float> {
-  MSL_USERFUNC
-  float operator()(float x, float y) {
-    auto diff = x - y;
-    if (diff < 0) {
-      diff *= (-1);
-    }
-    return diff;
-  }
-}
-
 class JacobiNeutralValueFunctor : public Functor2<int, int, float> {
 public:
   JacobiNeutralValueFunctor(int glob_rows, int glob_cols, float default_neutral)
       : glob_cols_(glob_cols), glob_rows_(glob_rows),
         default_neutral(default_neutral) {}
   MSL_USERFUNC
-  float operator()(int x, int y) { // here, x represents rows
+  virtual float operator()(int x, int y) const { // here, x represents rows
     // left and right column must be 100;
     if (y < 0 || y >= glob_cols_) {
       return 100;
@@ -86,49 +50,88 @@ private:
   int glob_cols_;
 
   int default_neutral;
-}
+};
+/**
+ * @brief Averages the top, bottom, left and right neighbours of a specific
+ * element
+ *
+ */
+class JacobiSweepFunctor
+    : public MMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
+
+  JacobiSweepFunctor() : MMapStencilFunctor() {}
+  MSL_USERFUNC
+  virtual float operator()(
+      int rowIndex, int colIndex,
+      const msl::PLMatrix<float, JacobiNeutralValueFunctor> &input) const {
+    float sum = 0;
+    for (int i = -stencil_size; i <= stencil_size; i++) {
+      if (i == 0)
+        continue;
+      sum += input.get(rowIndex + i, colIndex);
+    }
+
+    for (int i = -stencil_size; i <= stencil_size; i++) {
+      if (i == 0)
+        continue;
+      sum += input.get(rowIndex, colIndex + i);
+    }
+    return sum / (4 * stencil_size);
+  }
+};
+
+class AbsoluteDifference : public Functor2<float, float, float> {
+public:
+  MSL_USERFUNC
+  virtual float operator()(float x, float y) const {
+    auto diff = x - y;
+    if (diff < 0) {
+      diff *= (-1);
+    }
+    return diff;
+  }
+};
 
 class Max : public Functor2<float, float, float> {
+public:
   MSL_USERFUNC
-  float operator()(float x, float y) {
+  virtual float operator()(float x, float y) {
     if (x > y)
       return x;
 
     return y;
   }
-}
-
-} // namespace jacobi
-} // namespace msl
+};
 
 int run(int n, int m, int stencil_radius) {
-  msl::DM<float> mat(m, n, 75, true);
+  DM<float> mat(m, n, 75, true);
 
-  msl::jacobi::AbsoluteDifference difference_functor();
-  msl::jacobi::Max max_functor();
+  AbsoluteDifference difference_functor();
+  Max max_functor();
   float global_diff = 10;
 
   // mapStencil
-  msl::jacobi::Jacobi jacobi();
+  JacobiSweepFunctor jacobi();
 
   // Neutral value provider
-  msl::jacobi::JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
+  JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
 
-  int num_iter;
+  int num_iter = 0;
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
-    msl::DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
+    DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
 
-    if (num_iter % 4 == 0) {
-      msl::DM<float> differences = new_m.zip(mat, difference_functor);
-      global_diff = differneces.fold(max_functor, true);
-    }
+    // if (num_iter % 4 == 0) {
+    //   DM<float> differences = new_m.zip(mat, difference_functor);
+    //   global_diff = differences.fold(max_functor, true);
+    // }
     std::swap(new_m, mat);
     num_iter++;
   }
 
   return 0;
 }
-
+} // namespace jacobi
+} // namespace msl
 int main(int argc, char **argv) {
   msl::initSkeletons(argc, argv);
 
@@ -152,13 +155,13 @@ int main(int argc, char **argv) {
   msl::setNumRuns(nRuns);
 
   msl::startTiming();
-  for (int run = 0; run < msl::Muesli::num_runs; ++run) {
-    // Create matrix.
-    run(n, m, stencil_radius);
-    // mat.show();
-    msl::splitTime(run);
+  for (int r = 0; r < msl::Muesli::num_runs; ++r) {
+    msl::jacobi::run(n, m, stencil_radius);
+    msl::splitTime(r);
   }
   msl::stopTiming();
 
   msl::terminateSkeletons();
+
+  return 0;
 }

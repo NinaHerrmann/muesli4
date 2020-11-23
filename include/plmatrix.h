@@ -1,3 +1,4 @@
+
 /*
  * plmatrix.h
  *
@@ -34,7 +35,7 @@
 #pragma once
 
 #include "argtype.h"
-#include "shared_mem.h"
+#include "detail/shared_mem.h"
 
 namespace msl {
 
@@ -164,7 +165,8 @@ public:
    * @param tile_width
    * @return __device__
    */
-  __device__ void readToSharedMem(int r, int c, int tile_width, tile_height) {
+  __device__ void readToSharedMem(int r, int c, int tile_width,
+                                  int tile_height) {
     int tx = threadIdx.x;
     int ty = threadIdx.y;
     int row = r - firstRow; // Get the local row
@@ -199,7 +201,7 @@ public:
     if (tx == 0) {
       for (int i = 0; i < stencil_size; i++) {
         if (c + i - stencil_size < 0) {
-          smem[(ty + stencil_size) * width + i] = neutral_value(r, c);
+          smem[(ty + stencil_size) * width + i] = neutral_value_functor(r, c);
         } else
           smem[(ty + stencil_size) * width + i] =
               current_data[(row + stencil_size) * cols + c + i - stencil_size];
@@ -212,7 +214,7 @@ public:
       for (int i = 0; i < stencil_size; i++) {
         if (c + i + 1 > m - 1)
           smem[(ty + stencil_size) * width + i + tile_width + stencil_size] =
-              neutral_value(row, col);
+              neutral_value_functor(r, c);
         else
           smem[(ty + stencil_size) * width + i + tile_width + stencil_size] =
               current_data[(row + stencil_size) * cols + c + i + 1];
@@ -224,7 +226,7 @@ public:
       for (int i = 0; i < stencil_size; i++) {
         for (int j = 0; j < stencil_size; j++) {
           if (c + j - stencil_size < 0)
-            smem[i * width + j] = neutral_value(row, col);
+            smem[i * width + j] = neutral_value_functor(r, c);
           else
             smem[i * width + j] =
                 current_data[(row + i) * cols + c + j - stencil_size];
@@ -238,7 +240,7 @@ public:
         for (int j = 0; j < stencil_size; j++) {
           if (c + j + 1 > m - 1)
             smem[i * width + j + stencil_size + tile_width] =
-                neutral_value(row, col);
+                neutral_value_functor(r, c);
           else
             smem[i * width + j + stencil_size + tile_width] =
                 current_data[(row + i) * cols + c + j + 1];
@@ -252,7 +254,7 @@ public:
         for (int j = 0; j < stencil_size; j++) {
           if (c + j - stencil_size < 0)
             smem[(i + stencil_size + tile_width) * width + j] =
-                neutral_value(row, col);
+                neutral_value_functor(r, c);
           else
             smem[(i + stencil_size + tile_width) * width + j] =
                 current_data[(row + i + stencil_size + 1) * cols + c + j -
@@ -267,7 +269,7 @@ public:
         for (int j = 0; j < stencil_size; j++) {
           if (c + j + 1 > m - 1)
             smem[(i + stencil_size + tile_width) * width + j + stencil_size +
-                 tile_width] = neutral_value(row, col);
+                 tile_width] = neutral_value_functor(r, c);
           else
             smem[(i + stencil_size + tile_width) * width + j + stencil_size +
                  tile_width] =
@@ -289,12 +291,20 @@ public:
    */
   void setFirstRowGPU(int fr) { firstRowGPU = fr; }
 
+  /**
+   * @brief Set the GLOBAL index of the first element on the PLM to be processed
+   * by the GPU.
+   *
+   * @param fi
+   */
+  void setFirstGPUIdx(int fi) { firstGPUIdx = fi; }
+
 private:
   std::vector<T *> ptrs;
   typename std::vector<T *>::iterator it;
   T *current_data, *shared_data;
-  int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width,
-      tile_height, width;
+  int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, firstGPUIdx,
+      tile_width, tile_height, width;
   NeutralValueFunctor neutral_value_functor;
 };
 

@@ -32,7 +32,7 @@
 #pragma once
 
 #include "argtype.h"
-#include "functor_base.h"
+#include "detail/functor_base.h"
 namespace msl {
 
 /**************************************************************************
@@ -144,7 +144,7 @@ public:
   virtual ~Functor4() {}
 };
 
-template <typename T> class PLMatrix;
+template <typename T, typename NeutralValueFunctor> class PLMatrix;
 
 /**
  * \brief Class MMapStencilFunctor represents a functor for the mapStencil
@@ -153,7 +153,7 @@ template <typename T> class PLMatrix;
  * @tparam T Input data type.
  * @tparam R Output data type.
  */
-template <typename T, typename R>
+template <typename T, typename R, typename NeutralValueFunctor>
 class MMapStencilFunctor : public detail::MatrixFunctorBase {
 public:
   /**
@@ -176,7 +176,7 @@ public:
    */
   MSL_USERFUNC
   virtual R operator()(int rowIndex, int colIndex,
-                       const PLMatrix<T> &input) const = 0;
+                       const PLMatrix<T, NeutralValueFunctor> &input) const = 0;
 
   /**
    * \brief Returns the stencil size.

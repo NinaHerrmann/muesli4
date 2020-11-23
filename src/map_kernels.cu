@@ -1,3 +1,4 @@
+
 /*
  * map_kernels.cpp
  *
@@ -82,12 +83,10 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
   }
 }
 
-template <typename T, typename R, typename MapStencilFunctor,
-          typename NeutralValueFunctor>
+template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
-                              PLMatrix<T> *input, MapStencilFunctor func,
-                              NeutralValueFunctor neutral_value_func,
+                              PLMatrix<T, NeutralValueFunctor> *input, F func,
                               int tile_width, int tile_height) {
 
   size_t y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -98,43 +97,13 @@ msl::detail::mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
       // Global indexes are passed to the shared memory function.
       input->readToSharedMem(y + plan.firstRow, x + plan.firstCol, tile_width,
                              tile_height);
-      out[y * plan.mLocal + x] =
+      out[y * plan.gpuCols + x] =
           func(y + plan.firstRow, x + plan.firstCol, *input);
     }
   }
   __syncthreads();
 }
 
-// template <typename T, typename R, typename F>
-//__global__ void msl::detail::mapStencilKernel(T* in, R* out,
-// GPUExecutionPlan<T> plan, PLArray<T>* input, F func, int tile_width)
-//{
-//  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-//
-//  if (x < plan.size) {
-//    input->readToSharedMem(x+plan.first, tile_width);
-//    out[x] = func(x + plan.first, *input);
-//  }
-//
-//  __syncthreads();
-//}
-
-// template <typename T, typename R, typename F>
-//__global__ void msl::detail::mapStencilKernel(T* in, R* out,
-// GPUExecutionPlan<T> plan, PLMatrix<T>* input, F func, int tile_width)
-//{
-//  size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-//  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-//
-//  if (y < plan.nLocal) {
-//    if (x < plan.mLocal) {
-//      input->readToSharedMem(y+plan.firstRow, x+plan.firstCol, tile_width);
-//      out[y * plan.mLocal + x] = func(y + plan.firstRow, x + plan.firstCol,
-//      *input);
-//    }
-//  }
-//  __syncthreads();
-//}
 template <typename T> __global__ void msl::detail::printFromGPU(T *A) {
   int i = threadIdx.x;
   printf("i:%d; A[%d];", i, A[i]);

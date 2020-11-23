@@ -57,16 +57,16 @@ template <typename T> struct GPUExecutionPlan {
   // matrix, then this is the row major index.
   int first;
 
-  // First row where the GPU processing starts (local)
+  // First row where the GPU processing starts (global)
   int firstRow;
 
-  // First column where the GPU processing starts (local)
+  // First column where the GPU processing starts (global)
   int firstCol;
 
-  // Last row where the GPU processing ends (Local)
+  // Last row where the GPU processing ends (global)
   int lastRow;
 
-  // Last column where the GPU processing ends. (Local)
+  // Last column where the GPU processing ends. (global)
   int lastCol;
 
   // Host copy of the data stored in the GPU

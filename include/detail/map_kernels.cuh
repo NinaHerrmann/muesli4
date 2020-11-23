@@ -56,19 +56,10 @@ template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
 
-template <typename T, typename R, typename MapStencilFunctor,
-          typename NeutralValueFunctor>
+template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
-                                 MapStencilFunctor func,
-                                 NeutralValueFunctor neutral_value_func,
-                                 int tile_width, int tile_height);
-
-template <typename T, typename R, typename MapStencilFunctor,
-          typename NeutralValueFunctor>
-__global__ void mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
-                                 PLMatrix<T> *input, MapStencilFunctor func,
-                                 NeutralValueFunctor neutral_value_func,
-                                 int tile_width, int tile_height);
+                                 PLMatrix<T, NeutralValueFunctor> *input,
+                                 F func, int tile_width, int tile_height);
 
 template <typename T> __global__ void printFromGPU(T *A);
 // template <typename T, typename R, typename F>
@@ -76,14 +67,6 @@ template <typename T> __global__ void printFromGPU(T *A);
 //                                 R* out,
 //                                 GPUExecutionPlan<T> plan,
 //                                 PLArray<T>* input,
-//                                 F func,
-//                                 int tile_width);
-
-// template <typename T, typename R, typename F>
-//__global__ void mapStencilKernel(T* in,
-//                                 R* out,
-//                                 GPUExecutionPlan<T> plan,
-//                                 PLMatrix<T>* input,
 //                                 F func,
 //                                 int tile_width);
 

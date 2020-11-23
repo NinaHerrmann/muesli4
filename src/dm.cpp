@@ -614,15 +614,15 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f, T neutral_value) {
   throws(detail::NotYetImplementedException());
 }
 
+// template <typename T>
+// template <typename R, typename MapStencilFunctor>
+// msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f, T neutral_value) {
+//   printf("mapStencil\n");
+//   throws(detail::NotYetImplementedException());
+// }
 template <typename T>
-template <typename R, typename MapStencilFunctor>
-msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f, T neutral_value) {
-  printf("mapStencil\n");
-  throws(detail::NotYetImplementedException());
-}
-template <typename T>
-template <typename R, typename MapStencilFunctor, typename NeutralValueFunctor>
-msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
+template <typename MapStencilFunctor, typename NeutralValueFunctor>
+msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                                   NeutralValueFunctor &neutral_value_functor) {
 
   double t = MPI_Wtime();
@@ -632,12 +632,12 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                  "use the map stencil skeleton\n";
     fail_exit();
   }
-  // Check for row distribution.
-  if (blocksInRow > 1) {
-    std::cout << "Matrix must not be block distributed with more than 1 "
-                 "horizontal block for mapStencil!\n";
-    fail_exit();
-  }
+  // // Check for row distribution.
+  // if (blocksInRow > 1) {
+  //   std::cout << "Matrix must not be block distributed with more than 1 "
+  //                "horizontal block for mapStencil!\n";
+  //   fail_exit();
+  // }
 
   // Obtain stencil size.
   int stencil_size = f.getStencilSize();
@@ -645,19 +645,20 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   // Prepare padded local partition. We need additional 2*stencil_size rows.
   T *padded_local_matrix;
   cudaMallocHost(&padded_local_matrix, size * sizeof(T));
-  padding_time += (MPI_Wtime() - t);
-  t = MPI_Wtime();
+  // padding_time += (MPI_Wtime() - t);
+  // t = MPI_Wtime();
   // Update data in main memory if necessary.
   download(); // the data is transferred to main memory because the new padded
               // structures are going to be calculated. Since the padding is
               // being calculated by other GPUs they need to be exchanged.
-  upload_time += (MPI_Wtime() - t);
+  // upload_time += (MPI_Wtime() - t);
 
-  t = MPI_Wtime();
+  // t = MPI_Wtime();
   // Gather border regions.
   MPI_Status stat;
   MPI_Request req;
   int padding_size = stencil_size * ncol;
+
   // Top down (send last stencil_size rows to successor):
   // Non-blocking send.
   if (Muesli::proc_id < Muesli::num_local_procs - 1) {
@@ -669,6 +670,9 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   std::copy(localPartition, localPartition + nLocal,
             padded_local_matrix + padding_size);
 
+  // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
+  // be here. Can probably be placed after the second send and before the second
+  // receive
   // Blocking receive.
   if (Muesli::proc_id > 0) {
     MSL_Recv(Muesli::proc_id - 1, padded_local_matrix, stat, padding_size,
@@ -723,21 +727,21 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   }
 
   int tile_width = f.getTileWidth();
-  padding_time += (MPI_Wtime() - t);
-  t = MPI_Wtime();
+  // padding_time += (MPI_Wtime() - t);
+  // t = MPI_Wtime();
 
   // Device data for the padded local matrix
   std::vector<T *> d_padded_local_matrix(Muesli::num_gpus);
   // Create padded local matrix.
-  msl::PLMatrix<T> plm(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width,
-                       tile_width, getFirstGpuRow(), neutral_value_functor);
+  msl::PLMatrix<T, NeutralValueFunctor> plm(nrow, ncol, nlocalRows, ncol,
+                                            stencil_size, tile_width,
+                                            tile_width, neutral_value_functor);
   for (int i = 0; i < Muesli::num_gpus; i++) {
     int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
     cudaSetDevice(i);
     CUDA_CHECK_RETURN(cudaMalloc((void **)&d_padded_local_matrix[i],
                                  sizeof(T) * (gpu_elements)));
 
-    int firstLocalGpuRow = plans[i].firstRow - firstRow;
     // in this case, because of the top padding the copy will start from
     // firstRow - stencilSize rows, which is what we want.
     CUDA_CHECK_RETURN(cudaMemcpyAsync(
@@ -754,23 +758,25 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   // // upload(1);
 
   // Upload padded local partitions.
-  std::vector<PLMatrix<T> *> d_plm(Muesli::num_gpus);
+  std::vector<PLMatrix<T, NeutralValueFunctor> *> d_plm(Muesli::num_gpus);
   for (int i = 0; i < Muesli::num_gpus; i++) {
     cudaSetDevice(i);
+    plm.setFirstGPUIdx(plans[i].first);
     plm.setFirstRowGPU(plans[i].firstRow);
-    CUDA_CHECK_RETURN(cudaMalloc((void **)&d_plm[i], sizeof(PLMatrix<T>)));
-    CUDA_CHECK_RETURN(cudaMemcpyAsync(d_plm[i], &plm, sizeof(PLMatrix<T>),
-                                      cudaMemcpyHostToDevice,
-                                      Muesli::streams[i]));
+    CUDA_CHECK_RETURN(cudaMalloc((void **)&d_plm[i],
+                                 sizeof(PLMatrix<T, NeutralValueFunctor>)));
+    CUDA_CHECK_RETURN(cudaMemcpyAsync(
+        d_plm[i], &plm, sizeof(PLMatrix<T, NeutralValueFunctor>),
+        cudaMemcpyHostToDevice, Muesli::streams[i]));
     plm.update();
   }
 
   // Map stencil
-  DM<R> result(ncol, nrow, rowComplete);
+  DM<T> result(ncol, nrow, rowComplete);
   // result.upload(1); // no longer needed becasue the allocation is done during
   // construction
-  upload_time += (MPI_Wtime() - t);
-  t = MPI_Wtime();
+  // upload_time += (MPI_Wtime() - t);
+  // t = MPI_Wtime();
 
   int smem_size = (tile_width + 2 * stencil_size) *
                   (tile_width + 2 * stencil_size) * sizeof(T);
@@ -796,7 +802,9 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
 
 #pragma omp parallel for firstprivate(nCPU, f, ncol, firstRow, plm, result)
   for (int i = 0; i < nCPU; i++) {
-    result.setLocal(i / ncol, i % ncol, f(i / ncol + firstRow, i % ncol, plm));
+    // result.setLocal(i / ncol, i % ncol, f(i / ncol + firstRow, i % ncol,
+    // plm));
+    result.setLocal(i, f(i / ncol + firstRow, i % ncol, plm));
   }
 
   // Check for errors during gpu computation.
@@ -807,7 +815,7 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     CUDA_CHECK_RETURN(cudaFree(d_padded_local_matrix[i]));
   }
 
-  kernel_time += (MPI_Wtime() - t);
+  // kernel_time += (MPI_Wtime() - t);
   // Clean up.
   cudaFreeHost(padded_local_matrix);
 

@@ -35,21 +35,22 @@
 
 #include <type_traits>
 
-#include "exception.h"
+#include "detail/exception.h"
 #include "functors.h"
 #include "muesli.h"
 
-// #include "plarray.h"
-#include "conversion.h"
-#include "exec_plan.h"
+#include "detail/conversion.h"
+#include "detail/exec_plan.h"
+#include "plmatrix.h"
+
 
 #ifdef __CUDACC__
-#include "copy_kernel.cuh"
-#include "exec_plan.h"
-#include "fold_kernels.cuh"
-#include "map_kernels.cuh"
-#include "properties.cuh"
-#include "zip_kernels.cuh"
+#include "detail/copy_kernel.cuh"
+
+#include "detail/fold_kernels.cuh"
+#include "detail/map_kernels.cuh"
+#include "detail/properties.cuh"
+#include "detail/zip_kernels.cuh"
 
 #endif
 
@@ -218,17 +219,17 @@ public:
   template <typename MapStencilFunctor>
   void mapStencilInPlace(MapStencilFunctor &f, T neutral_value);
 
-  /**
-   * \brief Non-inplace variant of the mapStencil skeleton.
-   *
-   * @see mapStencilInPlace()
-   * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
-   * @tparam MapFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename MapStencilFunctor>
-  DM<R> mapStencil(MapStencilFunctor &f, T neutral_value);
+  // /**
+  //  * \brief Non-inplace variant of the mapStencil skeleton.
+  //  *
+  //  * @see mapStencilInPlace()
+  //  * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
+  //  * @tparam MapFunctor Functor type.
+  //  * @tparam R Return type.
+  //  * @return The newly created distributed array.
+  //  */
+  // template <typename R, typename MapStencilFunctor>
+  // DM<R> mapStencil(MapStencilFunctor &f, T neutral_value);
 
   /**
    * @brief Non-inplace variant of the mapStencil skeleton.
@@ -240,9 +241,8 @@ public:
    * @param neutral_value_functor
    * @return DM<R>
    */
-  template <typename R, typename MapStencilFunctor,
-            typename NeutralValueFunctor>
-  DM<R> mapStencil(MapStencilFunctor &f,
+  template <typename MapStencilFunctor, typename NeutralValueFunctor>
+  DM<T> mapStencil(MapStencilFunctor &f,
                    NeutralValueFunctor &neutral_value_functor);
 
 #ifndef __CUDACC__
