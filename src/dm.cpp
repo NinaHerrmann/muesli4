@@ -172,7 +172,18 @@ template <typename T> void msl::DM<T>::initGPUs() {
     plans[i].lastRow = (plans[i].first + plans[i].nLocal) / ncol;
     plans[i].lastCol = (plans[i].first + plans[i].nLocal) % ncol;
     plans[i].gpuRows = plans[i].lastRow - plans[i].firstRow + 1;
-    plans[i].gpuCols = plans[i].lastCol - plans[i].firstCol + 1;
+    if (plans[i].gpuRows > 2) {
+      plans[i].gpuCols = ncol;
+    } else if (plans[i].gpuRows == 2) {
+      if (plans[i].lastCol >= plans[i].firstCol) {
+        plans[i].gpuCols = ncol;
+      } else {
+        plans[i].gpuCols = ncol - (plans[i].firstCol - plans[i].lastCol);
+      }
+    } else if (plans[i].gpuRows > 0) {
+      plans[i].gpuCols = plans[i].lastCol - plans[i].firstCol;
+    }
+
     plans[i].h_Data = localPartition + gpuBase;
     CUDA_CHECK_RETURN(cudaMalloc(&plans[i].d_Data, plans[i].bytes));
     gpuBase += plans[i].size;
@@ -632,12 +643,6 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                  "use the map stencil skeleton\n";
     fail_exit();
   }
-  // // Check for row distribution.
-  // if (blocksInRow > 1) {
-  //   std::cout << "Matrix must not be block distributed with more than 1 "
-  //                "horizontal block for mapStencil!\n";
-  //   fail_exit();
-  // }
 
   // Obtain stencil size.
   int stencil_size = f.getStencilSize();
@@ -709,7 +714,7 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   // process n-1 need to fill upper (lower) border regions with neutral value.
   if (Muesli::proc_id == 0) {
 #pragma omp parallel for default(none)                                         \
-    firstprivate(stencil_size, ncol, neutral_value_functor)                    \
+    firstprivate(stencil_size, ncol, neutral_value_functor, padding_size)      \
         shared(padded_local_matrix)
     for (int i = 0; i < padding_size; i++) {
       padded_local_matrix[i] = neutral_value_functor(i / ncol, i % ncol);
@@ -717,8 +722,8 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   }
   if (Muesli::proc_id == Muesli::num_local_procs - 1) {
 #pragma omp parallel for default(none)                                         \
-    firstprivate(stencil_size, ncol, neutral_value_functor)                    \
-        shared(padded_local_matrix
+    firstprivate(stencil_size, ncol, neutral_value_functor, nLocal)            \
+        shared(padded_local_matrix)
     for (int i = (nLocal + stencil_size) * ncol;
          i < (nLocal + 2 * stencil_size) * ncol; i++) {
       padded_local_matrix[i] =
@@ -796,8 +801,8 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     // structures?
     detail::
         mapStencilKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-            plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i],
-            d_plm[i], f, tile_width, tile_width);
+            result.getExecPlans()[i].d_Data, plans[i], d_plm[i], f, tile_width,
+            tile_width);
   }
 
 #pragma omp parallel for firstprivate(nCPU, f, ncol, firstRow, plm, result)

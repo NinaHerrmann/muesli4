@@ -21,7 +21,7 @@ public:
       : glob_cols_(glob_cols), glob_rows_(glob_rows),
         default_neutral(default_neutral) {}
   MSL_USERFUNC
-  virtual float operator()(int x, int y) const { // here, x represents rows
+  float operator()(int x, int y) const { // here, x represents rows
     // left and right column must be 100;
     if (y < 0 || y >= glob_cols_) {
       return 100;
@@ -58,10 +58,10 @@ private:
  */
 class JacobiSweepFunctor
     : public MMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
-
+public:
   JacobiSweepFunctor() : MMapStencilFunctor() {}
   MSL_USERFUNC
-  virtual float operator()(
+  float operator()(
       int rowIndex, int colIndex,
       const msl::PLMatrix<float, JacobiNeutralValueFunctor> &input) const {
     float sum = 0;
@@ -83,7 +83,7 @@ class JacobiSweepFunctor
 class AbsoluteDifference : public Functor2<float, float, float> {
 public:
   MSL_USERFUNC
-  virtual float operator()(float x, float y) const {
+  float operator()(float x, float y) const {
     auto diff = x - y;
     if (diff < 0) {
       diff *= (-1);
@@ -95,7 +95,7 @@ public:
 class Max : public Functor2<float, float, float> {
 public:
   MSL_USERFUNC
-  virtual float operator()(float x, float y) {
+  float operator()(float x, float y) const {
     if (x > y)
       return x;
 
@@ -106,12 +106,13 @@ public:
 int run(int n, int m, int stencil_radius) {
   DM<float> mat(m, n, 75, true);
 
-  AbsoluteDifference difference_functor();
-  Max max_functor();
+  AbsoluteDifference difference_functor;
+  Max max_functor;
   float global_diff = 10;
 
   // mapStencil
-  JacobiSweepFunctor jacobi();
+  JacobiSweepFunctor jacobi;
+  jacobi.setStencilSize(1);
 
   // Neutral value provider
   JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
@@ -120,10 +121,10 @@ int run(int n, int m, int stencil_radius) {
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
 
-    // if (num_iter % 4 == 0) {
-    //   DM<float> differences = new_m.zip(mat, difference_functor);
-    //   global_diff = differences.fold(max_functor, true);
-    // }
+    if (num_iter % 4 == 0) {
+      DM<float> differences = new_m.zip(mat, difference_functor);
+      global_diff = differences.fold(max_functor, true);
+    }
     std::swap(new_m, mat);
     num_iter++;
   }

@@ -57,7 +57,7 @@ __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
 
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
-__global__ void mapStencilKernel(T *in, R *out, GPUExecutionPlan<T> plan,
+__global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
                                  PLMatrix<T, NeutralValueFunctor> *input,
                                  F func, int tile_width, int tile_height);
 

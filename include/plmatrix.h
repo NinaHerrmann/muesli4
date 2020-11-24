@@ -145,7 +145,7 @@ public:
     // bounds check
     if ((col < 0) || (col >= m)) {
       // out of bounds -> return neutral value
-      return neutral_value(row, col);
+      return neutral_value_functor(row, col);
     } else { // in bounds -> return desired value
       return current_data[(row - firstRow + stencil_size) * cols + col];
     }
