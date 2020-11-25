@@ -10,7 +10,7 @@
 #include "muesli.h"
 #include <algorithm>
 #define EPSILON 0.01
-#define MAX_ITER 10000
+#define MAX_ITER 1
 namespace msl {
 
 namespace jacobi {
@@ -23,7 +23,7 @@ public:
   MSL_USERFUNC
   float operator()(int x, int y) const { // here, x represents rows
     // left and right column must be 100;
-    if (y < 0 || y >= glob_cols_) {
+    if (y < 0 || y > (glob_cols_ - 1)) {
       return 100;
     }
 
@@ -33,7 +33,7 @@ public:
     }
 
     // bottom border must be 0
-    if (x >= glob_rows_) {
+    if (x > (glob_rows_ - 1)) {
       return 0;
     }
 
@@ -68,12 +68,16 @@ public:
     for (int i = -stencil_size; i <= stencil_size; i++) {
       if (i == 0)
         continue;
+      // printf("%d, %d is: %f\n", rowIndex + i, colIndex,
+      // input.get(rowIndex + i, colIndex));
       sum += input.get(rowIndex + i, colIndex);
     }
 
     for (int i = -stencil_size; i <= stencil_size; i++) {
       if (i == 0)
         continue;
+      // printf("%d, %d is: %f\n", rowIndex, colIndex + i,
+      // input.get(rowIndex, colIndex + i));
       sum += input.get(rowIndex, colIndex + i);
     }
     return sum / (4 * stencil_size);
@@ -121,14 +125,14 @@ int run(int n, int m, int stencil_radius) {
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
 
-    if (num_iter % 4 == 0) {
-      DM<float> differences = new_m.zip(mat, difference_functor);
-      global_diff = differences.fold(max_functor, true);
-    }
+    // if (num_iter % 4 == 0) {
+    //   DM<float> differences = new_m.zip(mat, difference_functor);
+    //   global_diff = differences.fold(max_functor, true);
+    // }
     std::swap(new_m, mat);
     num_iter++;
   }
-
+  mat.show();
   return 0;
 }
 } // namespace jacobi
@@ -136,10 +140,10 @@ int run(int n, int m, int stencil_radius) {
 int main(int argc, char **argv) {
   msl::initSkeletons(argc, argv);
 
-  int n = 32;
-  int m = 32;
+  int n = 10;
+  int m = 10;
   int stencil_radius = 1;
-  int nGPUs = 2;
+  int nGPUs = 1;
   int nRuns = 1;
   bool warmup = false;
   if (argc == 5) {
@@ -154,6 +158,8 @@ int main(int argc, char **argv) {
 
   msl::setNumGpus(nGPUs);
   msl::setNumRuns(nRuns);
+  msl::setNumThreads(1);
+  msl::Muesli::cpu_fraction = 0.25;
 
   msl::startTiming();
   for (int r = 0; r < msl::Muesli::num_runs; ++r) {

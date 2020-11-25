@@ -89,16 +89,30 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
                               PLMatrix<T, NeutralValueFunctor> *input, F func,
                               int tile_width, int tile_height) {
 
-  size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (y < plan.gpuRows) {
     if (x < plan.gpuCols) {
+      // printf("Index: %d, %d to result in global %d, %d\n", y, x,
+      //        y + plan.firstRow, x);
       // Global indexes are passed to the shared memory function.
-      input->readToSharedMem(y + plan.firstRow, x + plan.firstCol, tile_width,
-                             tile_height);
-      out[y * plan.gpuCols + x] =
-          func(y + plan.firstRow, x + plan.firstCol, *input);
+      // printf("Reading for row: %d\n", y + plan.firstRow);
+      input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
+                             plan.gpuRows, plan.gpuCols);
+      __syncthreads();
+      if (y == 0 && x == 0) {
+        input->printSharedMemory();
+      }
+      if ((y == 0 && x < plan.firstCol) ||
+          (y == (plan.gpuRows - 1) && x > plan.lastCol)) {
+        // printf("Skipping (%d,%d):\n", y, x);
+        __syncthreads();
+        return;
+      }
+      R val = func(y + plan.firstRow, x, *input);
+      // printf("Running (%d,%d). Value: %f\n", y, x, val);
+      out[y * plan.gpuCols + x - plan.firstCol] = val;
     }
   }
   __syncthreads();
@@ -106,5 +120,5 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 
 template <typename T> __global__ void msl::detail::printFromGPU(T *A) {
   int i = threadIdx.x;
-  printf("i:%d; A[%d];", i, A[i]);
+  printf("i:%d; A[%f];", i, A[i]);
 }

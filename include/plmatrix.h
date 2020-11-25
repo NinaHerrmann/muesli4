@@ -65,6 +65,8 @@ public:
    * stencil to the edge
    * @param tw Width of the data tile without the padding
    * @param th Height of the data tile without the padding
+   * @param gr Number of rows processed by the GPU
+   * @param gc number of columns processed by the GPU
    * @param nv_functor Functor with two input params of type int that should
    * return neutral values for a specific position in the matrix
    */
@@ -118,7 +120,16 @@ public:
    */
   MSL_USERFUNC
   int getCols() const { return cols; }
-
+  MSL_USERFUNC
+  void printSharedMemory() {
+    printf("Width: %d\n", width);
+    for (int i = 0; i < width; i++) {
+      for (int j = 0; j < width; j++) {
+        printf("%6.2f ", shared_data[i * width + j]);
+      }
+      printf("\n");
+    }
+  }
   /**
    * \brief Returns the element at the given global indices (\em row, \em col).
    *
@@ -133,6 +144,9 @@ public:
     int c = blockIdx.x * blockDim.x + threadIdx.x;
     int rowIndex = (row - firstRowGPU - r + stencil_size) + threadIdx.y;
     int colIndex = (col - c + stencil_size) + threadIdx.x;
+
+    // printf("for %d, %d fetching %d, %d. GPU wide thread coords: (%d, %d)\n",
+    //        row, col, rowIndex, colIndex, r, c);
     return shared_data[rowIndex * width + colIndex];
 //	  if ((col < 0) || (col >= m)) {
 //	    // out of bounds -> return neutral value
@@ -155,7 +169,9 @@ public:
 #ifdef __CUDACC__
 
   /**
-   * @brief Each thread block (on the GPU) reads elements from the padded local
+   * @brief
+   *
+   *
    *        matrix to shared memory. Called by the mapStencil skeleton kernel.
    * Note that in this case, current_data will point to the GPU memory it was
    * pointing to at the moment this object was copied to the GPU memory.
@@ -165,22 +181,29 @@ public:
    * @param tile_width
    * @return __device__
    */
-  __device__ void readToSharedMem(int r, int c, int tile_width,
-                                  int tile_height) {
+  __device__ void readToSharedMem(int r, int c, int tile_width, int tile_height,
+                                  int gpu_rows, int gpu_columns) {
     int tx = threadIdx.x;
+    int abs_tx = blockIdx.x * blockDim.x + threadIdx.x;
+
     int ty = threadIdx.y;
-    int row = r - firstRow; // Get the local row
+    int abs_ty = blockIdx.y * blockDim.y + threadIdx.y;
+    // Get the local row as it relates to the entire partition.
+    int row = r - firstRowGPU;
     T *smem = SharedMemory<T>();
+    printf("Thread y: %d, x: %d. GPU data size %d x %d\n", abs_ty, abs_tx,
+           gpu_rows, gpu_columns);
 
     // read assigned value into shared memory
     smem[(ty + stencil_size) * width + tx + stencil_size] =
         current_data[(row + stencil_size) * cols +
-                     c]; // the current data does not have padding on the left
-                         // and right
+                     c]; // the current data does not have padding on the
+                         // left and right
 
     // read halo values
     // first row of tile needs to read upper stencil_size rows of halo values
-    // corner will be skipped here because it will be read further down the line
+    // corner will be skipped here because it will be read further down the
+    // line
     if (ty == 0) {
       for (int i = 0; i < stencil_size; i++) {
         smem[i * width + stencil_size + tx] =
@@ -189,32 +212,35 @@ public:
     }
 
     // last row of tile needs to read lower stencil_size rows of halo values
-    if (ty == tile_width - 1) {
+    if (ty == tile_width - 1 || abs_ty == gpu_rows - 1) {
       for (int i = 0; i < stencil_size; i++) {
-        smem[(i + stencil_size + tile_width) * width + stencil_size + tx] =
+        smem[(i + stencil_size + ty + 1) * width + stencil_size + tx] =
             current_data[(row + stencil_size + i + 1) * cols + c];
       }
     }
 
-    // first column of tile needs to read left hand side stencil_size columns of
+    // first column of tile needs to read left hand side stencil_size columns
+    // of
     // halo values
     if (tx == 0) {
       for (int i = 0; i < stencil_size; i++) {
         if (c + i - stencil_size < 0) {
-          smem[(ty + stencil_size) * width + i] = neutral_value_functor(r, c);
+          smem[(ty + stencil_size) * width + i] =
+              neutral_value_functor(r, c + i - stencil_size);
         } else
           smem[(ty + stencil_size) * width + i] =
               current_data[(row + stencil_size) * cols + c + i - stencil_size];
       }
     }
 
-    // last column of tile needs to read right hand side stencil_size columns of
+    // last column of tile needs to read right hand side stencil_size columns
+    // of
     // halo values
-    if (tx == tile_width - 1) {
+    if (tx == tile_width - 1 || abs_tx == gpu_columns - 1) {
       for (int i = 0; i < stencil_size; i++) {
         if (c + i + 1 > m - 1)
-          smem[(ty + stencil_size) * width + i + tile_width + stencil_size] =
-              neutral_value_functor(r, c);
+          smem[(ty + stencil_size) * width + i + tx + 1 + stencil_size] =
+              neutral_value_functor(r, c + i + 1);
         else
           smem[(ty + stencil_size) * width + i + tile_width + stencil_size] =
               current_data[(row + stencil_size) * cols + c + i + 1];
@@ -226,7 +252,8 @@ public:
       for (int i = 0; i < stencil_size; i++) {
         for (int j = 0; j < stencil_size; j++) {
           if (c + j - stencil_size < 0)
-            smem[i * width + j] = neutral_value_functor(r, c);
+            smem[i * width + j] =
+                neutral_value_functor(r, c + j - stencil_size);
           else
             smem[i * width + j] =
                 current_data[(row + i) * cols + c + j - stencil_size];
@@ -235,12 +262,12 @@ public:
     }
 
     // upper right corner
-    if (tx == tile_width - 1 && ty == 0) {
+    if ((tx == tile_width - 1 || abs_tx == gpu_columns - 1) && ty == 0) {
       for (int i = 0; i < stencil_size; i++) {
         for (int j = 0; j < stencil_size; j++) {
           if (c + j + 1 > m - 1)
-            smem[i * width + j + stencil_size + tile_width] =
-                neutral_value_functor(r, c);
+            smem[i * width + j + stencil_size + tx + 1] =
+                neutral_value_functor(r, c + j + 1);
           else
             smem[i * width + j + stencil_size + tile_width] =
                 current_data[(row + i) * cols + c + j + 1];
@@ -249,12 +276,12 @@ public:
     }
 
     // lower left corner
-    if (tx == 0 && ty == tile_width - 1) {
+    if (tx == 0 && (ty == tile_width - 1 || abs_ty == gpu_rows - 1)) {
       for (int i = 0; i < stencil_size; i++) {
         for (int j = 0; j < stencil_size; j++) {
           if (c + j - stencil_size < 0)
-            smem[(i + stencil_size + tile_width) * width + j] =
-                neutral_value_functor(r, c);
+            smem[(i + stencil_size + ty + 1) * width + j] =
+                neutral_value_functor(r, c + j - stencil_size);
           else
             smem[(i + stencil_size + tile_width) * width + j] =
                 current_data[(row + i + stencil_size + 1) * cols + c + j -
@@ -264,12 +291,13 @@ public:
     }
 
     // lower right corner
-    if (tx == tile_width - 1 && ty == tile_width - 1) {
+    if ((tx == tile_width - 1 || abs_tx == gpu_columns - 1) &&
+        (ty == tile_width - 1 || abs_ty == gpu_rows - 1)) {
       for (int i = 0; i < stencil_size; i++) {
         for (int j = 0; j < stencil_size; j++) {
           if (c + j + 1 > m - 1)
-            smem[(i + stencil_size + tile_width) * width + j + stencil_size +
-                 tile_width] = neutral_value_functor(r, c);
+            smem[(i + stencil_size + ty + 1) * width + j + stencil_size + tx +
+                 1] = neutral_value_functor(r, c + j + 1);
           else
             smem[(i + stencil_size + tile_width) * width + j + stencil_size +
                  tile_width] =
@@ -303,8 +331,18 @@ private:
   std::vector<T *> ptrs;
   typename std::vector<T *>::iterator it;
   T *current_data, *shared_data;
-  int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, firstGPUIdx,
-      tile_width, tile_height, width;
+  int n;
+  int m;
+  int rows;
+  int cols;
+  int stencil_size;
+  // First row of the local matrix in the global matrix
+  int firstRow;
+  int firstRowGPU;
+  int firstGPUIdx;
+  int tile_width;
+  int tile_height;
+  int width;
   NeutralValueFunctor neutral_value_functor;
 };
 
