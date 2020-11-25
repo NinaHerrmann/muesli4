@@ -153,9 +153,9 @@ template <typename T> void msl::DM<T>::init() {
   indexGPU = nCPU;
   // printf("loc prozesses %d , First index %d, firstRowGpu %d\n",
   // Muesli::num_local_procs, firstIndex, indexGPU);
-  printf("Building datastructure with %d nodes %d cpus and %d gpus\n",
-         msl::Muesli::num_total_procs, msl::Muesli::num_local_procs,
-         msl::Muesli::num_gpus);
+  // printf("Building datastructure with %d nodes %d cpus and %d gpus\n",
+  //        msl::Muesli::num_total_procs, msl::Muesli::num_local_procs,
+  //        msl::Muesli::num_gpus);
 }
 
 // auxiliary method initGPUs
@@ -195,7 +195,7 @@ template <typename T> void msl::DM<T>::initGPUs() {
 
 // destructor removes a DM
 template <typename T> msl::DM<T>::~DM() {
-  printf("TODO: Destroy Datastructure\n");
+  // printf("TODO: Destroy Datastructure\n");
   /*#ifdef __CUDACC__
     CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
     for (int i = 0; i < ng; i++) {
@@ -742,15 +742,13 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
           neutral_value_functor(i / ncol - stencil_size, i % ncol);
     }
   }
-  // padded_local_matrix[100] = 100;
-  // padded_local_matrix[30] = 30;
-  // padded_local_matrix[50] = 50;
-  for (int i = 0; i < nlocalRows + 2 * stencil_size; i++) {
-    for (int j = 0; j < ncol; j++) {
-      printf("%6.2f ", padded_local_matrix[i * ncol + j]);
-    }
-    putchar('\n');
-  }
+
+  // for (int i = 0; i < nlocalRows + 2 * stencil_size; i++) {
+  //   for (int j = 0; j < ncol; j++) {
+  //     printf("%6.2f ", padded_local_matrix[i * ncol + j]);
+  //   }
+  //   putchar('\n');
+  // }
 
   int tile_width = f.getTileWidth();
   // padding_time += (MPI_Wtime() - t);
@@ -801,7 +799,7 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
   }
 
   // Map stencil
-  DM<T> result(ncol, nrow, rowComplete);
+  DM<T> result(nrow, ncol, rowComplete);
   result.upload(); // no longer needed becasue the allocation is done during
   // construction
   // upload_time += (MPI_Wtime() - t);

@@ -191,8 +191,8 @@ public:
     // Get the local row as it relates to the entire partition.
     int row = r - firstRowGPU;
     T *smem = SharedMemory<T>();
-    printf("Thread y: %d, x: %d. GPU data size %d x %d\n", abs_ty, abs_tx,
-           gpu_rows, gpu_columns);
+    // printf("Thread y: %d, x: %d. GPU data size %d x %d\n", abs_ty, abs_tx,
+    //        gpu_rows, gpu_columns);
 
     // read assigned value into shared memory
     smem[(ty + stencil_size) * width + tx + stencil_size] =

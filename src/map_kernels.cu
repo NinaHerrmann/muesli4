@@ -101,18 +101,16 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
       input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
                              plan.gpuRows, plan.gpuCols);
       __syncthreads();
-      if (y == 0 && x == 0) {
-        input->printSharedMemory();
-      }
+      // if (y == 0 && x == 0) {
+      //   input->printSharedMemory();
+      // }
       if ((y == 0 && x < plan.firstCol) ||
           (y == (plan.gpuRows - 1) && x > plan.lastCol)) {
-        // printf("Skipping (%d,%d):\n", y, x);
         __syncthreads();
         return;
       }
-      R val = func(y + plan.firstRow, x, *input);
-      // printf("Running (%d,%d). Value: %f\n", y, x, val);
-      out[y * plan.gpuCols + x - plan.firstCol] = val;
+      out[y * plan.gpuCols + x - plan.firstCol] =
+          func(y + plan.firstRow, x, *input);
     }
   }
   __syncthreads();

@@ -10,7 +10,7 @@
 #include "muesli.h"
 #include <algorithm>
 #define EPSILON 0.01
-#define MAX_ITER 1
+#define MAX_ITER 5000
 namespace msl {
 
 namespace jacobi {
@@ -108,7 +108,7 @@ public:
 };
 
 int run(int n, int m, int stencil_radius) {
-  DM<float> mat(m, n, 75, true);
+  DM<float> mat(n, m, 75, true);
 
   AbsoluteDifference difference_functor;
   Max max_functor;
@@ -132,16 +132,17 @@ int run(int n, int m, int stencil_radius) {
     std::swap(new_m, mat);
     num_iter++;
   }
-  mat.show();
+  // mat.show();
   return 0;
 }
 } // namespace jacobi
 } // namespace msl
 int main(int argc, char **argv) {
+  printf("float size %d\n", sizeof(float));
   msl::initSkeletons(argc, argv);
 
-  int n = 10;
-  int m = 10;
+  int n = 500;
+  int m = 500;
   int stencil_radius = 1;
   int nGPUs = 1;
   int nRuns = 1;
