@@ -195,19 +195,19 @@ template <typename T> void msl::DM<T>::initGPUs() {
 
 // destructor removes a DM
 template <typename T> msl::DM<T>::~DM() {
-  // printf("TODO: Destroy Datastructure\n");
-  /*#ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
-    for (int i = 0; i < ng; i++) {
-      if (plans[i].d_Data != 0) {
-        cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
-      }
+// printf("TODO: Destroy Datastructure\n");
+#ifdef __CUDACC__
+  CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
+  for (int i = 0; i < ng; i++) {
+    if (plans[i].d_Data != 0) {
+      cudaSetDevice(i);
+      CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
     }
-    delete[] plans;
-  #endif
-    delete[] localPartition;
-  */
+  }
+  delete[] plans;
+#else
+  delete[] localPartition;
+#endif
 }
 
 // ***************************** auxiliary methods
