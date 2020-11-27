@@ -42,7 +42,7 @@
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 #include "plmatrix.h"
-
+#include <utility>
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
@@ -106,10 +106,48 @@ public:
    */
   DM(int col, int row, const T &initial_value, bool rowComplete);
 
+#pragma region Rule of five
+  /**
+   * Taken from  https://cpppatterns.com/patterns/rule-of-five.html
+   *
+   */
+
+  /**
+   * @brief Copy constructor. Only performs a shallow copy of the object. Needed
+   * in case a swap operation is to be performed.
+   *
+   */
+  DM(const DM<T> &other);
+  DM(DM<T> &&other);
+  DM<T> &operator=(const DM<T> &other);
+  DM<T> &operator=(DM<T> &&other);
   /**
    * \brief Destructor.
    */
   ~DM();
+  // friend void swap(DM<T> &first, DM<T> &second) {
+  //   using std::swap;
+  //   swap(first.localPartition, second.localPartition);
+  //   swap(first.plans, second.plans);
+  //   swap(first.id, second.id);
+  //   swap(first.n, second.n);
+  //   swap(first.nLocal, second.nLocal);
+  //   swap(first.nlocalRows, second.nlocalRows);
+  //   swap(first.ncol, second.ncol);
+  //   swap(first.nrow, second.nrow);
+  //   swap(first.firstIndex, second.firstIndex);
+  //   swap(first.firstRow, second.firstRow);
+  //   swap(first.np, second.np);
+  //   swap(first.cpuMemoryInSync, second.cpuMemoryInSync);
+  //   swap(first.gpuCopyDistributed, second.gpuCopyDistributed);
+  //   swap(first.ng, second.ng);
+  //   swap(first.nGPU, second.nGPU);
+  //   swap(first.nCPU, second.nCPU);
+  //   swap(first.indexGPU, second.indexGPU);
+  //   swap(first.rowComplete, second.rowComplete);
+  // }
+
+#pragma endregion
 
   /**
    * \brief Initializes the elements of the distributed array with the value \em
@@ -381,8 +419,9 @@ public:
   DM<T> zipIndex(DM<T2> &b, ZipIndexFunctor &f);
 
   /**
-   * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j], b[i,j], c[i,j])
-   *        with \em b and \em c being other distributed matrices of the same size.
+   * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j],
+   * b[i,j], c[i,j]) with \em b and \em c being other distributed matrices of
+   * the same size.
    *
    * @param f The zip functor, must be of type \em AZipFunctor.
    * @tparam T2 Element type of the 1st distributed matrix to zip with.
@@ -390,23 +429,23 @@ public:
    * @tparam ZipFunctor Functor type.
    */
   template <typename T2, typename T3, typename ZipFunctor>
-  void zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f);
+  void zipInPlace3(DM<T2> &b, DM<T3> &c, ZipFunctor &f);
 
-  /**
-   * \brief Replaces each element a[i,j] of the distributed matrix a by f(a[i,j], b[i], c[i], d[i,j]),
-   *        with \em b and \em c being distributed arrays with a number of elements corresponding to
-   *        the number of rows of a
-   *        and d being another distributed matrix of the same size as a
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the 1st distributed array b
-   * @tparam T3 Element type of the 2nd distributed array c
-   * @tparam T4 Element type of the other distributed matrix d
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename T3, typename T4, typename ZipFunctor>
-  void zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f);
-
+  // /**
+  //  * \brief Replaces each element a[i,j] of the distributed matrix a by
+  //  * f(a[i,j], b[i], c[i], d[i,j]), with \em b and \em c being distributed
+  //  * arrays with a number of elements corresponding to the number of rows of
+  //  a
+  //  *        and d being another distributed matrix of the same size as a
+  //  *
+  //  * @param f The zip functor, must be of type \em AZipFunctor.
+  //  * @tparam T2 Element type of the 1st distributed array b
+  //  * @tparam T3 Element type of the 2nd distributed array c
+  //  * @tparam T4 Element type of the other distributed matrix d
+  //  * @tparam ZipFunctor Functor type.
+  //  */
+  // template <typename T2, typename T3, typename T4, typename ZipFunctor>
+  // void zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor &f);
 
   /**
    * \brief fold skeleton.
@@ -722,6 +761,11 @@ private:
   int getGpuId(int index) const;
 
   int getFirstGpuRow() const;
+
+  void copyLocalPartition(const DM<T> &other);
+  void freeLocalPartition();
+
+  void freePlans();
 };
 
 } // namespace msl

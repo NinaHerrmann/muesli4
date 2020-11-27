@@ -109,7 +109,6 @@ public:
 
 int run(int n, int m, int stencil_radius) {
   DM<float> mat(n, m, 75, true);
-
   AbsoluteDifference difference_functor;
   Max max_functor;
   float global_diff = 10;
@@ -124,14 +123,15 @@ int run(int n, int m, int stencil_radius) {
   int num_iter = 0;
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
-
-    // if (num_iter % 4 == 0) {
-    //   DM<float> differences = new_m.zip(mat, difference_functor);
-    //   global_diff = differences.fold(max_functor, true);
-    // }
-    std::swap(new_m, mat);
+    if (num_iter % 4 == 0) {
+      DM<float> differences = new_m.zip(mat, difference_functor);
+      // differences.show();
+      global_diff = differences.fold(max_functor, true);
+    }
+    mat = std::move(new_m);
     num_iter++;
   }
+  // printf("Finished in %d iterations\n", num_iter);
   // mat.show();
   return 0;
 }
@@ -147,11 +147,13 @@ int main(int argc, char **argv) {
   int nGPUs = 1;
   int nRuns = 1;
   bool warmup = false;
-  if (argc == 5) {
+  msl::Muesli::cpu_fraction = 0.25;
+  if (argc == 6) {
     n = atoi(argv[1]);
     m = atoi(argv[2]);
     nGPUs = atoi(argv[3]);
     nRuns = atoi(argv[4]);
+    msl::Muesli::cpu_fraction = atof(argv[5]);
 #ifdef __CUDACC__
     warmup = true;
 #endif
@@ -159,8 +161,7 @@ int main(int argc, char **argv) {
 
   msl::setNumGpus(nGPUs);
   msl::setNumRuns(nRuns);
-  msl::setNumThreads(1);
-  msl::Muesli::cpu_fraction = 0.25;
+  // msl::setNumThreads(1);
 
   msl::startTiming();
   for (int r = 0; r < msl::Muesli::num_runs; ++r) {

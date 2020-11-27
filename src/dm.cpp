@@ -123,6 +123,129 @@ msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
   upload();
 }
 
+template <typename T>
+msl::DM<T>::DM(const DM<T> &other)
+    : id(other.id), n(other.n), nLocal(other.nLocal),
+      nlocalRows(other.nlocalRows), ncol(other.ncol), nrow(other.nrow),
+      firstIndex(other.firstIndex), firstRow(other.firstRow), np(other.np),
+      cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
+                                                  *(other.plans)}},
+      gpuCopyDistributed(other.gpuCopyDistributed), ng(other.ng),
+      nGPU(other.nGPU), nCPU(other.nCPU), indexGPU(other.indexGPU),
+      rowComplete(other.rowComplete) {
+  copyLocalPartition(other);
+
+  // cpuMemoryInSync = true;
+  // upload();
+}
+
+template <typename T>
+msl::DM<T>::DM(DM<T> &&other)
+    : id(other.id), n(other.n), nLocal(other.nLocal),
+      nlocalRows(other.nlocalRows), ncol(other.ncol), nrow(other.nrow),
+      firstIndex(other.firstIndex), firstRow(other.firstRow), np(other.np),
+      cpuMemoryInSync(other.cpuMemoryInSync), plans{other.plans},
+      gpuCopyDistributed(other.gpuCopyDistributed), ng(other.ng),
+      nGPU(other.nGPU), nCPU(other.nCPU), indexGPU(other.indexGPU),
+      rowComplete(other.rowComplete) {
+  other.plans = nullptr;
+  localPartition = other.localPartition;
+  other.localPartition = nullptr;
+}
+
+template <typename T> msl::DM<T> &msl::DM<T>::operator=(DM<T> &&other) {
+  if (&other == this) {
+    return *this;
+  }
+
+  freeLocalPartition();
+
+  localPartition = other.localPartition;
+  other.localPartition = nullptr;
+  freePlans();
+  plans = other.plans;
+  other.plans = nullptr;
+
+  id = other.id;
+  n = other.n;
+  nLocal = other.nLocal;
+  nlocalRows = other.nlocalRows;
+  ncol = other.ncol;
+  nrow = other.nrow;
+  firstIndex = other.firstIndex;
+  firstRow = other.firstRow;
+  np = other.np;
+  cpuMemoryInSync = other.cpuMemoryInSync;
+  gpuCopyDistributed = other.gpuCopyDistributed;
+  ng = other.ng;
+  nGPU = other.nGPU;
+  indexGPU = other.indexGPU;
+  rowComplete = other.rowComplete;
+  return *this;
+}
+
+template <typename T> msl::DM<T> &msl::DM<T>::operator=(const DM<T> &other) {
+  if (&other == this) {
+    return *this;
+  }
+  freeLocalPartition();
+  copyLocalPartition(other);
+  freePlans();
+  plans = nullptr;
+  plans = new GPUExecutionPlan<T>{*(other.plans)};
+
+  id = other.id;
+  n = other.n;
+  nLocal = other.nLocal;
+  nlocalRows = other.nlocalRows;
+  ncol = other.ncol;
+  nrow = other.nrow;
+  firstIndex = other.firstIndex;
+  firstRow = other.firstRow;
+  np = other.np;
+  cpuMemoryInSync = other.cpuMemoryInSync;
+  gpuCopyDistributed = other.gpuCopyDistributed;
+  ng = other.ng;
+  nGPU = other.nGPU;
+  indexGPU = other.indexGPU;
+  rowComplete = other.rowComplete;
+  return *this;
+}
+template <typename T> void msl::DM<T>::copyLocalPartition(const DM<T> &other) {
+#ifdef __CUDACC__
+  CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+
+#else
+  localPartition = new T[nLocal];
+#endif
+  for (int i = 0; i < nLocal; i++)
+    localPartition[i] = other.localPartition[i];
+}
+
+template <typename T> void msl::DM<T>::freeLocalPartition() {
+#ifdef __CUDACC__
+  CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
+#else
+  delete[] localPartition;
+  localPartition = nullptr;
+#endif
+}
+
+template <typename T> void msl::DM<T>::freePlans() {
+#ifdef __CUDACC__
+  if (plans) {
+    for (int i = 0; i < ng; i++) {
+      if (plans[i].d_Data != 0) {
+        cudaSetDevice(i);
+        CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
+      }
+    }
+    delete[] plans;
+  }
+#endif
+}
+// template <typename T> void msl::DM<T>::swap(DM<T> &first, DM<T> &second) {}
+
 // auxiliary method init()
 template <typename T> void msl::DM<T>::init() {
   if (Muesli::proc_entrance == UNDEFINED) {
@@ -198,13 +321,15 @@ template <typename T> msl::DM<T>::~DM() {
 // printf("TODO: Destroy Datastructure\n");
 #ifdef __CUDACC__
   CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
-  for (int i = 0; i < ng; i++) {
-    if (plans[i].d_Data != 0) {
-      cudaSetDevice(i);
-      CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
+  if (plans) {
+    for (int i = 0; i < ng; i++) {
+      if (plans[i].d_Data != 0) {
+        cudaSetDevice(i);
+        CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
+      }
     }
+    delete[] plans;
   }
-  delete[] plans;
 #else
   delete[] localPartition;
 #endif
@@ -827,7 +952,8 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
             tile_width);
   }
   f.notify();
-#pragma omp parallel for firstprivate(nCPU, f, ncol, firstRow, plm, result)
+#pragma omp parallel for firstprivate(nCPU, f, ncol, firstRow, plm)            \
+    shared(result)
   for (int i = 0; i < nCPU; i++) {
     // result.setLocal(i / ncol, i % ncol, f(i / ncol + firstRow, i % ncol,
     // plm));
@@ -982,42 +1108,43 @@ void msl::DM<T>::zipInPlace3(DM<T2> &b, DM<T3> &c, ZipFunctor &f) {
   cpuMemoryInSync = false;
 }
 
-template <typename T>
-template <typename T2, typename T3, typename T4, typename ZipFunctor>
-void msl::DM<T>::zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor &f) {
-  // zip on GPU
-  for (int i = 0; i < ng; i++) {
-    cudaSetDevice(i);
-    dim3 dimBlock(Muesli::threads_per_block);
-    dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-    auto bplans = b.getExecPlans();
-    auto cplans = c.getExecPlans();
-    auto dplans = d.getExecPlans();
-    detail::zipKernelAAM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, d.plans[i].d_Data,
-        plans[i].d_Data, plans[i].nLocal, plans[i].first, bplans[i].first, f,
-        ncol);
-  }
+// template <typename T>
+// template <typename T2, typename T3, typename T4, typename ZipFunctor>
+// void msl::DM<T>::zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor
+// &f) {
+//   // zip on GPU
+//   for (int i = 0; i < ng; i++) {
+//     cudaSetDevice(i);
+//     dim3 dimBlock(Muesli::threads_per_block);
+//     dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+//     auto bplans = b.getExecPlans();
+//     auto cplans = c.getExecPlans();
+//     auto dplans = d.getExecPlans();
+//     detail::zipKernelAAM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+//         plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data,
+//         d.plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first,
+//         bplans[i].first, f, ncol);
+//   }
 
-  T2 *bPartition = b.getLocalPartition();
-  T3 *cPartition = c.getLocalPartition();
-  T4 *dPartition = d.getLocalPartition();
-  int bfirst = b.getFirstIndex();
-#pragma omp parallel for
-  for (int k = 0; k < nCPU; k++) {
-    int i = ((k + firstIndex) / ncol) - bfirst;
-    //    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d,
-    //            bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d,
-    //            bfirst=%d\n", k, i, firstIndex, ncol, localPartition[k],
-    //            bPartition[i], cPartition[i], dPartition[k], bfirst); // debug
-    localPartition[k] =
-        f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
-  }
+//   T2 *bPartition = b.getLocalPartition();
+//   T3 *cPartition = c.getLocalPartition();
+//   T4 *dPartition = d.getLocalPartition();
+//   int bfirst = b.getFirstIndex();
+// #pragma omp parallel for
+//   for (int k = 0; k < nCPU; k++) {
+//     int i = ((k + firstIndex) / ncol) - bfirst;
+//     //    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d,
+//     //            bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d,
+//     //            bfirst=%d\n", k, i, firstIndex, ncol, localPartition[k],
+//     //            bPartition[i], cPartition[i], dPartition[k], bfirst); //
+//     debug localPartition[k] =
+//         f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
+//   }
 
-  // check for errors during gpu computation
-  msl::syncStreams();
-  cpuMemoryInSync = false;
-}
+//   // check for errors during gpu computation
+//   msl::syncStreams();
+//   cpuMemoryInSync = false;
+// }
 
 // *********** fold *********************************************
 template <typename T>
