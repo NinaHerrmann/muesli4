@@ -1,5 +1,5 @@
 /*
- * da.h
+ * dm.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
  *              Herbert Kuchen <kuchen@uni-muenster.de>
@@ -379,6 +379,34 @@ public:
    */
   template <typename T2, typename ZipIndexFunctor>
   DM<T> zipIndex(DM<T2> &b, ZipIndexFunctor &f);
+
+  /**
+   * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j], b[i,j], c[i,j])
+   *        with \em b and \em c being other distributed matrices of the same size.
+   *
+   * @param f The zip functor, must be of type \em AZipFunctor.
+   * @tparam T2 Element type of the 1st distributed matrix to zip with.
+   * @tparam T3 Element type of the 2nd distributed matrix to zip with.
+   * @tparam ZipFunctor Functor type.
+   */
+  template <typename T2, typename T3, typename ZipFunctor>
+  void zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f);
+
+  /**
+   * \brief Replaces each element a[i,j] of the distributed matrix a by f(a[i,j], b[i], c[i], d[i,j]),
+   *        with \em b and \em c being distributed arrays with a number of elements corresponding to
+   *        the number of rows of a
+   *        and d being another distributed matrix of the same size as a
+   *
+   * @param f The zip functor, must be of type \em AZipFunctor.
+   * @tparam T2 Element type of the 1st distributed array b
+   * @tparam T3 Element type of the 2nd distributed array c
+   * @tparam T4 Element type of the other distributed matrix d
+   * @tparam ZipFunctor Functor type.
+   */
+  template <typename T2, typename T3, typename T4, typename ZipFunctor>
+  void zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f);
+
 
   /**
    * \brief fold skeleton.

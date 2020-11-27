@@ -657,7 +657,7 @@ msl::DA<T> msl::DA<T>::zipIndex(msl::DA<T2>& b, ZipIndexFunctor& f){  // should 
 
 template <typename T>
 template <typename T2, typename T3, typename ZipFunctor>
-void msl::DA<T>::zipInPlace2(DA<T2>& b, DA<T3>& c, ZipFunctor& f){  // should be return type DA<R>; debug type error!
+void msl::DA<T>::zipInPlace3(DA<T2>& b, DA<T3>& c, ZipFunctor& f){  // should be return type DA<R>; debug type error!
   // zip on GPU
   for (int i = 0; i < ng; i++) {
     cudaSetDevice(i);
