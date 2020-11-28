@@ -82,9 +82,9 @@ public:
    * @param size Size of the distributed array.
    * @param d Distribution of the distributed array.
    */
-  DM(int col, int row);
+  DM(int row, int col);
 
-  DM(int col, int row, bool rowComplete);
+  DM(int row, int col, bool rowComplete);
 
   /**
    * \brief Creates a distributed matrix with \em size elements equal to
@@ -93,7 +93,7 @@ public:
    * @param size Size of the distributed array.
    * @param initial_value Initial value for all elements.
    */
-  DM(int col, int row, const T &initial_value);
+  DM(int row, int col, const T &initial_value);
 
   /**
    * @brief Creates a distributed matrix with \em size elements equal to
@@ -104,48 +104,50 @@ public:
    * @param rowComplete if true, the matrix will be distributed between nodes in
    * full rows. If mapStencil will be used, this option needs to be set to true.
    */
-  DM(int col, int row, const T &initial_value, bool rowComplete);
+  DM(int row, int col, const T &initial_value, bool rowComplete);
 
 #pragma region Rule of five
   /**
-   * Taken from  https://cpppatterns.com/patterns/rule-of-five.html
-   *
+   * For more details see https://cpppatterns.com/patterns/rule-of-five.html
+   * The 5 functions here are needed to perform operations such as std::move.
+   * See examples/jacobi.cu for a usage reference.
    */
 
   /**
-   * @brief Copy constructor. Only performs a shallow copy of the object. Needed
-   * in case a swap operation is to be performed.
+   * @brief Copy constructor. Fully copies the object and it's data.
    *
    */
   DM(const DM<T> &other);
+
+  /**
+   * @brief Move constructor. Transfers ownership of resources allocated by \em
+   * other to the object that is being created
+   *
+   * @param other
+   */
   DM(DM<T> &&other);
+
+  /**
+   * @brief Copy assignment operator. Works the same as the copy constructor.
+   *
+   * @param other
+   * @return DM<T>&
+   */
   DM<T> &operator=(const DM<T> &other);
+
+  /**
+   * @brief Move assignment operator. This assigs the object defined in \em
+   * other to the left hand side of the operation without creating copies
+   *
+   * @param other
+   * @return DM<T>&
+   */
   DM<T> &operator=(DM<T> &&other);
+
   /**
    * \brief Destructor.
    */
   ~DM();
-  // friend void swap(DM<T> &first, DM<T> &second) {
-  //   using std::swap;
-  //   swap(first.localPartition, second.localPartition);
-  //   swap(first.plans, second.plans);
-  //   swap(first.id, second.id);
-  //   swap(first.n, second.n);
-  //   swap(first.nLocal, second.nLocal);
-  //   swap(first.nlocalRows, second.nlocalRows);
-  //   swap(first.ncol, second.ncol);
-  //   swap(first.nrow, second.nrow);
-  //   swap(first.firstIndex, second.firstIndex);
-  //   swap(first.firstRow, second.firstRow);
-  //   swap(first.np, second.np);
-  //   swap(first.cpuMemoryInSync, second.cpuMemoryInSync);
-  //   swap(first.gpuCopyDistributed, second.gpuCopyDistributed);
-  //   swap(first.ng, second.ng);
-  //   swap(first.nGPU, second.nGPU);
-  //   swap(first.nCPU, second.nCPU);
-  //   swap(first.indexGPU, second.indexGPU);
-  //   swap(first.rowComplete, second.rowComplete);
-  // }
 
 #pragma endregion
 

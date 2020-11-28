@@ -10,7 +10,7 @@
 #include "muesli.h"
 #include <algorithm>
 #define EPSILON 0.01
-#define MAX_ITER 5000
+#define MAX_ITER 1
 namespace msl {
 
 namespace jacobi {
@@ -65,19 +65,17 @@ public:
       int rowIndex, int colIndex,
       const msl::PLMatrix<float, JacobiNeutralValueFunctor> &input) const {
     float sum = 0;
+    // Add top and bottom values.
     for (int i = -stencil_size; i <= stencil_size; i++) {
       if (i == 0)
         continue;
-      // printf("%d, %d is: %f\n", rowIndex + i, colIndex,
-      // input.get(rowIndex + i, colIndex));
       sum += input.get(rowIndex + i, colIndex);
     }
 
+    // Add left and right values.
     for (int i = -stencil_size; i <= stencil_size; i++) {
       if (i == 0)
         continue;
-      // printf("%d, %d is: %f\n", rowIndex, colIndex + i,
-      // input.get(rowIndex, colIndex + i));
       sum += input.get(rowIndex, colIndex + i);
     }
     return sum / (4 * stencil_size);
@@ -125,52 +123,42 @@ int run(int n, int m, int stencil_radius) {
     DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
     if (num_iter % 4 == 0) {
       DM<float> differences = new_m.zip(mat, difference_functor);
-      // differences.show();
       global_diff = differences.fold(max_functor, true);
     }
     mat = std::move(new_m);
     num_iter++;
   }
-  // printf("Finished in %d iterations\n", num_iter);
-  // mat.show();
   return 0;
 }
 } // namespace jacobi
 } // namespace msl
 int main(int argc, char **argv) {
-  printf("float size %d\n", sizeof(float));
   msl::initSkeletons(argc, argv);
-
-  int n = 500;
-  int m = 500;
+  int n = 10;
+  int m = 10;
   int stencil_radius = 1;
   int nGPUs = 1;
   int nRuns = 1;
   bool warmup = false;
   msl::Muesli::cpu_fraction = 0.25;
+
   if (argc == 6) {
     n = atoi(argv[1]);
     m = atoi(argv[2]);
     nGPUs = atoi(argv[3]);
     nRuns = atoi(argv[4]);
     msl::Muesli::cpu_fraction = atof(argv[5]);
-#ifdef __CUDACC__
-    warmup = true;
-#endif
   }
 
   msl::setNumGpus(nGPUs);
   msl::setNumRuns(nRuns);
-  // msl::setNumThreads(1);
-
   msl::startTiming();
   for (int r = 0; r < msl::Muesli::num_runs; ++r) {
     msl::jacobi::run(n, m, stencil_radius);
     msl::splitTime(r);
   }
+
   msl::stopTiming();
-
   msl::terminateSkeletons();
-
   return 0;
 }

@@ -91,26 +91,16 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   int x = blockIdx.x * blockDim.x + threadIdx.x;
-
+  input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
+                         plan.gpuRows, plan.gpuCols);
   if (y < plan.gpuRows) {
     if (x < plan.gpuCols) {
-      // printf("Index: %d, %d to result in global %d, %d\n", y, x,
-      //        y + plan.firstRow, x);
-      // Global indexes are passed to the shared memory function.
-      // printf("Reading for row: %d\n", y + plan.firstRow);
-      input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
-                             plan.gpuRows, plan.gpuCols);
-      __syncthreads();
-      // if (y == 0 && x == 0) {
-      //   input->printSharedMemory();
-      // }
-      if ((y == 0 && x < plan.firstCol) ||
-          (y == (plan.gpuRows - 1) && x > plan.lastCol)) {
-        __syncthreads();
-        return;
+
+      if (!((y == 0 && x < plan.firstCol) ||
+            (y == (plan.gpuRows - 1) && x > plan.lastCol))) {
+        out[y * plan.gpuCols + x - plan.firstCol] =
+            func(y + plan.firstRow, x, *input);
       }
-      out[y * plan.gpuCols + x - plan.firstCol] =
-          func(y + plan.firstRow, x, *input);
     }
   }
   __syncthreads();

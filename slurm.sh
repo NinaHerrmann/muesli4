@@ -2,11 +2,11 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --gres=gpu:4
-#SBATCH --time=00:20:00
+#SBATCH --gres=gpu:1
+#SBATCH --time=00:60:00
 #SBATCH --exclusive
 #SBATCH --job-name=MPI-solver
 #SBATCH --outpu=/scratch/tmp/e_zhup01/output_muesli.txt
@@ -38,8 +38,8 @@ export I_MPI_FABRICS=shm:tcp
 # parameters: #processes (= dim of DA), #throws, #MPI nodes
 # mpirun /home/k/kuchen/Muesli4/build/piDA 1000 1000000 2 
 
-# parameters: #processes (= dim of DM), #throws, #MPI nodes
-mpirun /home/e/e_zhup01/muesli4/build/jacobi 500 500 4 30 0.2
-
+# parameters: #DMCols #DMRows #nGPU #nRuns #CpuPercentage
+mpirun /home/e/e_zhup01/muesli4/build/jacobi #500 500 4 30 0.2
+#srun nvprof --analysis-metrics -o /scratch/tmp/e_zhup01/muesli-jacobi-analysis.%p.nvprof /home/e/e_zhup01/muesli4/build/jacobi -numdevices=1
 # alternativ: mpirun -np 2 <Datei>
 # alternativ: srun <Datei>

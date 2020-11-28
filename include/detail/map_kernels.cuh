@@ -33,7 +33,7 @@
 #pragma once
 
 #include "exec_plan.h"
-// #include "plmatrix.h"
+#include "plmatrix.h"
 // #include "plarray.h"
 
 namespace msl {
