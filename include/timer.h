@@ -2,7 +2,7 @@
  * timer.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -40,43 +40,32 @@ namespace msl {
 /**
  * \brief Class Timer for timing purposes.
  */
-class Timer
-{
+class Timer {
 public:
   /**
    * \brief Default constructor.
    */
-  Timer()
-    : start(MPI_Wtime()),
-      split(MPI_Wtime()),
-      end(0.0),
-      splits(0)
-  {
-  }
+  Timer() : start(MPI_Wtime()), split(MPI_Wtime()), end(0.0), splits(0) {}
 
   /**
    * Creates a timer with name \em n.
    *
    * @param n The name of the timer.
    */
-  Timer(const std::string& n)
-    : start(MPI_Wtime()),
-      split(MPI_Wtime()),
-      end(0.0), splits(0),
-      name(n)
-  {
-  }
+  Timer(const std::string &n)
+      : start(MPI_Wtime()), split(MPI_Wtime()), end(0.0), splits(0), name(n) {}
 
   /**
    * \brief Stops the timer.
    *
    * @return Elapsed time since start.
    */
-  double stop()
-  {
-    MPI_Barrier(MPI_COMM_WORLD);
-    end = MPI_Wtime();
-    return end-start;
+  double stop() {
+    if (end == 0) {
+      MPI_Barrier(MPI_COMM_WORLD);
+      end = MPI_Wtime();
+    }
+    return end - start;
   }
 
   /**
@@ -84,8 +73,7 @@ public:
    *
    * @return Elapsed time since last split.
    */
-  double splitTime()
-  {
+  double splitTime() {
     MPI_Barrier(MPI_COMM_WORLD);
     double result = MPI_Wtime() - split;
     split = MPI_Wtime();
@@ -98,8 +86,7 @@ public:
    *
    * @return The total elapsed time.
    */
-  double totalTime()
-  {
+  double totalTime() {
     if (end == 0.0) {
       return stop();
     } else {
@@ -112,10 +99,7 @@ public:
    *
    * @return The number of splits.
    */
-  int getNumSplits()
-  {
-    return splits;
-  }
+  int getNumSplits() { return splits; }
 
 private:
   double start, split, end;
@@ -123,6 +107,4 @@ private:
   std::string name;
 };
 
-}
-
-
+} // namespace msl

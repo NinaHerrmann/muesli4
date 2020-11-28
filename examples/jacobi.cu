@@ -10,7 +10,7 @@
 #include "muesli.h"
 #include <algorithm>
 #define EPSILON 0.01
-#define MAX_ITER 1
+#define MAX_ITER 5000
 namespace msl {
 
 namespace jacobi {
@@ -128,26 +128,35 @@ int run(int n, int m, int stencil_radius) {
     mat = std::move(new_m);
     num_iter++;
   }
+  printf("Iterations:%d \n", num_iter);
   return 0;
 }
 } // namespace jacobi
 } // namespace msl
 int main(int argc, char **argv) {
   msl::initSkeletons(argc, argv);
-  int n = 10;
-  int m = 10;
+  int n = 500;
+  int m = 500;
   int stencil_radius = 1;
   int nGPUs = 1;
   int nRuns = 1;
-  bool warmup = false;
   msl::Muesli::cpu_fraction = 0.25;
+  bool warmup = false;
 
-  if (argc == 6) {
+  char *file = nullptr;
+
+  if (argc >= 6) {
     n = atoi(argv[1]);
     m = atoi(argv[2]);
     nGPUs = atoi(argv[3]);
     nRuns = atoi(argv[4]);
     msl::Muesli::cpu_fraction = atof(argv[5]);
+    if (msl::Muesli::cpu_fraction > 1) {
+      msl::Muesli::cpu_fraction /= 100;
+    }
+  }
+  if (argc == 7) {
+    file = argv[6];
   }
 
   msl::setNumGpus(nGPUs);
@@ -158,7 +167,12 @@ int main(int argc, char **argv) {
     msl::splitTime(r);
   }
 
-  msl::stopTiming();
+  if (file) {
+    msl::printTimeToFile(file);
+  } else {
+    msl::stopTiming();
+  }
+
   msl::terminateSkeletons();
   return 0;
 }

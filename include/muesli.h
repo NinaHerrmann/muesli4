@@ -1,4 +1,4 @@
- /*
+/*
  * muesli.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
@@ -35,28 +35,29 @@
 #include <mpi.h>
 
 #ifdef _OPENMP
-   #include <omp.h>
+#include <omp.h>
 #else
-   #define omp_get_thread_num() 0
+#define omp_get_thread_num() 0
 #endif
 
-#include <iostream>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <string>
+#include <fstream>
+#include <iostream>
 #include <limits>
-#include <sstream>
-#include <cstdarg>
-#include <vector>
 #include <math.h>
+#include <sstream>
+#include <string>
+#include <vector>
 
-#include "exception.h"
 #include "conversion.h"
+#include "exception.h"
 #include "timer.h"
 
 /*! \file muesli.h
- * \brief Contains global definitions such as macros, functions, enums and classes,
- *        and constants in order to configure Muesli.
+ * \brief Contains global definitions such as macros, functions, enums and
+ * classes, and constants in order to configure Muesli.
  */
 
 #ifdef __CUDACC__
@@ -88,17 +89,18 @@
  * \brief This macro checks return value of the CUDA runtime call and exits
  *        the application if the call failed.
  */
-#define CUDA_CHECK_RETURN(value) {                                \
-    cudaError_t _m_cudaStat = value;                              \
-    if (_m_cudaStat != cudaSuccess) {                             \
-      fprintf(stderr, "Error %s at line %d in file %s\n",         \
-          cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);   \
-      exit(EXIT_FAILURE);                                         \
-    }                                                             \
+#define CUDA_CHECK_RETURN(value)                                               \
+  {                                                                            \
+    cudaError_t _m_cudaStat = value;                                           \
+    if (_m_cudaStat != cudaSuccess) {                                          \
+      fprintf(stderr, "Error %s at line %d in file %s\n",                      \
+              cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);            \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
   }
 #else
-// when compiled with compilers other than nvcc, the function type qualifier macros
-// expand to an empty word.
+// when compiled with compilers other than nvcc, the function type qualifier
+// macros expand to an empty word.
 #define MSL_USERFUNC
 #define MSL_GPUFUNC
 #define MSL_CPUFUNC
@@ -113,53 +115,56 @@ namespace msl {
 typedef int ProcessorNo;
 
 /**
- * \brief Enum \em Distribution to represent the distribution mode of distributed
- *        data structures.
+ * \brief Enum \em Distribution to represent the distribution mode of
+ * distributed data structures.
  *
- * Enum \em Distribution to represent the distribution mode of a distributed data
- * structure. Currently there are two distribution modes: distributed and copy
- * distributed. In distributed mode, each process/GPU stores only a partition of
- * the entire data structure. In copy distributed mode, each process/GPU stores
- * the entire data structure.
+ * Enum \em Distribution to represent the distribution mode of a distributed
+ * data structure. Currently there are two distribution modes: distributed and
+ * copy distributed. In distributed mode, each process/GPU stores only a
+ * partition of the entire data structure. In copy distributed mode, each
+ * process/GPU stores the entire data structure.
  */
-enum Distribution {DIST, COPY};
+enum Distribution { DIST, COPY };
 
 /**
  * \brief Class \em Muesli contains globally available variables that determine
  *        the properties (number of running processes, threads, etc.) of the
  *        Muesli application.
  */
-class Muesli
-{
+class Muesli {
 public:
-  static int proc_id; // process id
-  static int proc_entrance; // process entrance (farm skeleton)
-  static int running_proc_no; // running process number (farm skeleton)
-  static int num_total_procs; // number of total processes
-  static int num_local_procs; // equals num_total_procs except when nesting DP into TP skeletons
-  static double start_time; // start time of an application
-  static char* program_name; // program name of an application
+  static int proc_id;           // process id
+  static int proc_entrance;     // process entrance (farm skeleton)
+  static int running_proc_no;   // running process number (farm skeleton)
+  static int num_total_procs;   // number of total processes
+  static int num_local_procs;   // equals num_total_procs except when nesting DP
+                                // into TP skeletons
+  static double start_time;     // start time of an application
+  static char *program_name;    // program name of an application
   static int distribution_mode; // for farm skeleton
-  static int task_group_size; // aggregated task group size (farm skeleton)
-  static int num_conc_kernels; // number of concurrent kernels (farm skeleton)
-  static int num_threads; // number of CPU threads
-  static int num_runs; // number of runs, for benchmarking
-  static int num_gpus; // number of GPUs
-  static double cpu_fraction; // fraction of each DA partition handled by CPU cores (rather than GPUs)
-  static int max_gpus; // maximum number of GPUs of each process
-  static int threads_per_block; // for one dimensional GPU thread blocks (DArray)
-  static int tpb_x; // for two dimensional GPU thread blocks (DMatrix)
-  static int tpb_y; // for two dimensional GPU thread blocks (DMatrix)
+  static int task_group_size;   // aggregated task group size (farm skeleton)
+  static int num_conc_kernels;  // number of concurrent kernels (farm skeleton)
+  static int num_threads;       // number of CPU threads
+  static int num_runs;          // number of runs, for benchmarking
+  static int num_gpus;          // number of GPUs
+  static double cpu_fraction;   // fraction of each DA partition handled by CPU
+                                // cores (rather than GPUs)
+  static int max_gpus;          // maximum number of GPUs of each process
+  static int
+      threads_per_block; // for one dimensional GPU thread blocks (DArray)
+  static int tpb_x;      // for two dimensional GPU thread blocks (DMatrix)
+  static int tpb_y;      // for two dimensional GPU thread blocks (DMatrix)
   static bool debug_communication; // farm skeleton
-  static bool use_timer; // use a timer?
-  static bool farm_statistics; // collect statistics of how many task were processed by CPU/GPU
+  static bool use_timer;           // use a timer?
+  static bool farm_statistics;     // collect statistics of how many task were
+                                   // processed by CPU/GPU
 #ifdef __CUDACC__
-  static std::vector<cudaStream_t> streams;  // cuda streams for multi-gpu
+  static std::vector<cudaStream_t> streams; // cuda streams for multi-gpu
 #endif
 };
 
 static const int ANY_TAG = MPI_ANY_TAG;
-static const int MYTAG = 1; // used for ordinary messages containing data
+static const int MYTAG = 1;   // used for ordinary messages containing data
 static const int STOPTAG = 2; // used to stop the following process
 static const int TERMINATION_TEST = 3;
 static const int RANDOM_DISTRIBUTION = 1;
@@ -171,21 +176,22 @@ static const int DEFAULT_NUM_CONC_KERNELS = 16;
 static const int DEFAULT_NUM_RUNS = 1;
 static const int DEFAULT_TILE_WIDTH = 16;
 
-
 /**
  * \brief Initializes Muesli. Needs to be called before any skeleton is used.
  */
-void initSkeletons(int argc, char** argv, bool debug_communication = 0);
+void initSkeletons(int argc, char **argv, bool debug_communication = 0);
 
 /**
- * \brief Terminates Muesli. Needs to be called at the end of a Muesli application.
+ * \brief Terminates Muesli. Needs to be called at the end of a Muesli
+ * application.
  */
 void terminateSkeletons();
 
 /**
- * \brief Wrapper for printf. Only process with id 0 prints the given format string.
+ * \brief Wrapper for printf. Only process with id 0 prints the given format
+ * string.
  */
-void printv(const char* format, ...);
+void printv(const char *format, ...);
 
 /**
  * \brief Sets the number of CPU threads.
@@ -264,6 +270,13 @@ void splitTime(int run);
 double stopTiming();
 
 /**
+ * @brief
+ *
+ * @param file_name
+ */
+void printTimeToFile(char *file_name);
+
+/**
  * \brief Checks whether this is process with id 0.
  *
  * @return True if process id equals 0.
@@ -282,11 +295,10 @@ void setFarmStatistics(bool val);
  * @return A unique thread id.
  */
 MSL_USERFUNC
-inline size_t getUniqueID()
-{
+inline size_t getUniqueID() {
 #ifdef __CUDA_ARCH__
   return blockIdx.x * blockDim.x + threadIdx.x +
-      ((blockIdx.y * blockDim.y + threadIdx.y)*blockDim.x * gridDim.x);
+         ((blockIdx.y * blockDim.y + threadIdx.y) * blockDim.x * gridDim.x);
 #else
   return omp_get_thread_num();
 #endif
@@ -300,14 +312,11 @@ inline size_t getUniqueID()
  * @tparam T The type for which negative infinity shall be determined.
  * @return Negative infinity for a given type \em T
  */
-template<typename T>
-T getNegativeInfinity()
-{
+template <typename T> T getNegativeInfinity() {
   // given type has a value for infinity
-  if(std::numeric_limits<T>::has_infinity) {
-    return - std::numeric_limits<T>::infinity();
-  }
-  else { // given type has no value for infinity
+  if (std::numeric_limits<T>::has_infinity) {
+    return -std::numeric_limits<T>::infinity();
+  } else { // given type has no value for infinity
     return std::numeric_limits<T>::min();
   }
 }
@@ -320,14 +329,11 @@ T getNegativeInfinity()
  * @tparam T The type for which positive infinity shall be determined.
  * @return Negative infinity for a given type \em T
  */
-template<typename T>
-T getPositiveInfinity()
-{
+template <typename T> T getPositiveInfinity() {
   // given type has a value for infinity
-  if(std::numeric_limits<T>::has_infinity) {
+  if (std::numeric_limits<T>::has_infinity) {
     return std::numeric_limits<T>::infinity();
-  }
-  else { // given type has no value for infinity
+  } else { // given type has no value for infinity
     return std::numeric_limits<T>::max();
   }
 }
@@ -346,14 +352,13 @@ T getPositiveInfinity()
 inline void MSL_SendTag(int destination, int tag);
 
 /**
- * \brief Receives a message without content. Mainly used for control messages such
- *        as stop messages.
+ * \brief Receives a message without content. Mainly used for control messages
+ * such as stop messages.
  *
  * @param source The source process id of the message.
  * @param tag Message tag.
  */
 inline void MSL_ReceiveTag(int source, int tag);
-
 
 //
 // SEND/RECV FOR DATA PARALLEL SKELETONS
@@ -369,10 +374,12 @@ inline void MSL_ReceiveTag(int source, int tag);
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Send(int destination, T* send_buffer, size_t size, int tag = MYTAG);
+inline void MSL_Send(int destination, T *send_buffer, size_t size,
+                     int tag = MYTAG);
 
 /**
- * \brief Sends (non-blocking) a buffer of type \em T to process \em destination.
+ * \brief Sends (non-blocking) a buffer of type \em T to process \em
+ * destination.
  *
  * @param destination The destination process id.
  * @param send_buffer The send buffer.
@@ -382,7 +389,8 @@ inline void MSL_Send(int destination, T* send_buffer, size_t size, int tag = MYT
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_ISend(int destination, T* send_buffer, MPI_Request& req, size_t size, int tag = MYTAG);
+inline void MSL_ISend(int destination, T *send_buffer, MPI_Request &req,
+                      size_t size, int tag = MYTAG);
 
 /**
  * \brief Receives a buffer of type \em T from process \em source.
@@ -394,7 +402,7 @@ inline void MSL_ISend(int destination, T* send_buffer, MPI_Request& req, size_t 
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Recv(int source, T* recv_buffer, size_t size, int tag = MYTAG);
+inline void MSL_Recv(int source, T *recv_buffer, size_t size, int tag = MYTAG);
 
 /**
  * \brief Receives a buffer of type \em T from process \em source.
@@ -407,7 +415,8 @@ inline void MSL_Recv(int source, T* recv_buffer, size_t size, int tag = MYTAG);
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Recv(int source, T* recv_buffer, MPI_Status& stat, size_t size, int tag = MYTAG);
+inline void MSL_Recv(int source, T *recv_buffer, MPI_Status &stat, size_t size,
+                     int tag = MYTAG);
 
 /**
  * \brief Receives (non-blockig) a buffer of type \em T from process \em source.
@@ -420,12 +429,15 @@ inline void MSL_Recv(int source, T* recv_buffer, MPI_Status& stat, size_t size, 
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_IRecv(int source, T* recv_buffer, MPI_Request& req, size_t size, int tag = MYTAG);
+inline void MSL_IRecv(int source, T *recv_buffer, MPI_Request &req, size_t size,
+                      int tag = MYTAG);
 
-// Send/receive function for sending a buffer of type T to process \em destination and
-// receiving a buffer of type T from the same process (destination).
-template<typename T>
-inline void MSL_SendReceive(int destination, T* send_buffer, T* recv_buffer, size_t size = 1);
+// Send/receive function for sending a buffer of type T to process \em
+// destination and receiving a buffer of type T from the same process
+// (destination).
+template <typename T>
+inline void MSL_SendReceive(int destination, T *send_buffer, T *recv_buffer,
+                            size_t size = 1);
 
 /**
  * \brief Implementation of the MPI_Broadcast routine. Only the processes in
@@ -438,8 +450,8 @@ inline void MSL_SendReceive(int destination, T* send_buffer, T* recv_buffer, siz
  * @param count Number of elements in \em buffer.
  * @tparam T Type of the message.
  */
-template<typename T>
-void broadcast(T* buffer, int* const ids, int np, int idRoot, size_t count);
+template <typename T>
+void broadcast(T *buffer, int *const ids, int np, int idRoot, size_t count);
 
 /**
  * \brief Implementation of the MPI_Allgather routine. Only the processes in
@@ -452,36 +464,37 @@ void broadcast(T* buffer, int* const ids, int np, int idRoot, size_t count);
  * @param count Number of elements in \em send_buffer.
  * @tparam T Type of the message.
  */
-template<typename T>
-void allgather(T* send_buffer, T* recv_buffer, int* const ids, int np, size_t count);
+template <typename T>
+void allgather(T *send_buffer, T *recv_buffer, int *const ids, int np,
+               size_t count);
 
 /**
- * \brief Wrapper for the MPI_Allgather routine. Every process in \em MPI_COMM WORLD
- *        participates.
+ * \brief Wrapper for the MPI_Allgather routine. Every process in \em MPI_COMM
+ * WORLD participates.
  *
  * @param send_buffer Send buffer.
  * @param recv_buffer Receive buffer.
  * @param count Number of elements in \em send_buffer.
  * @tparam T Type of the message.
  */
-template<typename T>
-void allgather(T* send_buffer, T* recv_buffer, size_t count);
+template <typename T>
+void allgather(T *send_buffer, T *recv_buffer, size_t count);
 
 /**
- * \brief Wrapper for the MPI_Scatter routine. Every process in \em MPI_COMM WORLD
- *        participates.
+ * \brief Wrapper for the MPI_Scatter routine. Every process in \em MPI_COMM
+ * WORLD participates.
  *
  * @param send_buffer Send buffer.
  * @param recv_buffer Receive buffer.
  * @param count Number of elements in \em send_buffer.
  * @tparam T Type of the message.
  */
-template<typename T>
-void scatter(T* send_buffer, T* recv_buffer, size_t count);
+template <typename T>
+void scatter(T *send_buffer, T *recv_buffer, size_t count);
 
 /**
- * \brief Wrapper for the MPI_Broadcast routine. Every process in \em MPI_COMM WORLD
- *        participates.
+ * \brief Wrapper for the MPI_Broadcast routine. Every process in \em MPI_COMM
+ * WORLD participates.
  *
  * @param source Root process id of the broadcast.
  * @param buffer The message buffer.
@@ -489,15 +502,14 @@ void scatter(T* send_buffer, T* recv_buffer, size_t count);
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Broadcast(int source, T* buffer, int size);
+inline void MSL_Broadcast(int source, T *buffer, int size);
 
 /**
- * \brief Wrapper for the MPI_Barrier routine. Every process in \em MPI_COMM WORLD
- *        participates.
+ * \brief Wrapper for the MPI_Barrier routine. Every process in \em MPI_COMM
+ * WORLD participates.
  *
  */
 inline void barrier();
-
 
 //
 // SEND/RECV FOR TASK PARALLEL SKELETONS
@@ -512,7 +524,8 @@ inline void barrier();
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Send(int destination, std::vector<T>& send_buffer, int tag = MYTAG);
+inline void MSL_Send(int destination, std::vector<T> &send_buffer,
+                     int tag = MYTAG);
 
 /**
  * \brief Receives a std::vector of type \em T from process \em source.
@@ -523,15 +536,15 @@ inline void MSL_Send(int destination, std::vector<T>& send_buffer, int tag = MYT
  * @tparam T Type of the message.
  */
 template <typename T>
-inline void MSL_Recv(int source, std::vector<T>& recv_buffer, int tag = MYTAG);
-
+inline void MSL_Recv(int source, std::vector<T> &recv_buffer, int tag = MYTAG);
 
 //
 // AUXILIARY FUNCTIONS
 //
 
 /**
- * \brief Used to quit the program on failure,  must be used after initSkeletons()
+ * \brief Used to quit the program on failure,  must be used after
+ * initSkeletons()
  */
 void fail_exit();
 
@@ -540,26 +553,24 @@ void fail_exit();
  *
  * @param e The exception to throw.
  */
-void throws(const detail::Exception& e);
+void throws(const detail::Exception &e);
 
-template <typename C1, typename C2>
-inline C1 proj1_2(C1 a, C2 b);
+template <typename C1, typename C2> inline C1 proj1_2(C1 a, C2 b);
 
-template <typename C1, typename C2>
-inline C2 proj2_2(C1 a, C2 b);
+template <typename C1, typename C2> inline C2 proj2_2(C1 a, C2 b);
 
-//template <typename F>
-// inline int auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int col);
+// template <typename F>
+// inline int auxRotateRows(const Fct1<int, int, F>& f, int blocks, int row, int
+// col);
 
-//template <typename F>
-// inline int auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int col);
+// template <typename F>
+// inline int auxRotateCols(const Fct1<int, int, F>& f, int blocks, int row, int
+// col);
 
-template <typename T>
-inline void show(T* a, int size);
+template <typename T> inline void show(T *a, int size);
 
-}
+} // namespace msl
 
 #include "../src/muesli_com.cpp"
 
 #include "../src/muesli.cpp"
-
