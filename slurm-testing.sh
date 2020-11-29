@@ -2,11 +2,11 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=8
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:4
-#SBATCH --time=15:00:00
+#SBATCH --time=10:00:00
 #SBATCH --exclusive
 #SBATCH --job-name=Muesli-solver
 #SBATCH --outpu=/scratch/tmp/e_zhup01/muesli-measurements/output_muesli.txt
@@ -40,14 +40,8 @@ export I_MPI_FABRICS=shm:tcp
 
 # parameters: #DMCols #DMRows #nGPU #nRuns #CpuPercentage
 
-for cpu_p in `seq 10 10 40`; do
-    for m_size in 512 1000 5000 10000; do
-        for gpu_n in 1 4; do
-        mpirun /home/e/e_zhup01/muesli4/build/jacobi $m_size $m_size $gpu_n 10 $cpu_p "/scratch/tmp/e_zhup01/muesli-measurements/stats_n8.csv"
-        done
-    done    
-done
 
+mpirun /home/e/e_zhup01/muesli4/build/jacobi 50 50 2 1 10 "/scratch/tmp/e_zhup01/muesli-measurements/stats_test.csv"
 
 #srun nvprof --analysis-metrics -o /scratch/tmp/e_zhup01/muesli-jacobi-analysis.%p.nvprof /home/e/e_zhup01/muesli4/build/jacobi -numdevices=1
 # alternativ: mpirun -np 2 <Datei>

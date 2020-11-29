@@ -274,7 +274,7 @@ double stopTiming();
  *
  * @param file_name
  */
-void printTimeToFile(char *file_name);
+void printTimeToFile(const char *id, const char *file_name);
 
 /**
  * \brief Checks whether this is process with id 0.

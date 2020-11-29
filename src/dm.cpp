@@ -853,7 +853,7 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
          i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
 
       padded_local_matrix[i] =
-          neutral_value_functor(i / ncol - stencil_size, i % ncol);
+          neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
     }
   }
   int tile_width = f.getTileWidth();
@@ -872,12 +872,17 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     CUDA_CHECK_RETURN(cudaMalloc((void **)&d_padded_local_matrix[i],
                                  sizeof(T) * (gpu_elements)));
 
+    // printf("Process: %d\nGPU id: %d\nGPU rows:%d\nFirst GPU row:%d\nFirst "
+    //        "localRow:%d\nGPUCols: %d\nGPUfirstCol:%d\nGPU elements:%d\nTotal
+    //        " "local elements:%d\nPLM size: %d\n", msl::Muesli::proc_id, i,
+    //        plans[i].gpuRows, plans[i].firstRow, firstRow, plans[i].gpuCols,
+    //        plans[i].firstCol, gpu_elements, nLocal, size);
+
     // in this case, because of the top padding the copy will start from
     // firstRow - stencilSize rows, which is what we want.
-
     CUDA_CHECK_RETURN(cudaMemcpyAsync(
         d_padded_local_matrix[i],
-        padded_local_matrix + (plans[i].firstRow * ncol),
+        padded_local_matrix + ((plans[i].firstRow - firstRow) * ncol),
         sizeof(T) * gpu_elements, cudaMemcpyHostToDevice, Muesli::streams[i]));
     plm.addDevicePtr(d_padded_local_matrix[i]);
   }

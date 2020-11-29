@@ -61,10 +61,9 @@ public:
    * @return Elapsed time since start.
    */
   double stop() {
-    if (end == 0) {
-      MPI_Barrier(MPI_COMM_WORLD);
-      end = MPI_Wtime();
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    end = MPI_Wtime();
+
     return end - start;
   }
 

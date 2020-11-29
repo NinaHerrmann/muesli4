@@ -233,12 +233,15 @@ double msl::stopTiming() {
   return total_time;
 }
 
-void msl::printTimeToFile(char *file_name) {
+void msl::printTimeToFile(const char *id, const char *file_name) {
+  int runs = timer->getNumSplits();
   double time = msl::stopTiming();
-  std::ofstream outputFile;
-  outputFile.open(file_name, std::ios_base::app);
-  outputFile << time << "\n";
-  outputFile.close();
+  if (msl::Muesli::proc_id == 0) {
+    std::ofstream outputFile;
+    outputFile.open(file_name, std::ios_base::app);
+    outputFile << id << "," << (time / runs) << "\n";
+    outputFile.close();
+  }
 }
 
 bool msl::isRootProcess() { return Muesli::proc_id == 0; }

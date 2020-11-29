@@ -128,6 +128,7 @@ int run(int n, int m, int stencil_radius) {
     mat = std::move(new_m);
     num_iter++;
   }
+
   printf("Iterations:%d \n", num_iter);
   return 0;
 }
@@ -161,6 +162,9 @@ int main(int argc, char **argv) {
 
   msl::setNumGpus(nGPUs);
   msl::setNumRuns(nRuns);
+
+  printf("Config:\nSize:%d\n#GPU:%d\nCPU perc:%f\n", n, nGPUs,
+         msl::Muesli::cpu_fraction);
   msl::startTiming();
   for (int r = 0; r < msl::Muesli::num_runs; ++r) {
     msl::jacobi::run(n, m, stencil_radius);
@@ -168,7 +172,9 @@ int main(int argc, char **argv) {
   }
 
   if (file) {
-    msl::printTimeToFile(file);
+    std::string id = "s" + std::to_string(n) + "_g" + std::to_string(nGPUs) +
+                     "_cp" + std::to_string(msl::Muesli::cpu_fraction * 100);
+    msl::printTimeToFile(id.c_str(), file);
   } else {
     msl::stopTiming();
   }
