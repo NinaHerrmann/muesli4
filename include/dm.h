@@ -36,6 +36,7 @@
 #include <type_traits>
 
 #include "muesli.h"
+#include "da.h"
 #include "exception.h"
 #include "functors.h"
 // #include "plarray.h"
@@ -43,6 +44,7 @@
 #include "conversion.h"
 #ifdef __CUDACC__
 #include "map_kernels.cuh"
+#include "combine_kernels.cuh"
 #include "zip_kernels.cuh"
 #include "fold_kernels.cuh"
 #include "copy_kernel.cuh"
@@ -311,6 +313,18 @@ public:
 
 #endif
 
+  // SKELETONS / COMPUTATION / COMBINE
+  /**
+    * \brief Calculates multiple elements of the output.
+    * They are calculated and combined with a given user function.
+    *
+    * @tparam T2 Element type of the distributed matrix to zip with.
+    * @tparam CalcFunctor Functor for calculating the output.
+    * @tparam CombineFunctor Functor for combining multiple elements.
+    */
+  template <typename T2, typename CalcFunctor,typename CombineFunctor>
+  DM<T> combine(DM<T2>& b, CalcFunctor& f, CombineFunctor& f2);
+
   // SKELETONS / COMPUTATION / ZIP
 
   /**
@@ -500,6 +514,20 @@ public:
    * @return The global size.
    */
   int getSize() const;
+
+  /**
+   * \brief Returns the global size of the distributed array.
+   *
+   * @return The global size.
+   */
+  int getRows() const;
+
+  /**
+   * \brief Returns the global size of the distributed array.
+   *
+   * @return The global size.
+   */
+  int getCols() const;
 
   /**
    * \brief Returns the size of local partitions of the distributed array.

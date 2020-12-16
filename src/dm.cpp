@@ -84,10 +84,11 @@ msl::DM<T>::DM(int row, int col, const T& v)
   initGPUs();
 #else
 #endif
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int i=0; i< nLocal; i++) localPartition[i] = v;
   upload();
 }
+//DMatrix(int n0, int m0, int rows, int cols, const F2& f, Distribution d = DIST);
 
 // auxiliary method init() 
 template<typename T>
@@ -102,9 +103,9 @@ void msl::DM<T>::init() {
   nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
   nCPU = nLocal - nGPU * ng;
   firstIndex =  id * nLocal;
-  printf("loc prozesses %d , First index %d, firstRowGpu %d\n", Muesli::num_local_procs, firstIndex, indexGPU);
-  printf("Building datastructure with %d nodes %d cpus and %d gpus\n", msl::Muesli::num_total_procs,
-         msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
+  //printf("loc prozesses %d , First index %d\n", Muesli::num_local_procs, firstIndex);
+  //printf("Building datastructure with %d nodes %d cpus and %d gpus\n", msl::Muesli::num_total_procs,
+         //msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
 }
 
 
@@ -202,6 +203,16 @@ T msl::DM<T>::get(int index) const {
 template<typename T>
 int msl::DM<T>::getSize() const {
   return n;
+}
+
+template<typename T>
+int msl::DM<T>::getCols() const {
+  return ncol;
+}
+
+template<typename T>
+int msl::DM<T>::getRows() const {
+  return nrow;
 }
 
 template<typename T>
@@ -582,6 +593,18 @@ msl::DM<R> msl::DM<T>::mapStencil(MapStencilFunctor& f, T neutral_value)
 {
   printf("mapStencil\n");
   throws(detail::NotYetImplementedException());
+}
+//*********************************** Combine ********************************
+template <typename T>
+template <typename T2, typename CalcFunctor, typename CombineFunctor>
+msl::DM<T> msl::DM<T>::combine(DM<T2>& b, CalcFunctor& f, CombineFunctor& f2){
+  // Have a local Matrix for each node.
+  T intermediatepointer[b.getSize()] = {0};
+  // We have b as the distance and this
+  DM<T> result(b.getRows, b.getCols(), 0);
+  /* TODO firstly, create a datastructure where the pheremone is saved
+     TODO secondly, combine the datastructures created (zip?) */
+  return result;
 }
 
 // ************************************ zip ***************************************
