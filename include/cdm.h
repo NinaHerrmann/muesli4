@@ -45,7 +45,6 @@
 #include "conversion.h"
 #ifdef __CUDACC__
 #include "map_kernels.cuh"
-#include "combine_kernels.cuh"
 #include "zip_kernels.cuh"
 #include "fold_kernels.cuh"
 #include "copy_kernel.cuh"
@@ -193,7 +192,7 @@ namespace msl {
          * @param b The array to store the elements of the distributed array.
          */
         template <typename gatherfunctor>
-        msl::DM<T> gather(gatherfunctor gf);
+        void gather(gatherfunctor gf);
 
         //
         // GETTERS AND SETTERS

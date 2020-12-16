@@ -138,8 +138,10 @@ msl::CDM<T>::~CDM() {
 template<typename T>
 T msl::CDM<T>::get(int index) const {
   // TODO
-  msl::MSL_Broadcast(idSource, &message, 1);
-  return message;
+  throws(detail::NotYetImplementedException());
+
+  //msl::MSL_Broadcast(idSource, &message, 1);
+  return index;
 }
 
 template<typename T>
@@ -169,22 +171,13 @@ void msl::CDM<T>::setCpuMemoryInSync(bool b) {
 
 template<typename T>
 void msl::CDM<T>::set(int globalIndex, const T& v) {
-  localPartition[localIndex] = v;
+  localPartition[globalIndex] = v;
 }
 
 template<typename T>
 GPUExecutionPlan<T>* msl::CDM<T>::getExecPlans(){
   //std::vector<GPUExecutionPlan<T> > ret(plans, plans + Muesli::num_gpus);
   return plans;
-}
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-  if (code != cudaSuccess)
-  {
-    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-    if (abort) exit(code);
-  }
 }
 
 template<typename T>
@@ -276,8 +269,9 @@ void msl::CDM<T>::broadcast(msl::DM<T> dm) {
 
 // SKELETONS / COMMUNICATION / GATHER
 
-template<typename T, typename gatherfunctor>
-msl::DM<T> msl::CDM<T>::gather(gatherfunctor gf) {
+template<typename T>
+template<typename gatherfunctor>
+void msl::CDM<T>::gather(gatherfunctor gf) {
   printf("gather\n");
   throws(detail::NotYetImplementedException());
   msl::DM<T> result(nrow, ncol, 1);
@@ -348,7 +342,7 @@ T msl::CDM<T>::fold(FoldFunctor& f, bool final_fold_on_cpu){
   // fold local elements on CPU (overlap with GPU computations)
   // TODO: openmp has parallel reduce operators.
   T cpu_result = localPartition[0];
-  for (int k = 1; k<nCPU; k++) {
+  for (int k = 1; k<n; k++) {
     cpu_result = f(cpu_result, localPartition[k]);
   }
 

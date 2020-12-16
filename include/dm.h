@@ -36,6 +36,7 @@
 #include <type_traits>
 
 #include "muesli.h"
+#include "da.h"
 #include "exception.h"
 #include "functors.h"
 // #include "plarray.h"
