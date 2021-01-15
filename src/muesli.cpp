@@ -105,18 +105,19 @@ void msl::initSkeletons(int argc, char **argv, bool debug_communication) {
 void msl::terminateSkeletons() {
   std::ostringstream s;
   std::ostringstream s_time;
-  if (isRootProcess())
-    printf("debug: terminating skeletons\n");
+  //if (isRootProcess())
+    //printf("debug: terminating skeletons\n");
   MPI_Barrier(MPI_COMM_WORLD);
-  if (isRootProcess())
-    printf("debug: behind barrier\n");
+  //if (isRootProcess())
+    //printf("debug: behind barrier\n");
+  msl::printv("\n");
 
   if (Muesli::use_timer) {
     double total_time = timer->totalTime();
     s_time << "Total time: " << total_time << "s" << std::endl;
   }
 
-  if (isRootProcess()) {
+/*  if (isRootProcess()) {
     s << std::endl << "Name: " << Muesli::program_name << std::endl;
     s << "Proc: " << Muesli::num_total_procs << std::endl;
 #ifdef __CUDACC__
@@ -137,9 +138,9 @@ void msl::terminateSkeletons() {
     }
 
     printf("%s", s.str().c_str());
-  }
-  if (isRootProcess())
-    printf("debug: behind output of run time statistics\n");
+  }*/
+  //if (isRootProcess())
+    //printf("debug: behind output of run time statistics\n");
 
 #ifdef _CUDACC__
   for (auto it = Muesli::streams.begin(); it != Muesli::streams.end(); ++it) {
@@ -222,14 +223,14 @@ void msl::startTiming() {
 void msl::splitTime(int run) {
   double result = timer->splitTime();
   if (isRootProcess()) {
-    std::cout << "Run " << run << ": " << result << "s" << std::endl;
+    //std::cout << "Run " << run << ": " << result << "s" << std::endl;
   }
 }
 
 double msl::stopTiming() {
   int runs = timer->getNumSplits();
   double total_time = timer->stop();
-  msl::printv("\nTime/run: %fs\n", total_time / runs);
+  msl::printv("%f;", total_time / runs);
   return total_time;
 }
 

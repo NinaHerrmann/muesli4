@@ -256,8 +256,8 @@ public:
    * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
    * @tparam MapStencilFunctor Functor type.
    */
-  template <typename MapStencilFunctor>
-  void mapStencilInPlace(MapStencilFunctor &f, T neutral_value);
+  template <typename MapStencilFunctor, typename NeutralValueFunctor>
+  void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
   // /**
   //  * \brief Non-inplace variant of the mapStencil skeleton.
