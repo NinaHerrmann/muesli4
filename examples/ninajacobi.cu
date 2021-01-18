@@ -97,6 +97,18 @@ namespace msl {
             }
         };
 
+        class zipIdentity : public Functor2<float, float, float> {
+        public:
+            MSL_USERFUNC
+            float operator()(float x, float y) const {
+                auto diff = x - y;
+                if (diff < 0) {
+                    diff *= (-1);
+                }
+                return diff;
+            }
+        };
+
         class Max : public Functor2<float, float, float> {
         public:
             MSL_USERFUNC
@@ -124,26 +136,30 @@ namespace msl {
             // mapStencil
             JacobiSweepFunctor jacobi;
             jacobi.setStencilSize(1);
-            CopyFunctor copy;
+
             // Neutral value provider
             JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
-
+            DM<float> new_m(n, m, 75, true);
             int num_iter = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {
-                DM<float> new_m = mat.mapStencil(jacobi, neutral_value_functor);
                 if (num_iter % 4 == 0) {
+                    new_m = mat.mapStencil(jacobi, neutral_value_functor);
+
                     DM<float> differences = new_m.zip(mat, difference_functor);
                     global_diff = differences.fold(max_functor, true);
+                    mat = std::move(new_m);
+                } else {
+                    mat.mapStencilInPlace(jacobi, neutral_value_functor);
                 }
                 num_iter++;
-                mat = std::move(new_m);
             }
 
             if (msl::isRootProcess()) {
-                printf("RO:%d;", num_iter);
+                printf("R:%d;", num_iter);
             }
             return 0;
         }
+
     } // namespace jacobi
 } // namespace msl
 int main(int argc, char **argv) {
@@ -180,7 +196,6 @@ int main(int argc, char **argv) {
         printf("%d; %d; %.2f; %d", n, nGPUs, msl::Muesli::cpu_fraction, msl::Muesli::num_runs);
         //printf("Config:\tSize:%d; #GPU:%d; CPU perc:%.2f;", n, nGPUs, msl::Muesli::cpu_fraction);
     }
-
     msl::startTiming();
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
         msl::jacobi::run(n, m, stencil_radius);
@@ -194,7 +209,6 @@ int main(int argc, char **argv) {
     } else {
         msl::stopTiming();
     }
-
     msl::terminateSkeletons();
     return 0;
 }
