@@ -9,15 +9,15 @@
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
 #SBATCH --job-name=Muesli-solver
-#SBATCH --outpu=/scratch/tmp/e_zhup01/muesli-measurements/output_muesli.txt
-#SBATCH --error=/scratch/tmp/e_zhup01/muesli-measurements/error_muesli.txt
+#SBATCH --outpu=/scratch/tmp/n_herr03/muesli-measurements/output_muesli.txt
+#SBATCH --error=/scratch/tmp/n_herr03/muesli-measurements/error_muesli.txt
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=endizhupani@uni-muenster.de
+#SBATCH --mail-user=n_herr03@uni-muenster.de
 
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-cd /home/e/e_zhup01/muesli4
+cd /home/n/n_herr03/muesli4
 
 ./build.sh
 export OMP_NUM_THREADS=4
@@ -40,10 +40,10 @@ export I_MPI_FABRICS=shm:tcp
 
 # parameters: #DMCols #DMRows #nGPU #nRuns #CpuPercentage
 
-for cpu_p in `seq 10 10 40`; do
+for cpu_p in 0.02 0.04 0.06 0.08 0.10 0.12 0.14; do
     for m_size in 512 1000 5000 10000; do
         for gpu_n in 1 4; do
-        mpirun /home/e/e_zhup01/muesli4/build/jacobi $m_size $m_size $gpu_n 10 $cpu_p "/scratch/tmp/e_zhup01/muesli-measurements/stats_n8.csv"
+        mpirun /home/n/n_herr03/muesli4/build/jacobi $m_size $m_size $gpu_n 10 $cpu_p "/scratch/tmp/n_herr03/muesli-measurements/usualmpirun.csv"
         done
     done    
 done
