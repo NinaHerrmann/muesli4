@@ -748,7 +748,11 @@ private:
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete;
+  bool plinit = false; // pl matrix initialized?
 
+  PLMatrix<T> plm; // plmatrix
+  std::vector<PLMatrix<T>*> d_plm; // plmatrix
+  std::vector<T*> d_padded_local_matrix; // plmatrix
   //
   // AUXILIARY
   //

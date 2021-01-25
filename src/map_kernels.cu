@@ -86,8 +86,8 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
-                              PLMatrix<T, NeutralValueFunctor> *input, F func,
-                              int tile_width, int tile_height) {
+                              PLMatrix<T> *input, F func,
+                              int tile_width, int tile_height, NeutralValueFunctor nv) {
 
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   int x = blockIdx.x * blockDim.x + threadIdx.x;

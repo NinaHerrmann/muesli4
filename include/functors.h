@@ -144,8 +144,23 @@ public:
   virtual ~Functor4() {}
 };
 
-template <typename T, typename NeutralValueFunctor> class PLMatrix;
+template <typename T> class PLMatrix;
 
+namespace jacobi {
+    class JacobiNeutralValueFunctor2 : public Functor2<int, int, float> {
+    public:
+        JacobiNeutralValueFunctor2(float default_neutral)
+                : default_neutral(default_neutral) {}
+
+        MSL_USERFUNC
+        float operator()(int x, int y) const { // here, x represents rows
+            return default_neutral;
+        }
+
+    private:
+       int default_neutral;
+    };
+}
 /**
  * \brief Class MMapStencilFunctor represents a functor for the mapStencil
  * skeleton of the distributed matrix.
@@ -176,7 +191,7 @@ public:
    */
   MSL_USERFUNC
   virtual R operator()(int rowIndex, int colIndex,
-                       const PLMatrix<T, NeutralValueFunctor> &input) const = 0;
+                       const PLMatrix<T> &input) const = 0;
 
   /**
    * \brief Returns the stencil size.
@@ -191,6 +206,12 @@ public:
    * @param value The new stencil size.
    */
   void setStencilSize(int value) { stencil_size = value; }
+  /**
+   * \brief Sets the stencil size.
+   *
+   * @param value The new stencil size.
+   */
+  //void setNVF(NeutralValueFunctor &nv) { nvf = nv; }
 
   /**
    * \brief Destructor.
@@ -200,6 +221,7 @@ public:
 protected:
   int stencil_size;
 };
+
 
 // /**
 //  * Represents a functor that takes an array of arguments and produces one

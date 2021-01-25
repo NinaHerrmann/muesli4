@@ -50,7 +50,7 @@ namespace msl {
  * @tparam NeutralValueFunctor Functor that will provide the neutral value. The
  * Out type of the function must be the same as T
  */
-template <typename T, typename NeutralValueFunctor>
+template <typename T>
 class PLMatrix : public ArgumentType {
 public:
   /**
@@ -67,16 +67,17 @@ public:
    * @param th Height of the data tile without the padding
    * @param gr Number of rows processed by the GPU
    * @param gc number of columns processed by the GPU
-   * @param nv_functor Functor with two input params of type int that should
    * return neutral values for a specific position in the matrix
    */
-  PLMatrix(int n, int m, int r, int c, int ss, int tw, int th,
-           NeutralValueFunctor &nv_functor)
+  PLMatrix(int n, int m, int r, int c, int ss, int tw, int th)
       : ArgumentType(), current_data(0), shared_data(0), n(n), m(m), rows(r),
         cols(c), stencil_size(ss), firstRow(Muesli::proc_id * r),
-        tile_width(tw), width(2 * stencil_size + tile_width),
-        neutral_value_functor(nv_functor) {}
+        tile_width(tw), width(2 * stencil_size + tile_width) {}
 
+  /**
+   * \brief Default Constructor.
+   */
+  PLMatrix() {}
   /**
    * \brief Destructor.
    */
@@ -137,7 +138,7 @@ public:
    * @param col The global col index.
    */
   MSL_USERFUNC
-  T get(int row, int col) const {
+    T get(int row, int col) const {
 #ifdef __CUDA_ARCH__
     // GPU version: read from shared memory.
     int r = blockIdx.y * blockDim.y + threadIdx.y;
@@ -159,7 +160,7 @@ public:
     // bounds check
     if ((col < 0) || (col >= m)) {
       // out of bounds -> return neutral value
-      return neutral_value_functor(row, col);
+      return 100;
     } else { // in bounds -> return desired value
       return current_data[(row - firstRow + stencil_size) * cols + col];
     }
@@ -227,8 +228,8 @@ public:
       if (tx == 0) {
         for (int i = 0; i < stencil_size; i++) {
           if (c + i - stencil_size < 0) {
-            smem[(ty + stencil_size) * width + i] =
-                neutral_value_functor(r, c + i - stencil_size);
+            smem[(ty + stencil_size) * width + i] = 100;
+              //  neutral_value_functor(r, c + i - stencil_size);
           } else
             smem[(ty + stencil_size) * width + i] =
                 current_data[(row + stencil_size) * cols + c + i -
@@ -242,8 +243,8 @@ public:
       if (tx == tile_width - 1 || abs_tx == gpu_columns - 1) {
         for (int i = 0; i < stencil_size; i++) {
           if (c + i + 1 > m - 1)
-            smem[(ty + stencil_size) * width + i + tx + 1 + stencil_size] =
-                neutral_value_functor(r, c + i + 1);
+            smem[(ty + stencil_size) * width + i + tx + 1 + stencil_size] = 100;
+               // neutral_value_functor(r, c + i + 1);
           else
             smem[(ty + stencil_size) * width + i + tile_width + stencil_size] =
                 current_data[(row + stencil_size) * cols + c + i + 1];
@@ -255,8 +256,8 @@ public:
         for (int i = 0; i < stencil_size; i++) {
           for (int j = 0; j < stencil_size; j++) {
             if (c + j - stencil_size < 0)
-              smem[i * width + j] =
-                  neutral_value_functor(r, c + j - stencil_size);
+              smem[i * width + j] = 100;
+                  //neutral_value_functor(r, c + j - stencil_size);
             else
               smem[i * width + j] =
                   current_data[(row + i) * cols + c + j - stencil_size];
@@ -269,8 +270,8 @@ public:
         for (int i = 0; i < stencil_size; i++) {
           for (int j = 0; j < stencil_size; j++) {
             if (c + j + 1 > m - 1)
-              smem[i * width + j + stencil_size + tx + 1] =
-                  neutral_value_functor(r, c + j + 1);
+              smem[i * width + j + stencil_size + tx + 1] = 100;
+                 // neutral_value_functor(r, c + j + 1);
             else
               smem[i * width + j + stencil_size + tile_width] =
                   current_data[(row + i) * cols + c + j + 1];
@@ -283,8 +284,8 @@ public:
         for (int i = 0; i < stencil_size; i++) {
           for (int j = 0; j < stencil_size; j++) {
             if (c + j - stencil_size < 0)
-              smem[(i + stencil_size + ty + 1) * width + j] =
-                  neutral_value_functor(r, c + j - stencil_size);
+              smem[(i + stencil_size + ty + 1) * width + j] = 0;
+                  //neutral_value_functor(r, c + j - stencil_size);
             else
               smem[(i + stencil_size + tile_width) * width + j] =
                   current_data[(row + i + stencil_size + 1) * cols + c + j -
@@ -299,8 +300,8 @@ public:
         for (int i = 0; i < stencil_size; i++) {
           for (int j = 0; j < stencil_size; j++) {
             if (c + j + 1 > m - 1)
-              smem[(i + stencil_size + ty + 1) * width + j + stencil_size + tx +
-                   1] = neutral_value_functor(r, c + j + 1);
+              smem[(i + stencil_size + ty + 1) * width + j + stencil_size + tx + 1] = 0;
+                      //neutral_value_functor(r, c + j + 1);
             else
               smem[(i + stencil_size + tile_width) * width + j + stencil_size +
                    tile_width] =
@@ -321,6 +322,21 @@ public:
    * @param fr The first row index.
    */
   void setFirstRowGPU(int fr) { firstRowGPU = fr; }
+
+  /**
+   * @brief Set the size of the Stencil.
+   *
+   * @param s
+   */
+  void setStencilSize(int s) { stencil_size = s; }
+
+  /**
+   * @brief Set Neutral Value functor
+   *
+   * @param nv
+   */
+  //template <typename NeutralValueFunctor>
+  //void setNVV(NeutralValueFunctor nv) { neutral_value_functor = nv; }
 
   /**
    * @brief Set the GLOBAL index of the first element on the PLM to be processed
@@ -346,7 +362,6 @@ private:
   int tile_width;
   int tile_height;
   int width;
-  NeutralValueFunctor neutral_value_functor;
 };
 
 } // namespace msl

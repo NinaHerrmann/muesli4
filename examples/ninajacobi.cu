@@ -35,12 +35,13 @@ namespace msl {
 
                 // bottom border must be 0
                 if (x > (glob_rows_ - 1)) {
+                    //printf("I will return 0;", glob_rows_);
                     return 0;
                 }
 
                 // this should never be called if indexes don't represent border points
                 // inner values are 75
-                return default_neutral;
+                return 75;
             }
 
         private:
@@ -50,7 +51,7 @@ namespace msl {
             // Global number of columns
             int glob_cols_;
 
-            int default_neutral;
+            int default_neutral = 75;
         };
 
 /**
@@ -61,12 +62,12 @@ namespace msl {
         class JacobiSweepFunctor
                 : public MMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
         public:
-            JacobiSweepFunctor() : MMapStencilFunctor() {}
+            JacobiSweepFunctor() : MMapStencilFunctor(){}
 
             MSL_USERFUNC
             float operator()(
                     int rowIndex, int colIndex,
-                    const msl::PLMatrix<float, JacobiNeutralValueFunctor> &input) const {
+                    const msl::PLMatrix<float> &input) const {
                 float sum = 0;
                 // Add top and bottom values.
                 for (int i = -stencil_size; i <= stencil_size; i++) {
@@ -128,7 +129,9 @@ namespace msl {
         };
 
         int run(int n, int m, int stencil_radius) {
+            JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
             DM<float> mat(n, m, 75, true);
+
             AbsoluteDifference difference_functor;
             Max max_functor;
             float global_diff = 10;
@@ -136,26 +139,61 @@ namespace msl {
             // mapStencil
             JacobiSweepFunctor jacobi;
             jacobi.setStencilSize(1);
+            //jacobi.setNVF(neutral_value_functor);
 
             // Neutral value provider
-            JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
             DM<float> new_m(n, m, 75, true);
             int num_iter = 0;
-            while (global_diff > EPSILON && num_iter < MAX_ITER) {
-                if (num_iter % 4 == 0) {
+            cudaEvent_t start, stop;
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            float milliseconds,maps , diffs, difffolds, move = 0;
+            while (global_diff > EPSILON && num_iter < 10) {
+               /* if (num_iter % 4 == 0) {
+                    cudaEventRecord(start);
                     new_m = mat.mapStencil(jacobi, neutral_value_functor);
-
+                    cudaEventRecord(stop);
+                    cudaEventSynchronize(stop);
+                    cudaEventElapsedTime(&milliseconds, start, stop);
+                    maps += milliseconds;
+                    cudaEventRecord(start);
                     DM<float> differences = new_m.zip(mat, difference_functor);
+                    cudaEventRecord(stop);
+                    cudaEventSynchronize(stop);
+                    cudaEventElapsedTime(&milliseconds, start, stop);
+                    diffs += milliseconds;
+                    cudaEventRecord(start);
                     global_diff = differences.fold(max_functor, true);
+                    cudaEventRecord(stop);
+                    cudaEventSynchronize(stop);
+                    cudaEventElapsedTime(&milliseconds, start, stop);
+                    difffolds += milliseconds;
+                    cudaEventRecord(start);
                     mat = std::move(new_m);
-                } else {
+                    cudaEventRecord(stop);
+                    cudaEventSynchronize(stop);
+                    cudaEventElapsedTime(&milliseconds, start, stop);
+                    move += milliseconds;
+                } else {*/
+                    cudaEventRecord(start);
                     mat.mapStencilInPlace(jacobi, neutral_value_functor);
-                }
+                    cudaEventRecord(stop);
+                    cudaEventSynchronize(stop);
+                    cudaEventElapsedTime(&milliseconds, start, stop);
+                    maps += milliseconds;
+                //}
+                mat.download();
+                mat.show();
                 num_iter++;
             }
 
             if (msl::isRootProcess()) {
-                printf("R:%d;", num_iter);
+                //printf("R:%d;", num_iter);
+                printf("\n mapstencil %.3fs;\n", maps / 1000);
+                printf("differences zip %.3fs;\n", diffs / 1000);
+                printf("differences fold %.3fs;\n", difffolds / 1000);
+                printf("Move %.3fs;\n", move / 1000);
+                printf("It %d;\n", num_iter);
             }
             return 0;
         }
@@ -170,7 +208,7 @@ int main(int argc, char **argv) {
     int nGPUs = 1;
     int nRuns = 1;
     msl::Muesli::cpu_fraction = 0.25;
-    bool warmup = false;
+    //bool warmup = false;
 
     char *file = nullptr;
 
