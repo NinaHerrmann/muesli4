@@ -1,6 +1,6 @@
 
 /**
- * Copyright (c) 2020 Endi Zhupani
+ * Copyright (c) 2020 Nina Herrmann, Endi Zhupani
  *
  * This software is released under the MIT License.
  * https://opensource.org/licenses/MIT
@@ -35,13 +35,12 @@ namespace msl {
 
                 // bottom border must be 0
                 if (x > (glob_rows_ - 1)) {
-                    //printf("I will return 0;", glob_rows_);
                     return 0;
                 }
 
                 // this should never be called if indexes don't represent border points
                 // inner values are 75
-                return 75;
+                return default_neutral;
             }
 
         private:
@@ -82,6 +81,7 @@ namespace msl {
                         continue;
                     sum += input.get(rowIndex, colIndex + i);
                 }
+
                 return sum / (4 * stencil_size);
             }
         };
@@ -148,8 +148,8 @@ namespace msl {
             cudaEventCreate(&start);
             cudaEventCreate(&stop);
             float milliseconds,maps , diffs, difffolds, move = 0;
-            while (global_diff > EPSILON && num_iter < 10) {
-               /* if (num_iter % 4 == 0) {
+            while (global_diff > EPSILON && num_iter < MAX_ITER) {
+               if (num_iter % 4 == 0) {
                     cudaEventRecord(start);
                     new_m = mat.mapStencil(jacobi, neutral_value_functor);
                     cudaEventRecord(stop);
@@ -174,16 +174,14 @@ namespace msl {
                     cudaEventSynchronize(stop);
                     cudaEventElapsedTime(&milliseconds, start, stop);
                     move += milliseconds;
-                } else {*/
+                } else {
                     cudaEventRecord(start);
                     mat.mapStencilInPlace(jacobi, neutral_value_functor);
                     cudaEventRecord(stop);
                     cudaEventSynchronize(stop);
                     cudaEventElapsedTime(&milliseconds, start, stop);
                     maps += milliseconds;
-                //}
-                mat.download();
-                mat.show();
+                }
                 num_iter++;
             }
 

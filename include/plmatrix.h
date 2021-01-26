@@ -148,7 +148,8 @@ public:
 
     // printf("for %d, %d fetching %d, %d. GPU wide thread coords: (%d, %d)\n",
     //        row, col, rowIndex, colIndex, r, c);
-    return shared_data[rowIndex * width + colIndex];
+
+      return shared_data[rowIndex * width + colIndex];
 //	  if ((col < 0) || (col >= m)) {
 //	    // out of bounds -> return neutral value
 //	    return neutral_value;
@@ -158,11 +159,12 @@ public:
 #else
     // CPU version: read from main memory.
     // bounds check
-    if ((col < 0) || (col >= m)) {
+    if ((col < 0) || (col >= m) || (row < 0) || (row >= n)) {
       // out of bounds -> return neutral value
       return 100;
     } else { // in bounds -> return desired value
-      return current_data[(row - firstRow + stencil_size) * cols + col];
+
+      return current_data[(row - firstRow +1 ) * cols + col];
     }
 #endif
   }
@@ -316,6 +318,26 @@ public:
   }
 #endif
 
+    void show(const std::string &descr) {
+        std::ostringstream s;
+        s << descr;
+        if (msl::isRootProcess()) {
+            s << "[";
+            for (int i = 0; i < (n*m) - 1; i++) {
+                s << current_data[i];
+                ((i + 1) % cols == 0) ? s << "\n " : s << " ";
+                ;
+            }
+            s << current_data[n - 1] << "]" << std::endl;
+            s << std::endl;
+        }
+
+        if (msl::isRootProcess())
+            printf("%s", s.str().c_str());
+    }
+        void setCurentData(T element, int index) {
+            current_data[index] = element;
+        }
   /**
    * \brief Sets the first row index for the current device.
    *
@@ -337,7 +359,11 @@ public:
    */
   //template <typename NeutralValueFunctor>
   //void setNVV(NeutralValueFunctor nv) { neutral_value_functor = nv; }
-
+void updateCpuCurrentData(T *padded_local_matrix, int nCPU){
+      for (int i = 0; i < nCPU; i++) {
+          current_data[i] = padded_local_matrix[i];
+      }
+}
   /**
    * @brief Set the GLOBAL index of the first element on the PLM to be processed
    * by the GPU.
