@@ -43,8 +43,10 @@ export I_MPI_FABRICS=shm:tcp
 for cpu_p in 0.02 0.04 0.06 0.08 0.10 0.12 0.14; do
     for m_size in 512 1000 5000 10000; do
         for gpu_n in 1 4; do
-        mpirun /home/n/n_herr03/muesli4/build/jacobi $m_size $m_size $gpu_n 10 $cpu_p "/scratch/tmp/n_herr03/muesli-measurements/usualmpirun.csv"
-        done
+		for np in 1 2; do
+        		mpirun -np np /home/n/n_herr03/muesli4/build/ninajacobi $m_size $m_size $gpu_n 10 $cpu_p "/scratch/tmp/n_herr03/muesli-measurements/ninajacobi.csv"
+        	done
+	done
     done    
 done
 

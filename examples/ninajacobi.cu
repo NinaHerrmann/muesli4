@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
     msl::setNumRuns(nRuns);
 
     if (msl::isRootProcess()) {
-        printf("%d; %d; %.2f; %d", n, nGPUs, msl::Muesli::cpu_fraction, msl::Muesli::num_runs);
+//        printf("%d; %d; %.2f; %d", n, nGPUs, msl::Muesli::cpu_fraction, msl::Muesli::num_runs);
         //printf("Config:\tSize:%d; #GPU:%d; CPU perc:%.2f;", n, nGPUs, msl::Muesli::cpu_fraction);
     }
     msl::startTiming();
@@ -239,8 +239,8 @@ int main(int argc, char **argv) {
     }
 
     if (file) {
-        std::string id = "s" + std::to_string(n) + "_g" + std::to_string(nGPUs) +
-                         "_cp" + std::to_string(msl::Muesli::cpu_fraction * 100);
+        std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) +
+                         ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";";
         msl::printTimeToFile(id.c_str(), file);
     } else {
         msl::stopTiming();

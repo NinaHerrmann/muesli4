@@ -240,7 +240,7 @@ void msl::printTimeToFile(const char *id, const char *file_name) {
   if (msl::Muesli::proc_id == 0) {
     std::ofstream outputFile;
     outputFile.open(file_name, std::ios_base::app);
-    outputFile << id << "," << (time / runs) << "\n";
+    outputFile << id << "" << (time / runs) << "\n";
     outputFile.close();
   }
 }
