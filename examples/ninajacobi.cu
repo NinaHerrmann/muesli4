@@ -144,54 +144,21 @@ namespace msl {
             // Neutral value provider
             DM<float> new_m(n, m, 75, true);
             int num_iter = 0;
-            cudaEvent_t start, stop;
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
             float milliseconds,maps , diffs, difffolds, move = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {
                if (num_iter % 4 == 0) {
-                    cudaEventRecord(start);
                     new_m = mat.mapStencil(jacobi, neutral_value_functor);
-                    cudaEventRecord(stop);
-                    cudaEventSynchronize(stop);
-                    cudaEventElapsedTime(&milliseconds, start, stop);
-                    maps += milliseconds;
-                    cudaEventRecord(start);
                     DM<float> differences = new_m.zip(mat, difference_functor);
-                    cudaEventRecord(stop);
-                    cudaEventSynchronize(stop);
-                    cudaEventElapsedTime(&milliseconds, start, stop);
-                    diffs += milliseconds;
-                    cudaEventRecord(start);
                     global_diff = differences.fold(max_functor, true);
-                    cudaEventRecord(stop);
-                    cudaEventSynchronize(stop);
-                    cudaEventElapsedTime(&milliseconds, start, stop);
-                    difffolds += milliseconds;
-                    cudaEventRecord(start);
                     mat = std::move(new_m);
-                    cudaEventRecord(stop);
-                    cudaEventSynchronize(stop);
-                    cudaEventElapsedTime(&milliseconds, start, stop);
-                    move += milliseconds;
                 } else {
-                    cudaEventRecord(start);
                     mat.mapStencilInPlace(jacobi, neutral_value_functor);
-                    cudaEventRecord(stop);
-                    cudaEventSynchronize(stop);
-                    cudaEventElapsedTime(&milliseconds, start, stop);
-                    maps += milliseconds;
                 }
                 num_iter++;
             }
 
             if (msl::isRootProcess()) {
-                //printf("R:%d;", num_iter);
-                printf("\n mapstencil %.3fs;\n", maps / 1000);
-                printf("differences zip %.3fs;\n", diffs / 1000);
-                printf("differences fold %.3fs;\n", difffolds / 1000);
-                printf("Move %.3fs;\n", move / 1000);
-                printf("It %d;\n", num_iter);
+                printf("R:%d;", num_iter);
             }
             return 0;
         }
