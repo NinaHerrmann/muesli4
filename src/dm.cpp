@@ -45,6 +45,7 @@ msl::DM<T>::DM()
         np(0),             // number of (MPI-) nodes (= Muesli::num_local_procs)
         id(0),             // id of local node among all nodes (= Muesli::proc_id)
         localPartition(0), // local partition of the DM
+        padded_local_matrix(0), // local partition of the DM
         cpuMemoryInSync(false), // is GPU memory in sync with CPU?
         firstIndex(0), // first global index of the DM on the local partition
         firstRow(0),   // first golbal row index of the DM on the local partition
@@ -61,7 +62,8 @@ msl::DM<T>::DM()
         plinit(false), // pl matrix initialized?
         plm(false), // PLMatrix?
         d_plm(0), // PLMatrix?
-        d_padded_local_matrix(0) // PLMatrix?
+        d_padded_local_matrix(0), // PLMatrix?
+        padded_local_matrix(0)
 {}
 
 // constructor creates a non-initialized DM
@@ -805,9 +807,9 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     int stencil_size = f.getStencilSize();
     int size = (nlocalRows + 2 * stencil_size) * ncol;
     // Prepare padded local partition. We need additional 2*stencil_size rows.
-
-    T *padded_local_matrix;
-    cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+    if (!plinit) {
+        cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+    }
     // Update data in main memory if necessary.
     download(); // the data is transferred to main memory because the new padded
     // structures are going to be calculated. Since the padding is
@@ -973,9 +975,9 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     int stencil_size = f.getStencilSize();
     int size = (nlocalRows + 2 * stencil_size) * ncol;
     // Prepare padded local partition. We need additional 2*stencil_size rows.
-
-    T *padded_local_matrix;
-    cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+    if (!plinit) {
+        cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+    }
     // Update data in main memory if necessary.
     download(); // the data is transferred to main memory because the new padded
     // structures are going to be calculated. Since the padding is

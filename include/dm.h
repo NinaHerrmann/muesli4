@@ -750,6 +750,7 @@ private:
   bool rowComplete;
   bool plinit = false; // pl matrix initialized?
 
+  T *padded_local_matrix;
   PLMatrix<T> plm; // plmatrix
   std::vector<PLMatrix<T>*> d_plm; // plmatrix
   std::vector<T*> d_padded_local_matrix; // plmatrix
