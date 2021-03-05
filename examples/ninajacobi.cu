@@ -159,6 +159,11 @@ namespace msl {
 
             if (msl::isRootProcess()) {
                 printf("R:%d;", num_iter);
+                //printf("\n mapstencil %.3fs;\n", maps / 1000);
+                //printf("differences zip %.3fs;\n", diffs / 1000);
+                //printf("differences fold %.3fs;\n", difffolds / 1000);
+                //printf("Move %.3fs;\n", move / 1000);
+                //printf("It %d;\n", num_iter);
             }
             return 0;
         }
