@@ -942,6 +942,8 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
         detail::mapStencilKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                 plans[i].d_Data, plans[i], d_plm[i], f, tile_width,
                         tile_width, neutral_value_functor);
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
     }
     f.notify();
 

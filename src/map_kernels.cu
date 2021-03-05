@@ -91,8 +91,7 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   int x = blockIdx.x * blockDim.x + threadIdx.x;
-  input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
-                         plan.gpuRows, plan.gpuCols);
+  //input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height, plan.gpuRows, plan.gpuCols);
   if (y < plan.gpuRows) {
     if (x < plan.gpuCols) {
 

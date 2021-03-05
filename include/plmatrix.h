@@ -148,8 +148,18 @@ public:
 
     // printf("for %d, %d fetching %d, %d. GPU wide thread coords: (%d, %d)\n",
     //        row, col, rowIndex, colIndex, r, c);
-
-      return shared_data[rowIndex * width + colIndex];
+      if ((col < 0) || (col >= m)) {
+          return 75;
+      } else {
+          if ((row < 0)) {
+              return 100;
+          }
+          if ((row > n)) {
+              return 0;
+          }
+      }
+      return current_data[rowIndex * width + colIndex];
+      //return shared_data[rowIndex * width + colIndex];
 //	  if ((col < 0) || (col >= m)) {
 //	    // out of bounds -> return neutral value
 //	    return neutral_value;
