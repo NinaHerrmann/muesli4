@@ -103,9 +103,27 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
       }
     }
   }
-  __syncthreads();
 }
+template <typename T, typename R, typename F, typename NeutralValueFunctor>
+__global__ void
+msl::detail::mapSimpleStencilKernel(R *out, GPUExecutionPlan<T> plan,
+                              SimplePLMatrix<T> *input, F func,
+                              int tile_width, int tile_height, NeutralValueFunctor nv) {
 
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (y < plan.gpuRows) {
+        if (x < plan.gpuCols) {
+
+            if (!((y == 0 && x < plan.firstCol) ||
+                  (y == (plan.gpuRows - 1) && x > plan.lastCol))) {
+                out[y * plan.gpuCols + x - plan.firstCol] =
+                        func(y + plan.firstRow, x, *input);
+            }
+        }
+    }
+}
 template <typename T> __global__ void msl::detail::printFromGPU(T *A) {
   int i = threadIdx.x;
   printf("i:%d; A[%f];", i, A[i]);

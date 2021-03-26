@@ -258,6 +258,8 @@ public:
    */
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+  template <typename MapStencilFunctor, typename NeutralValueFunctor>
+  void mapSimpleStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
   // /**
   //  * \brief Non-inplace variant of the mapStencil skeleton.
@@ -284,7 +286,9 @@ public:
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   DM<T> mapStencil(MapStencilFunctor &f,
                    NeutralValueFunctor &neutral_value_functor);
-
+  template <typename MapStencilFunctor, typename NeutralValueFunctor>
+  DM<T> mapSimpleStencil(MapStencilFunctor &f,
+                     NeutralValueFunctor &neutral_value_functor);
 #ifndef __CUDACC__
 
   // SKELETONS / COMPUTATION / MAP / INPLACE
@@ -752,8 +756,11 @@ private:
 
   T *padded_local_matrix;
   PLMatrix<T> plm; // plmatrix
+  SimplePLMatrix<T> simplePLMatrix; // plmatrix
   std::vector<PLMatrix<T>*> d_plm; // plmatrix
+  std::vector<SimplePLMatrix<T>*> array_of_simple_d_plm; // plmatrix
   std::vector<T*> d_padded_local_matrix; // plmatrix
+  std::vector<T*> array_of_d_pointers; // plmatrix
   //
   // AUXILIARY
   //

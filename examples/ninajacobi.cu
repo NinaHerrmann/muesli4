@@ -66,7 +66,7 @@ namespace msl {
             MSL_USERFUNC
             float operator()(
                     int rowIndex, int colIndex,
-                    const msl::PLMatrix<float> &input) const {
+                    const msl::SimplePLMatrix<float> &input) const {
                 float sum = 0;
                 // Add top and bottom values.
                 for (int i = -stencil_size; i <= stencil_size; i++) {
@@ -146,19 +146,26 @@ namespace msl {
             int num_iter = 0;
             float milliseconds,maps , diffs, difffolds, move = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {
-               if (num_iter % 4 == 0) {
-                    new_m = mat.mapStencil(jacobi, neutral_value_functor);
+                if (num_iter % 4 == 0) {
+                    new_m = mat.mapSimpleStencil(jacobi, neutral_value_functor);
                     DM<float> differences = new_m.zip(mat, difference_functor);
                     global_diff = differences.fold(max_functor, true);
                     mat = std::move(new_m);
                 } else {
-                    mat.mapStencilInPlace(jacobi, neutral_value_functor);
+                    mat.mapSimpleStencilInPlace(jacobi, neutral_value_functor);
                 }
                 num_iter++;
             }
 
             if (msl::isRootProcess()) {
                 printf("R:%d;", num_iter);
+                //mat.download();
+                //mat.show("matrix");
+                //printf("\n mapstencil %.3fs;\n", maps / 1000);
+                //printf("differences zip %.3fs;\n", diffs / 1000);
+                //printf("differences fold %.3fs;\n", difffolds / 1000);
+                //printf("Move %.3fs;\n", move / 1000);
+                //printf("It %d;\n", num_iter);
             }
             return 0;
         }

@@ -145,6 +145,7 @@ public:
 };
 
 template <typename T> class PLMatrix;
+template <typename T> class SimplePLMatrix;
 
 namespace jacobi {
     class JacobiNeutralValueFunctor2 : public Functor2<int, int, float> {
@@ -168,6 +169,7 @@ namespace jacobi {
  * @tparam T Input data type.
  * @tparam R Output data type.
  */
+
 template <typename T, typename R, typename NeutralValueFunctor>
 class MMapStencilFunctor : public detail::MatrixFunctorBase {
 public:
@@ -191,7 +193,7 @@ public:
    */
   MSL_USERFUNC
   virtual R operator()(int rowIndex, int colIndex,
-                       const PLMatrix<T> &input) const = 0;
+                       const SimplePLMatrix<T> &input) const = 0;
 
   /**
    * \brief Returns the stencil size.
