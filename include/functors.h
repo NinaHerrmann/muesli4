@@ -193,7 +193,7 @@ public:
    */
   MSL_USERFUNC
   virtual R operator()(int rowIndex, int colIndex,
-                       const SimplePLMatrix<T> &input) const = 0;
+                       const PLMatrix<T> &input) const = 0;
 
   /**
    * \brief Returns the stencil size.
