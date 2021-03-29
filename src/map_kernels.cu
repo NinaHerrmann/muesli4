@@ -113,16 +113,10 @@ msl::detail::mapSimpleStencilKernel(R *out, GPUExecutionPlan<T> plan,
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (y < plan.gpuRows) {
-        if (x < plan.gpuCols) {
 
-            if (!((y == 0 && x < plan.firstCol) ||
-                  (y == (plan.gpuRows - 1) && x > plan.lastCol))) {
-                out[y * plan.gpuCols + x - plan.firstCol] =
-                        func(y + plan.firstRow, x, *input);
-            }
-        }
-    }
+    out[y * plan.gpuCols + x - plan.firstCol] =
+            func(y + plan.firstRow, x, *input);
+
 }
 template <typename T> __global__ void msl::detail::printFromGPU(T *A) {
   int i = threadIdx.x;

@@ -121,8 +121,6 @@ public:
           if (row >= n){
               return 0;
           } else {
-              int r = blockIdx.y * blockDim.y + threadIdx.y;
-              int c = blockIdx.x * blockDim.x + threadIdx.x;
               int onlycpucols = firstRowGPU ;
 
               return current_data[(row - firstRow + 1) * cols - (onlycpucols * cols) + col];

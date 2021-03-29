@@ -956,7 +956,9 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapSimpleStencilInPlace(MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -1050,8 +1052,16 @@ void msl::DM<T>::mapSimpleStencilInPlace(MapStencilFunctor &f,
     // Instead of always creating new matrixes reuse them.
     if (!plinit) {
         // plm
+        int cpurows = nCPU % ncol;
+        printf("CPU processes %d rows\n", cpurows);
         simplePLMatrix = msl::SimplePLMatrix<T>(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width, tile_width);
     }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t0 += milliseconds;
+    cudaEventRecord(start);
     for (int i = 0; i < Muesli::num_gpus; i++) {
         int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
         cudaSetDevice(i);
@@ -1083,7 +1093,11 @@ void msl::DM<T>::mapSimpleStencilInPlace(MapStencilFunctor &f,
         simplePLMatrix.update();
     }
     simplePLMatrix.updateCpuCurrentData(padded_local_matrix, nCPU + 2 * (n / ncol));
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t1 += milliseconds;
+    cudaEventRecord(start);
     // Map stencil
     for (int i = 0; i < Muesli::num_gpus; i++) {
         f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
@@ -1103,13 +1117,22 @@ void msl::DM<T>::mapSimpleStencilInPlace(MapStencilFunctor &f,
                         tile_width, neutral_value_functor);
     }
     f.notify();
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t2 += milliseconds;
+    cudaEventRecord(start);
 
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
         localPartition[i] = f(i / ncol + firstRow, i % ncol, simplePLMatrix);
     }
     plinit = true;
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t3 += milliseconds;
+    //printf("MPICPU Init %.2f; GPU Init %.2f;GPU Kernel %.2f; CPU Calc %.2f;\n", t0, t1, t2, t3);
 }
 
 template<typename T>
@@ -1129,7 +1152,8 @@ msl::DM<T> msl::DM<T>::mapSimpleStencil(MapStencilFunctor &f,
     int stencil_size = f.getStencilSize();
     int size = (nlocalRows + 2 * stencil_size) * ncol;
     if (!plinit) {
-        cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+        padded_local_matrix = new T [size * sizeof(T)];
+        //cudaMallocHost(&padded_local_matrix, size * sizeof(T));
     }
     // Update data in main memory if necessary.
     download();
@@ -1179,20 +1203,21 @@ msl::DM<T> msl::DM<T>::mapSimpleStencil(MapStencilFunctor &f,
     // TODO (endizhupani@uni-muenster.de): This isn't really necessary. Probably
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
-
-    if (Muesli::proc_id == 0) {
+    if (!plinit) {
+        if (Muesli::proc_id == 0) {
 #pragma omp parallel for
-        for (int i = 0; i < padding_size; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            for (int i = 0; i < padding_size; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            }
         }
-    }
 
-    if (Muesli::proc_id == Muesli::num_local_procs - 1) {
+        if (Muesli::proc_id == Muesli::num_local_procs - 1) {
 #pragma omp parallel for
-        for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+            for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+            }
         }
     }
     int tile_width = f.getTileWidth();
@@ -1202,6 +1227,7 @@ msl::DM<T> msl::DM<T>::mapSimpleStencil(MapStencilFunctor &f,
         array_of_d_pointers = std::vector<T *>(Muesli::num_gpus);
         for (int i = 0; i < Muesli::num_gpus; i++) {
             int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
+            //printf("gpuelements %d %d %d\n", gpu_elements, plans[i].gpuRows, plans[i].gpuCols );
             cudaSetDevice(i);
             CUDA_CHECK_RETURN(cudaMalloc((void **) &array_of_d_pointers[i],
                                          sizeof(T) * (gpu_elements)));
@@ -1218,6 +1244,7 @@ msl::DM<T> msl::DM<T>::mapSimpleStencil(MapStencilFunctor &f,
         CUDA_CHECK_RETURN(cudaMemcpyAsync(array_of_d_pointers[i],
                                           padded_local_matrix + ((plans[i].firstRow - firstRow) * ncol),
                                           sizeof(T) * gpu_elements, cudaMemcpyHostToDevice, Muesli::streams[i]));
+        // TODO WHy is that necessary?
         simplePLMatrix.addDevicePtr(array_of_d_pointers[i]);
     }
     // Add the CPU Data as a pointer
@@ -1229,6 +1256,9 @@ msl::DM<T> msl::DM<T>::mapSimpleStencil(MapStencilFunctor &f,
         array_of_simple_d_plm = std::vector<SimplePLMatrix < T> * > (Muesli::num_gpus);
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
+            printf("size of simplepl %d\n", sizeof(SimplePLMatrix < T > ));
+            // TODO create a local datastructure here with nGPUcols + stencil * GPUrows + stencil
+            // simplePLMatrix = msl::SimplePLMatrix<T>(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width, tile_width);
             simplePLMatrix.setFirstGPUIdx(plans[i].first);
             simplePLMatrix.setFirstRowGPU(plans[i].firstRow);
             CUDA_CHECK_RETURN(cudaMalloc((void **) &array_of_simple_d_plm[i], sizePLMatrix));
@@ -1429,7 +1459,9 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
         // What des this calculation mean???
         dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
                      (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
-
+        //printf("Start block x %d block y %d ; grid x: %d y: %d\n", tile_width, tile_width, (plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x, (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
+        /*dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);*/
         detail::mapStencilKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                 result.getExecPlans()[i].d_Data, plans[i], d_plm[i], f, tile_width,
                         tile_width, neutral_value_functor);

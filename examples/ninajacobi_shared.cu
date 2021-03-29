@@ -66,7 +66,7 @@ namespace msl {
             MSL_USERFUNC
             float operator()(
                     int rowIndex, int colIndex,
-                    const msl::SimplePLMatrix<float> &input) const {
+                    const msl::PLMatrix<float> &input) const {
                 float sum = 0;
                 // Add top and bottom values.
                 for (int i = -stencil_size; i <= stencil_size; i++) {
@@ -140,7 +140,6 @@ namespace msl {
             JacobiSweepFunctor jacobi;
             jacobi.setStencilSize(1);
             jacobi.setTileWidth(tile_width);
-
             //jacobi.setNVF(neutral_value_functor);
 
             // Neutral value provider
@@ -149,12 +148,12 @@ namespace msl {
             float milliseconds,maps , diffs, difffolds, move = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {
                 if (num_iter % 4 == 0) {
-                    new_m = mat.mapSimpleStencil(jacobi, neutral_value_functor);
+                    new_m = mat.mapStencil(jacobi, neutral_value_functor);
                     DM<float> differences = new_m.zip(mat, difference_functor);
                     global_diff = differences.fold(max_functor, true);
                     mat = std::move(new_m);
                 } else {
-                    mat.mapSimpleStencilInPlace(jacobi, neutral_value_functor);
+                    mat.mapStencilInPlace(jacobi, neutral_value_functor);
                 }
                 num_iter++;
             }
@@ -203,9 +202,6 @@ int main(int argc, char **argv) {
     if (argc == 8) {
         file = argv[7];
     }
-
-    msl::setNumGpus(nGPUs);
-    msl::setNumRuns(nRuns);
 
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
