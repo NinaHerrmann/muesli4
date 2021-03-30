@@ -862,6 +862,7 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
 
+    // TODO checkif onlz initialization
     if (Muesli::proc_id == 0) {
 #pragma omp parallel for
         for (int i = 0; i < padding_size; i++) {

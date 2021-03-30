@@ -92,10 +92,11 @@ namespace msl {
 
         void dm_test(int dim) {
           printf("Starting dm_test...\n");
+          // TODO test if filling works
           DM<int> a(10,10, 2);
           a.show("a1");
           
-          DM<int> b(10,10, 1);
+          DM<int> b(10,10, 0);
           b.show("b1");
  
           Produkt pr;
@@ -135,7 +136,7 @@ namespace msl {
           DA<int>  ar2 = ar1.map(sqr);
           ar2.show("ar2");
           
-          Proj1 pr1;
+          /*Proj1 pr1;
           a.zipInPlaceAAM(ar1,ar2,b,pr1);
           a.show("a5");
 
@@ -149,7 +150,7 @@ namespace msl {
 
           CopyCond copyCond;
           a.zipInPlaceAAM(ar1,ar2,c,copyCond);
-          a.show("a8");
+          a.show("a8");*/
 
           return;
         }
@@ -160,6 +161,8 @@ int main(int argc, char** argv){
   msl::setNumRuns(1);
   msl::setNumGpus(2);
   msl::initSkeletons(argc, argv);
+  msl::Muesli::cpu_fraction = 0.2;
+
   printf("Starting Program %c with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
   msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
   msl::test::dm_test(16);
