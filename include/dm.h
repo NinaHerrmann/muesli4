@@ -661,6 +661,10 @@ public:
    * \brief Manually free device memory.
    */
   void freeDevice();
+  /**
+   * \brief Print stencil time.
+   */
+  void printTime();
 
   /**
    * \brief Set how the local partition is distributed among the GPUs. Current

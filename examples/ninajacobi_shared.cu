@@ -160,8 +160,9 @@ namespace msl {
 
             if (msl::isRootProcess()) {
                 printf("R:%d;", num_iter);
-                //mat.download();
-                //mat.show("matrix");
+                mat.printTime();
+                mat.download();
+                mat.show("matrix");
                 //printf("\n mapstencil %.3fs;\n", maps / 1000);
                 //printf("differences zip %.3fs;\n", diffs / 1000);
                 //printf("differences fold %.3fs;\n", difffolds / 1000);

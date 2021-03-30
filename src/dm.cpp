@@ -680,6 +680,11 @@ void msl::DM<T>::freeDevice() {
     }
 #endif
 }
+template<typename T>
+void msl::DM<T>::printTime() {
+    printf("\nProcesses %d;MPI %.2f; MPIWait %.2f;Padded Neutral %.2f; GPU Init %.2f; GPU Kernel%.2f; CPU Kernel%.2f;Sum %.2f\n",
+           msl::Muesli::num_total_procs, t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
+}
 
 //*********************************** Maps ********************************
 
@@ -794,7 +799,9 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -808,76 +815,94 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     int size = (nlocalRows + 2 * stencil_size) * ncol;
     // Prepare padded local partition. We need additional 2*stencil_size rows.
     if (!plinit) {
-        cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+        padded_local_matrix = new T [size * sizeof(T)];
     }
     // Update data in main memory if necessary.
     download(); // the data is transferred to main memory because the new padded
     // structures are going to be calculated. Since the padding is
     // being calculated by other GPUs they need to be exchanged.
     // Gather border regions.
+    int padding_size = stencil_size * ncol;
+    float milliseconds = 0;
     MPI_Status stat;
     MPI_Request req;
-    int padding_size = stencil_size * ncol;
+    if (msl::Muesli::num_total_procs > 1) {
 
-    // Top down (send last stencil_size rows to successor):
-    // Non-blocking send.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
-        MSL_ISend(Muesli::proc_id + 1, buffer, req, padding_size, msl::MYTAG);
+        // Top down (send last stencil_size rows to successor):
+        // Non-blocking send.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
+            MSL_ISend(Muesli::proc_id + 1, buffer, req, padding_size, msl::MYTAG);
+        }
+
     }
     // Copy localPartition to padded_local_matrix
+
     std::copy(localPartition, localPartition + nLocal,
               padded_local_matrix + padding_size);
+    if (msl::Muesli::num_total_procs > 1) {
 
-    // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
-    // be here. Can probably be placed after the second send and before the second
-    // receive
-    // Blocking receive.
-    if (Muesli::proc_id > 0) {
-        MSL_Recv(Muesli::proc_id - 1, padded_local_matrix, stat, padding_size,
-                 msl::MYTAG);
-    }
-    // Wait for completion.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        MPI_Wait(&req, &stat);
-    }
-    // Bottom up (send first stencil_rows to predecessor):
-    // Non-blocking send.
-    if (Muesli::proc_id > 0) {
-        MSL_ISend(Muesli::proc_id - 1, localPartition, req, padding_size,
-                  msl::MYTAG);
-    }
-    // Blocking receive.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        T *buffer = padded_local_matrix + (nlocalRows + stencil_size) * ncol;
-        MSL_Recv(Muesli::proc_id + 1, buffer, stat, padding_size, msl::MYTAG);
-    }
-    // Wait for completion.
-    if (Muesli::proc_id > 0) {
-        MPI_Wait(&req, &stat);
+        // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
+        // be here. Can probably be placed after the second send and before the second
+        // receive
+        // Blocking receive.
+        if (Muesli::proc_id > 0) {
+            MSL_Recv(Muesli::proc_id - 1, padded_local_matrix, stat, padding_size,
+                     msl::MYTAG);
+        }
+        // Wait for completion.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            MPI_Wait(&req, &stat);
+        }
+        // Bottom up (send first stencil_rows to predecessor):
+        // Non-blocking send.
+        if (Muesli::proc_id > 0) {
+            MSL_ISend(Muesli::proc_id - 1, localPartition, req, padding_size,
+                      msl::MYTAG);
+        }
+        // Blocking receive.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer = padded_local_matrix + (nlocalRows + stencil_size) * ncol;
+            MSL_Recv(Muesli::proc_id + 1, buffer, stat, padding_size, msl::MYTAG);
+        }
+        // Wait for completion.
+        if (Muesli::proc_id > 0) {
+            MPI_Wait(&req, &stat);
+        }
     }
     // Process 0 and process n-1 need to fill upper (lower) border regions with
     // neutral value.
     // TODO (endizhupani@uni-muenster.de): This isn't really necessary. Probably
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t4 += milliseconds;
+    cudaEventRecord(start);
     // TODO checkif onlz initialization
-    if (Muesli::proc_id == 0) {
+    if (!plinit) {
+        if (Muesli::proc_id == 0) {
 #pragma omp parallel for
-        for (int i = 0; i < padding_size; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            for (int i = 0; i < padding_size; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            }
         }
-    }
 
-    if (Muesli::proc_id == Muesli::num_local_procs - 1) {
+        if (Muesli::proc_id == Muesli::num_local_procs - 1) {
 #pragma omp parallel for
-        for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+            for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+            }
         }
     }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t0 += milliseconds;
+    cudaEventRecord(start);
     int tile_width = f.getTileWidth();
     // Device data for the padded local matrix
     if (!plinit) {
@@ -923,7 +948,11 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
         plm.update();
     }
     plm.updateCpuCurrentData(padded_local_matrix, nCPU + 2 * (n / ncol));
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t1 += milliseconds;
+    cudaEventRecord(start);
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T);
@@ -945,13 +974,23 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                         tile_width, neutral_value_functor);
     }
     f.notify();
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t2 += milliseconds;
+    cudaEventRecord(start);
 
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
         localPartition[i] = f(i / ncol + firstRow, i % ncol, plm);
     }
     plinit = true;
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t3 += milliseconds;
+    //printf("MPICPU Init %.2f; GPU Init %.2f;GPU Kernel %.2f; CPU Calc %.2f;\n", t0, t1, t2, t3);
+
 }
 template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
@@ -1313,6 +1352,9 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                                   NeutralValueFunctor &neutral_value_functor) {
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
 
     double t = MPI_Wtime();
 
@@ -1327,75 +1369,95 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     int size = (nlocalRows + 2 * stencil_size) * ncol;
     // Prepare padded local partition. We need additional 2*stencil_size rows.
     if (!plinit) {
-        cudaMallocHost(&padded_local_matrix, size * sizeof(T));
+        padded_local_matrix = new T [size * sizeof(T)];
     }
     // Update data in main memory if necessary.
     download(); // the data is transferred to main memory because the new padded
     // structures are going to be calculated. Since the padding is
     // being calculated by other GPUs they need to be exchanged.
     // Gather border regions.
+    int padding_size = stencil_size * ncol;
+    float milliseconds = 0;
     MPI_Status stat;
     MPI_Request req;
-    int padding_size = stencil_size * ncol;
+    if (msl::Muesli::num_total_procs > 1) {
 
-    // Top down (send last stencil_size rows to successor):
-    // Non-blocking send.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
-        MSL_ISend(Muesli::proc_id + 1, buffer, req, padding_size, msl::MYTAG);
+        // Top down (send last stencil_size rows to successor):
+        // Non-blocking send.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
+            MSL_ISend(Muesli::proc_id + 1, buffer, req, padding_size, msl::MYTAG);
+        }
     }
     // Copy localPartition to padded_local_matrix
+    
     std::copy(localPartition, localPartition + nLocal,
               padded_local_matrix + padding_size);
-    // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
-    // be here. Can probably be placed after the second send and before the second
-    // receive
-    // Blocking receive.
-    if (Muesli::proc_id > 0) {
-        MSL_Recv(Muesli::proc_id - 1, padded_local_matrix, stat, padding_size,
-                 msl::MYTAG);
-    }
-    // Wait for completion.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        MPI_Wait(&req, &stat);
-    }
-    // Bottom up (send first stencil_rows to predecessor):
-    // Non-blocking send.
-    if (Muesli::proc_id > 0) {
-        MSL_ISend(Muesli::proc_id - 1, localPartition, req, padding_size,
-                  msl::MYTAG);
-    }
-    // Blocking receive.
-    if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-        T *buffer = padded_local_matrix + (nlocalRows + stencil_size) * ncol;
-        MSL_Recv(Muesli::proc_id + 1, buffer, stat, padding_size, msl::MYTAG);
-    }
-    // Wait for completion.
-    if (Muesli::proc_id > 0) {
-        MPI_Wait(&req, &stat);
-    }
+    if (msl::Muesli::num_total_procs > 1) {
+        // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
+        // be here. Can probably be placed after the second send and before the second
+        // receive
+        // Blocking receive.
+        if (Muesli::proc_id > 0) {
+            MSL_Recv(Muesli::proc_id - 1, padded_local_matrix, stat, padding_size,
+                     msl::MYTAG);
+        }
+        // Wait for completion.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            MPI_Wait(&req, &stat);
+        }
+        // Bottom up (send first stencil_rows to predecessor):
+        // Non-blocking send.
+        if (Muesli::proc_id > 0) {
+            MSL_ISend(Muesli::proc_id - 1, localPartition, req, padding_size,
+                      msl::MYTAG);
+        }
+        // Blocking receive.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer = padded_local_matrix + (nlocalRows + stencil_size) * ncol;
+            MSL_Recv(Muesli::proc_id + 1, buffer, stat, padding_size, msl::MYTAG);
+        }
 
+        // Wait for completion.
+        if (Muesli::proc_id > 0) {
+            MPI_Wait(&req, &stat);
+        }
+    }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t4 += milliseconds;
+    cudaEventRecord(start);
 
     // Process 0 and process n-1 need to fill upper (lower) border regions with
     // neutral value.
     // TODO (endizhupani@uni-muenster.de): This isn't really necessary. Probably
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
-    if (Muesli::proc_id == 0) {
+    if (!plinit) {
+        printf("oncehere\n");
+        if (Muesli::proc_id == 0) {
 #pragma omp parallel for
-        for (int i = 0; i < padding_size; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            for (int i = 0; i < padding_size; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol - stencil_size, i % ncol);
+            }
         }
-    }
 
-    if (Muesli::proc_id == Muesli::num_local_procs - 1) {
-#pragma omp parallel for
-        for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
-            padded_local_matrix[i] =
-                    neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+
+        if (Muesli::proc_id == Muesli::num_local_procs - 1) {
+    #pragma omp parallel for
+            for (int i = (nlocalRows + stencil_size) * ncol; i < (nlocalRows + 2 * stencil_size) * ncol; i++) {
+                padded_local_matrix[i] =
+                        neutral_value_functor(i / ncol + firstRow - stencil_size, i % ncol);
+            }
         }
     }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t0 += milliseconds;
+    cudaEventRecord(start);
     int tile_width = f.getTileWidth();
     if (!plinit) {
         d_padded_local_matrix = std::vector<T *>(Muesli::num_gpus);
@@ -1447,6 +1509,11 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
 
 // Map Stencil operation
     DM <T> result(nrow, ncol, rowComplete);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t1 += milliseconds;
+    cudaEventRecord(start);
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T);
     for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -1468,11 +1535,20 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                         tile_width, neutral_value_functor);
     }
     f.notify();
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t2 += milliseconds;
+    // cudaEventRecord(start);
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
         result.setLocal(i, f(i / ncol + firstRow, i % ncol, plm));
     }
     plinit = true;
+     cudaEventRecord(stop);
+     cudaEventSynchronize(stop);
+     cudaEventElapsedTime(&milliseconds, start, stop);
+     t3 += milliseconds;
     return result;
 }
 
