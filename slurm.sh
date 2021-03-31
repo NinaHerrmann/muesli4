@@ -8,16 +8,16 @@
 #SBATCH --gres=gpu:4
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
-#SBATCH --job-name=Muesli-solver
-#SBATCH --outpu=/scratch/tmp/n_herr03/1Nodedatastructure.txt
-#SBATCH --error=/scratch/tmp/n_herr03/1Nodedatastructure.txt
+#SBATCH --job-name=GlobalMemoryOldThreads
+#SBATCH --outpu=/scratch/tmp/n_herr03/globalmem.txt
+#SBATCH --error=/scratch/tmp/n_herr03/globalmem.error
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=n_herr03@uni-muenster.de
 
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-cd /home/n/n_herr03/muesli4ninajacobi
+cd /home/n/n_herr03/globalmem/
 
 ./build.sh
 export OMP_NUM_THREADS=4
@@ -49,12 +49,12 @@ export I_MPI_FABRICS=shm:tcp
 #	done
 #    done    
 #done
-for run in 1 2 3 4 5 6 7 8 9 10; do
+for m_size in 512 1000 5000 10000; do
     for cpu_p in 0.2; do
-    	for m_size in 512 1000 5000; do
-    	    for gpu_n in 1 4; do
+    	for gpu_n in 1 2 4; do
+    	    for run in 1 2 3 4 5 6 7 8 9 10; do
                 for np in 1; do
-                        mpirun -np $np /home/n/n_herr03/muesli4ninajacobi/build/ninajacobi $m_size $m_size $gpu_n 1 $cpu_p "/scratch/tmp/n_herr03/1Nodedatastructure.csv"
+                        mpirun -np $np /home/n/n_herr03/globalmem/build/ninajacobi $m_size $m_size $gpu_n 1 $cpu_p "/scratch/tmp/n_herr03/next_realglobalmem.csv"
                 done
             done
     	done
