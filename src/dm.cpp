@@ -682,8 +682,8 @@ void msl::DM<T>::freeDevice() {
 }
 template<typename T>
 void msl::DM<T>::printTime() {
-    printf("\n%.2f;%.2f;%.2f;%.2f;%.2f;%.2f; %.2f",
-           msl::Muesli::num_total_procs, t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
+    printf("\n%.2f;%.2f;%.2f;%.2f;%.2f;%.2f; %.2f;",
+            t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
 }
 
 //*********************************** Maps ********************************
