@@ -682,7 +682,7 @@ void msl::DM<T>::freeDevice() {
 }
 template<typename T>
 void msl::DM<T>::printTime() {
-    printf("\nProcesses %d;MPI %.2f; MPIWait %.2f;Padded Neutral %.2f; GPU Init %.2f; GPU Kernel%.2f; CPU Kernel%.2f;Sum %.2f\n",
+    printf("\n%.2f;%.2f;%.2f;%.2f;%.2f;%.2f; %.2f",
            msl::Muesli::num_total_procs, t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
 }
 
@@ -799,9 +799,9 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
+    //cudaEventCreate(&start);
+    //cudaEventCreate(&stop);
+    //cudaEventRecord(start);
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -875,11 +875,11 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     // TODO (endizhupani@uni-muenster.de): This isn't really necessary. Probably
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t4 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
     // TODO checkif onlz initialization
     if (!plinit) {
         if (Muesli::proc_id == 0) {
@@ -898,11 +898,11 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
             }
         }
     }
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t0 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
     int tile_width = f.getTileWidth();
     // Device data for the padded local matrix
     if (!plinit) {
@@ -948,11 +948,11 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
         plm.update();
     }
     plm.updateCpuCurrentData(padded_local_matrix, nCPU + 2 * (n / ncol));
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t1 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T);
@@ -974,21 +974,21 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                         tile_width, neutral_value_functor);
     }
     f.notify();
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t2 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
 
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
         localPartition[i] = f(i / ncol + firstRow, i % ncol, plm);
     }
     plinit = true;
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
-    t3 += milliseconds;
+    t3 += milliseconds;*/
     //printf("MPICPU Init %.2f; GPU Init %.2f;GPU Kernel %.2f; CPU Calc %.2f;\n", t0, t1, t2, t3);
 
 }
@@ -1352,9 +1352,9 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                                   NeutralValueFunctor &neutral_value_functor) {
-    cudaEventCreate(&start);
+    /*cudaEventCreate(&start);
     cudaEventCreate(&stop);
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
 
     double t = MPI_Wtime();
 
@@ -1377,7 +1377,7 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
     // being calculated by other GPUs they need to be exchanged.
     // Gather border regions.
     int padding_size = stencil_size * ncol;
-    float milliseconds = 0;
+    //float milliseconds = 0;
     MPI_Status stat;
     MPI_Request req;
     if (msl::Muesli::num_total_procs > 1) {
@@ -1423,11 +1423,11 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
             MPI_Wait(&req, &stat);
         }
     }
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t4 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
 
     // Process 0 and process n-1 need to fill upper (lower) border regions with
     // neutral value.
@@ -1453,11 +1453,11 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
             }
         }
     }
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t0 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
     int tile_width = f.getTileWidth();
     if (!plinit) {
         d_padded_local_matrix = std::vector<T *>(Muesli::num_gpus);
@@ -1509,11 +1509,11 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
 
 // Map Stencil operation
     DM <T> result(nrow, ncol, rowComplete);
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t1 += milliseconds;
-    cudaEventRecord(start);
+    cudaEventRecord(start);*/
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T);
     for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -1535,20 +1535,20 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
                         tile_width, neutral_value_functor);
     }
     f.notify();
-    cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     t2 += milliseconds;
-    // cudaEventRecord(start);
+    // cudaEventRecord(start);*/
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
         result.setLocal(i, f(i / ncol + firstRow, i % ncol, plm));
     }
     plinit = true;
-     cudaEventRecord(stop);
+    /*cudaEventRecord(stop);
      cudaEventSynchronize(stop);
      cudaEventElapsedTime(&milliseconds, start, stop);
-     t3 += milliseconds;
+     t3 += milliseconds;*/
     return result;
 }
 
