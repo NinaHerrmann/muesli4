@@ -682,8 +682,8 @@ void msl::DM<T>::freeDevice() {
 }
 template<typename T>
 void msl::DM<T>::printTime() {
-    printf("\n%.2f;%.2f;%.2f;%.2f;%.2f;%.2f; %.2f",
-           msl::Muesli::num_total_procs, t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
+    printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f;t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; sum %.2f;",
+           t0, t1, t2, t3, t4, t5, t6,t10, t7, t8, t9, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
 }
 
 //*********************************** Maps ********************************
@@ -799,9 +799,11 @@ template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-    //cudaEventCreate(&start);
-    //cudaEventCreate(&stop);
-    //cudaEventRecord(start);
+    int debug = 1;
+    if(debug){	cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    }
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -824,6 +826,14 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     // Gather border regions.
     int padding_size = stencil_size * ncol;
     float milliseconds = 0;
+    if (debug){
+	    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t0 += milliseconds;
+    cudaEventRecord(start);
+    }
+
     MPI_Status stat;
     MPI_Request req;
     if (msl::Muesli::num_total_procs > 1) {
@@ -837,9 +847,22 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
 
     }
     // Copy localPartition to padded_local_matrix
+  if (debug) {
+	  cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t1 += milliseconds;
+    cudaEventRecord(start);
+  }
 
     std::copy(localPartition, localPartition + nLocal,
               padded_local_matrix + padding_size);
+    if(debug) {  cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t2 += milliseconds;
+    cudaEventRecord(start);}
+
     if (msl::Muesli::num_total_procs > 1) {
 
         // TODO (endizhupani@uni-muenster.de): This blocking receive does not need to
@@ -875,11 +898,11 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     // TODO (endizhupani@uni-muenster.de): This isn't really necessary. Probably
     // the neutral value can be directly used in the calculation Process 0 and
     // process n-1 need to fill upper (lower) border regions with neutral value.
-    /*cudaEventRecord(stop);
+    if (debug){cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
-    t4 += milliseconds;
-    cudaEventRecord(start);*/
+    t3 += milliseconds;
+    cudaEventRecord(start);}
     // TODO checkif onlz initialization
     if (!plinit) {
         if (Muesli::proc_id == 0) {
@@ -898,11 +921,12 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
             }
         }
     }
-    /*cudaEventRecord(stop);
+    if(debug){cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
-    t0 += milliseconds;
-    cudaEventRecord(start);*/
+    t4 += milliseconds;
+    cudaEventRecord(start);
+    }
     int tile_width = f.getTileWidth();
     // Device data for the padded local matrix
     if (!plinit) {
@@ -918,16 +942,40 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     if (!plinit) {
         plm = msl::PLMatrix<T>(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width, tile_width);
     }
+if (debug) {cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t5 += milliseconds;
+cudaEventRecord(start);
+}
     for (int i = 0; i < Muesli::num_gpus; i++) {
         int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
         cudaSetDevice(i);
         CUDA_CHECK_RETURN(cudaMemcpyAsync(d_padded_local_matrix[i],
                                           padded_local_matrix + ((plans[i].firstRow - firstRow) * ncol),
                                           sizeof(T) * gpu_elements, cudaMemcpyHostToDevice, Muesli::streams[i]));
-        plm.addDevicePtr(d_padded_local_matrix[i]);
+ if(debug){   cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t10 += milliseconds;
+cudaEventRecord(start);
+ }
+	plm.addDevicePtr(d_padded_local_matrix[i]);
+if(debug){
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t6 += milliseconds;
+cudaEventRecord(start);
+}
     }
     // Add the CPU Data as a pointer
     plm.addDevicePtr(padded_local_matrix);
+ if(debug){   cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t6 += milliseconds;
+cudaEventRecord(start);}
     // Upload padded local partitions.
     int sizePLMatrix = sizeof(PLMatrix < T > );
     if (!plinit) {
@@ -939,6 +987,12 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
             CUDA_CHECK_RETURN(cudaMalloc((void **) &d_plm[i], sizePLMatrix));
         }
     }
+    if(debug) {
+	    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t7 += milliseconds;
+cudaEventRecord(start);}
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
         plm.setFirstGPUIdx(plans[i].first);
@@ -947,12 +1001,17 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
                                           cudaMemcpyHostToDevice, Muesli::streams[i]));
         plm.update();
     }
-    plm.updateCpuCurrentData(padded_local_matrix, nCPU + 2 * (n / ncol));
-    /*cudaEventRecord(stop);
+    if(debug){cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
-    t1 += milliseconds;
-    cudaEventRecord(start);*/
+    t8 += milliseconds;
+cudaEventRecord(start);}
+    plm.updateCpuCurrentData(padded_local_matrix, nCPU + 2 * (n / ncol));
+    if(debug) {cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    t9 += milliseconds;
+    }
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T);

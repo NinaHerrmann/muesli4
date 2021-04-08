@@ -766,7 +766,7 @@ private:
   std::vector<T*> d_padded_local_matrix; // plmatrix
   std::vector<T*> array_of_d_pointers; // plmatrix
   cudaEvent_t start, stop;
-  float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0;
+  float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
 
   //
   // AUXILIARY
