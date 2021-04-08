@@ -145,54 +145,28 @@ namespace msl {
             // Neutral value provider
             DM<float> new_m(n, m, 75, true);
             int num_iter = 0;
-            //float milliseconds,maps , diffs, difffolds, move = 0;
-            cudaEvent_t start1, stop1;
-	    //std::chrono::duration<double> tstencil = 0.0, tinplace = 0.0, tzip= 0.0, tfold= 0.0, tmove= 0.0;
-	   float  milliseconds, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
-	    auto start = std::chrono::high_resolution_clock::now();
-	    auto stop = std::chrono::high_resolution_clock::now();
-	    double tstencil = 0, tinplace = 0, tzip= 0, tfold= 0, tmove= 0;
-	    std::chrono::duration<double> tstencil1 = stop-start, tinplace1 = stop-start, tzip1= stop-start, tfold1= stop-start, tmove1= stop-start;
-
-	    while (global_diff > EPSILON && num_iter < MAX_ITER) {
-                if (num_iter % 50 == 0) {
-		    start = std::chrono::high_resolution_clock::now();
+            float milliseconds,maps , diffs, difffolds, move = 0;
+            while (global_diff > EPSILON && num_iter < 20) {
+                if (num_iter % 4 == 0) {
                     new_m = mat.mapStencil(jacobi, neutral_value_functor);
-                    stop = std::chrono::high_resolution_clock::now();
-                    tstencil1 = stop - start;
-		    tstencil += tstencil1.count();
-                    start = std::chrono::high_resolution_clock::now();
-		    DM<float> differences = new_m.zip(mat, difference_functor);
-                    stop = std::chrono::high_resolution_clock::now();
-                    tzip1 = stop - start;
-		    tzip += tzip1.count();
-                    start = std::chrono::high_resolution_clock::now();
-		    global_diff = differences.fold(max_functor, true);
-                    stop = std::chrono::high_resolution_clock::now();
-                    tfold1 = stop - start;
-		    tfold += tfold1.count();
-                    start = std::chrono::high_resolution_clock::now();
-		    mat = std::move(new_m);
-                    stop = std::chrono::high_resolution_clock::now();
-                    tmove1 = stop - start;
-		    tmove += tmove1.count();
+                    DM<float> differences = new_m.zip(mat, difference_functor);
+                    global_diff = differences.fold(max_functor, true);
+                    mat = std::move(new_m);
                 } else {
-                    start = std::chrono::high_resolution_clock::now();
-		    mat.mapStencilInPlace(jacobi, neutral_value_functor);
-                    stop = std::chrono::high_resolution_clock::now();
-                    tinplace1 = stop - start;
-                    tinplace += tinplace1.count();
-
-		}
+                    mat.mapStencilInPlace(jacobi, neutral_value_functor);
+                }
                 num_iter++;
+		mat.download();
+                mat.show("matrix");
+
             }
 
             if (msl::isRootProcess()) {
                 printf("R:%d;", num_iter);
                 mat.printTime();
-                //mat.download();
-                //mat.show("matrix");
-                printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil, tinplace, tzip, tfold, tmove);
+                mat.download();
+                mat.show("matrix");
+                //printf("\n mapstencil %.3fs;\n", maps / 1000);
                 //printf("differences zip %.3fs;\n", diffs / 1000);
                 //printf("differences fold %.3fs;\n", difffolds / 1000);
                 //printf("Move %.3fs;\n", move / 1000);
