@@ -1099,7 +1099,7 @@ msl::DM<T> msl::DM<T>::mapStencil(MapStencilFunctor &f,
         }
     }
     // Copy localPartition to padded_local_matrix
-    
+
     std::copy(localPartition, localPartition + nLocal,
               padded_local_matrix + padding_size);
     if (msl::Muesli::num_total_procs > 1) {

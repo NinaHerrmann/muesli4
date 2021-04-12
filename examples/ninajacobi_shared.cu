@@ -193,6 +193,7 @@ namespace msl {
                 //mat.download();
                 //mat.show("matrix");
                 printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil, tinplace, tzip, tfold, tmove);
+
                 //printf("differences zip %.3fs;\n", diffs / 1000);
                 //printf("differences fold %.3fs;\n", difffolds / 1000);
                 //printf("Move %.3fs;\n", move / 1000);
