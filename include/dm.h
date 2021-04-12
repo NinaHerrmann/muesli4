@@ -65,7 +65,8 @@ namespace msl {
  *
  * \tparam T Element type. Restricted to classes without pointer data members.
  */
-template <typename T> class DM {
+template <typename T>
+class DM{
 public:
   //
   // CONSTRUCTORS / DESTRUCTOR
@@ -258,8 +259,8 @@ public:
    */
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
-  template <typename MapStencilFunctor, typename NeutralValueFunctor>
-  void mapSimpleStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+  template <typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
+  void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
   // /**
   //  * \brief Non-inplace variant of the mapStencil skeleton.
@@ -286,9 +287,6 @@ public:
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   DM<T> mapStencil(MapStencilFunctor &f,
                    NeutralValueFunctor &neutral_value_functor);
-  template <typename MapStencilFunctor, typename NeutralValueFunctor>
-  DM<T> mapSimpleStencil(MapStencilFunctor &f,
-                     NeutralValueFunctor &neutral_value_functor);
 #ifndef __CUDACC__
 
   // SKELETONS / COMPUTATION / MAP / INPLACE
@@ -548,7 +546,14 @@ public:
    * @return The element at the given global index.
    */
   T get(int index) const;
-
+    /**
+     * \brief Returns the element at the given row \em row and column \em column.
+     *
+     * @param row The global row.
+     * @param column The global column.
+     * @return The element at the given global index.
+     */
+    T get_shared(int row, int column) const;
   /**
    * \brief Sets the element at the given global index \em globalIndex to the
    *        given value \em v, with 0 <= globalIndex < size.
@@ -757,14 +762,14 @@ private:
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete;
   bool plinit = false; // pl matrix initialized?
+  bool plinitMM = false; // pl matrix initialized?
 
   T *padded_local_matrix;
   PLMatrix<T> plm; // plmatrix
-  SimplePLMatrix<T> simplePLMatrix; // plmatrix
   std::vector<PLMatrix<T>*> d_plm; // plmatrix
-  std::vector<SimplePLMatrix<T>*> array_of_simple_d_plm; // plmatrix
+  std::vector<T*> d_dm; // plmatrix
   std::vector<T*> d_padded_local_matrix; // plmatrix
-  std::vector<T*> array_of_d_pointers; // plmatrix
+  T* padding_stencil;
   cudaEvent_t start, stop;
   float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
 

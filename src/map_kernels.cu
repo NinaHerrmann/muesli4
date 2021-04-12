@@ -106,19 +106,22 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 }
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
-msl::detail::mapSimpleStencilKernel(R *out, GPUExecutionPlan<T> plan,
-                              SimplePLMatrix<T> *input, F func,
+msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
+                                T *name, T *input, F func,
                               int tile_width, int tile_height, NeutralValueFunctor nv) {
 
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-
-
-    out[y * plan.gpuCols + x - plan.firstCol] =
-            func(y + plan.firstRow, x, *input);
+// f(i / ncol + firstRow, i % ncol, localPartition, 16, 16, padding_stencil)
+    if (y < plan.gpuRows) {
+        if (x < plan.gpuCols) {
+            out[y * plan.gpuCols + x - plan.firstCol] = func(y + plan.firstRow, x, name, 16, 16, input);
+        }
+    }
 
 }
-template <typename T> __global__ void msl::detail::printFromGPU(T *A) {
-  int i = threadIdx.x;
-  printf("i:%d; A[%f];", i, A[i]);
+template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size) {
+  for (int i = 0; i < size; i++) {
+      printf("[%.1f];", A[i]);
+  }
 }

@@ -32,9 +32,10 @@
 
 #pragma once
 
+#include <dm.h>
 #include "exec_plan.h"
 #include "plmatrix.h"
-#include "simpleplmatrix.h"
+#include "dm.h"
 // #include "plarray.h"
 
 namespace msl {
@@ -61,10 +62,11 @@ template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
                                  PLMatrix<T> *input,
                                  F func, int tile_width, int tile_height, NeutralValueFunctor nv);
+template <typename T> class DM;
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
-__global__ void mapSimpleStencilKernel(R *out, GPUExecutionPlan<T> plan, SimplePLMatrix<T> *input,
+__global__ void mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, T *name, T *input,
                                  F func, int tile_width, int tile_height, NeutralValueFunctor nv);
-template <typename T> __global__ void printFromGPU(T *A);
+template <typename T> __global__ void printFromGPU(T *A, int size);
 // template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,
 //                                 R* out,

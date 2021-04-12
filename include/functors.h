@@ -31,8 +31,29 @@
 
 #pragma once
 
+#include <type_traits>
+
+#include "detail/exception.h"
+#include "functors.h"
+#include "muesli.h"
+
+#include "detail/conversion.h"
+#include "detail/exec_plan.h"
+#include "plmatrix.h"
+#include <utility>
+
+#ifdef __CUDACC__
+#include "detail/copy_kernel.cuh"
+
+#include "detail/fold_kernels.cuh"
+#include "detail/map_kernels.cuh"
+#include "detail/properties.cuh"
+#include "detail/zip_kernels.cuh"
+#endif
 #include "argtype.h"
 #include "detail/functor_base.h"
+#include "dm.h"
+
 namespace msl {
 
 /**************************************************************************
@@ -144,6 +165,7 @@ public:
   virtual ~Functor4() {}
 };
 
+template <typename T> class DM;
 template <typename T> class PLMatrix;
 template <typename T> class SimplePLMatrix;
 
@@ -224,7 +246,6 @@ protected:
   int stencil_size;
 };
 
-
 // /**
 //  * Represents a functor that takes an array of arguments and produces one
 //  * output.
@@ -273,4 +294,56 @@ protected:
 //   const int GetStencilRadius() { return stencil_radius_; }
 // };
 
+    template <typename T, typename R, typename NeutralValueFunctor>
+    class DMMapStencilFunctor : public detail::MatrixFunctorBase {
+    public:
+        /**
+         * \brief Default Constructor.
+         *
+         * Sets a default stencil size of 1.
+         */
+        DMMapStencilFunctor() : stencil_size(1) {
+            this->setTileWidth(msl::DEFAULT_TILE_WIDTH);
+        }
+
+        /**
+         * \brief Function call operator has to be implemented by the user. Here,
+         *        the actual function is implemented.
+         *
+         * @param rowIndex Global row index of the input value.
+         * @param colIndex Global column index of the input value.
+         * @param input Input for the map stencil function.
+         * @return Output of the map stencil function.
+         */
+        MSL_USERFUNC
+        virtual R operator()(int rowIndex, int colIndex, T *input, int ncol, int nrow, float *paddingborder) const = 0;
+
+        /**
+         * \brief Returns the stencil size.
+         *
+         * @return The stencil size.
+         */
+        int getStencilSize() { return stencil_size; }
+
+        /**
+         * \brief Sets the stencil size.
+         *
+         * @param value The new stencil size.
+         */
+        void setStencilSize(int value) { stencil_size = value; }
+        /**
+         * \brief Sets the stencil size.
+         *
+         * @param value The new stencil size.
+         */
+        //void setNVF(NeutralValueFunctor &nv) { nvf = nv; }
+
+        /**
+         * \brief Destructor.
+         */
+        virtual ~DMMapStencilFunctor() {}
+
+    protected:
+        int stencil_size;
+    };
 } // namespace msl

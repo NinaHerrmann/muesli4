@@ -59,29 +59,50 @@ namespace msl {
  *
  */
         class JacobiSweepFunctor
-                : public MMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
+                : public DMMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
         public:
-            JacobiSweepFunctor() : MMapStencilFunctor(){}
-
+            JacobiSweepFunctor() : DMMapStencilFunctor(){}
+//
             MSL_USERFUNC
             float operator()(
-                    int rowIndex, int colIndex,
-                    const msl::PLMatrix<float> &input) const {
+                    int rowIndex, int colIndex, float *input, int ncol, int nrow, float *paddingborder) const {
                 float sum = 0;
                 // Add top and bottom values.
+
                 for (int i = -stencil_size; i <= stencil_size; i++) {
                     if (i == 0)
                         continue;
-                    sum += input.get(rowIndex + i, colIndex);
+                    float value = 0;
+                    // top broder must be 100;
+                    if (rowIndex + i < 0) {
+                        value = paddingborder[colIndex];
+                    } else {
+                        if (rowIndex + i > (nrow - 1)) {
+                            int where = ncol + colIndex;
+                            printf("%d\n", where);
+                            if (where < 17) {value = paddingborder[where];}
+                        } else {
+                            int index = (rowIndex + i) * ncol + colIndex;
+                            value = input[index];
+                        }
+                    }
+
+                    sum += value;
                 }
 
                 // Add left and right values.
                 for (int i = -stencil_size; i <= stencil_size; i++) {
                     if (i == 0)
                         continue;
-                    sum += input.get(rowIndex, colIndex + i);
+                    float value = 0;
+                    if (colIndex + i < 0 || colIndex + i > (ncol - 1)) {
+                        value = 100;
+                    } else {
+                        int index = rowIndex * ncol + colIndex + i;
+                        value = input[index];
+                    }
+                    sum += value;
                 }
-
                 return sum / (4 * stencil_size);
             }
         };
@@ -144,28 +165,38 @@ namespace msl {
 
             // Neutral value provider
             DM<float> new_m(n, m, 75, true);
-            int num_iter = 0;
-            float milliseconds,maps , diffs, difffolds, move = 0;
-            while (global_diff > EPSILON && num_iter < 20) {
-                if (num_iter % 4 == 0) {
-                    new_m = mat.mapStencil(jacobi, neutral_value_functor);
-                    DM<float> differences = new_m.zip(mat, difference_functor);
-                    global_diff = differences.fold(max_functor, true);
-                    mat = std::move(new_m);
-                } else {
-                    mat.mapStencilInPlace(jacobi, neutral_value_functor);
-                }
-                num_iter++;
-		mat.download();
-                mat.show("matrix");
+            DM<float> test_m(n, m, 75, true);
+            DM<float> test2_m(n, m, 75, true);
 
+            int num_iter = 0;
+            //float milliseconds,maps , diffs, difffolds, move = 0;
+            while (global_diff > EPSILON && num_iter < 1) {
+                if (num_iter % 4 == 0) {
+                    //new_m = mat.mapStencil(jacobi, neutral_value_functor);
+                    //DM<float> differences = new_m.zip(mat, difference_functor);
+                    //global_diff = differences.fold(max_functor, true);
+                    //mat = std::move(new_m);
+                } else {
+                    //mat.mapStencilInPlace(jacobi, neutral_value_functor);
+                    //test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
+
+                }
+                test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                //test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
+                num_iter++;
+                test2_m.download();
+                test2_m.show("othermatrix");
             }
+           // test_m.download();
 
             if (msl::isRootProcess()) {
                 printf("R:%d;", num_iter);
-                mat.printTime();
-                mat.download();
-                mat.show("matrix");
+
+                //test2_m.download();
+                //test2_m.show("transfer");
+                //mat.printTime();
+                //mat.download();
+                //mat.show("matrix");
                 //printf("\n mapstencil %.3fs;\n", maps / 1000);
                 //printf("differences zip %.3fs;\n", diffs / 1000);
                 //printf("differences fold %.3fs;\n", difffolds / 1000);
