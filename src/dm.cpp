@@ -1773,13 +1773,18 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         }
 
     }
-
+    if(debug){cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        t4 += milliseconds;
+        cudaEventRecord(start);
+    }
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
 
         // If it is the first GPU copy first part from CPU
         if (i == 0) {
-            cudaMemcpyAsync(d_dm[i], plans[i].h_Data - padding_size,
+            cudaMemcpyAsync(d_dm[i], padding_stencil,
                             padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
         } else {
             // Top must be copied from other GPU
