@@ -1769,7 +1769,18 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
     }
     float milliseconds = 0.0;
-
+    if (!plinitMM) {
+        for (int i = 0; i < Muesli::num_gpus; i++) {
+            if (i == (Muesli::num_gpus - 1)) {
+                cudaMemcpyAsync(d_dm[i]+padding_size, padding_stencil + padding_size,
+                                padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+            }
+            if (i == 0) {
+                cudaMemcpyAsync(d_dm[i], padding_stencil,
+                                padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+            }
+        }
+    }
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
         /*if (i == 0) {
@@ -1778,18 +1789,12 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaEventRecord(start);
         }*/
         // If it is the first GPU copy first part from CPU
-        if (i == 0) {
-            cudaMemcpyAsync(d_dm[i], padding_stencil,
-                            padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-        } else {
+        if (i != 0) {
             // Top must be copied from other GPU
             cudaMemcpy(d_dm[i], plans[i-1].d_Data + (plans[i].nLocal-padding_size),
                             padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
         }
-        if (i == (Muesli::num_gpus - 1)) {
-            cudaMemcpyAsync(d_dm[i]+padding_size, padding_stencil + padding_size,
-                            padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-        } else {
+        if (i != (Muesli::num_gpus - 1)) {
             // Bottom must be copied from other GPU
             cudaMemcpy(d_dm[i]+padding_size, plans[i+1].d_Data,
                             padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
@@ -1804,6 +1809,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         gpuErrchk( cudaDeviceSynchronize() );
         printf("\n%d -->", i);
         detail::printFromGPU<<<1,1>>>(d_dm[i],16);*/
+        
     }
 
     // Map stencil
