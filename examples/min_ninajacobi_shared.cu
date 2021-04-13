@@ -79,8 +79,7 @@ namespace msl {
                     } else {
                         if (rowIndex + i > (nrow - 1)) {
                             int where = ncol + colIndex;
-                            printf("%d\n", where);
-                            if (where < 17) {value = paddingborder[where];}
+                            value = paddingborder[where];
                         } else {
                             int index = (rowIndex + i) * ncol + colIndex;
                             value = input[index];
@@ -164,37 +163,39 @@ namespace msl {
             //jacobi.setNVF(neutral_value_functor);
 
             // Neutral value provider
-            DM<float> new_m(n, m, 75, true);
+            DM<float> differences(n, m, 0, true);
             DM<float> test_m(n, m, 75, true);
             DM<float> test2_m(n, m, 75, true);
 
             int num_iter = 0;
             //float milliseconds,maps , diffs, difffolds, move = 0;
-            while (global_diff > EPSILON && num_iter < 1) {
-                if (num_iter % 4 == 0) {
-                    //new_m = mat.mapStencil(jacobi, neutral_value_functor);
-                    //DM<float> differences = new_m.zip(mat, difference_functor);
-                    //global_diff = differences.fold(max_functor, true);
-                    //mat = std::move(new_m);
+            while (global_diff > EPSILON && num_iter < MAX_ITER) {
+                if (num_iter % 50 == 0) {
+                    //printf("calc with test_m\n");
+                    test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                    differences = test_m.zip(test2_m, difference_functor);
+                    global_diff = differences.fold(max_functor, true);
                 } else {
-                    //mat.mapStencilInPlace(jacobi, neutral_value_functor);
-                    //test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
-
+                    if (num_iter % 2 == 0) {
+                        test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                    } else {
+                        test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
+                    }
                 }
-                test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
-                //test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
                 num_iter++;
-                test2_m.download();
-                test2_m.show("othermatrix");
             }
-           // test_m.download();
-
+            /*test_m.download();
+            test_m.show("test_m");
+            test2_m.download();
+            test2_m.show("test2_m");
+            differences.download();
+            differences.show("othermatrix");*/
             if (msl::isRootProcess()) {
-                printf("R:%d;", num_iter);
+                printf("R:%d;%.2f;", num_iter, global_diff);
 
                 //test2_m.download();
                 //test2_m.show("transfer");
-                //mat.printTime();
+                //test_m.printTime();
                 //mat.download();
                 //mat.show("matrix");
                 //printf("\n mapstencil %.3fs;\n", maps / 1000);

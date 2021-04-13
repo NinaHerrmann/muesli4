@@ -107,15 +107,30 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
-                                T *name, T *input, F func,
+                                T *inputdm, T *inputpadding, F func,
                               int tile_width, int tile_height, NeutralValueFunctor nv) {
 
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    //int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-// f(i / ncol + firstRow, i % ncol, localPartition, 16, 16, padding_stencil)
-    if (y < plan.gpuRows) {
+    int col = x % plan.gpuCols;
+    int row = x / plan.gpuCols;
+    //  input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
+//                         plan.gpuRows, plan.gpuCols);
+
+    //extern __shared__ float smem[];
+    // printf("Thread y: %d, x: %d. GPU data size %d x %d\n", abs_ty, abs_tx,
+    //        gpu_rows, gpu_columns);
+   /* if (y < plan.gpuRows) {
         if (x < plan.gpuCols) {
-            out[y * plan.gpuCols + x - plan.firstCol] = func(y + plan.firstRow, x, name, 16, 16, input);
+            int index = (y) * plan.gpuCols + x;
+            //smem[index] = inputdm[index];
+        }
+    }*/
+    //__syncthreads();
+    if (row < plan.gpuRows) {
+        if (col < plan.gpuCols) {
+            //printf("%d, %d , %d writeto %d -- \n", row,col,x, row * (plan.gpuCols) + col);
+            out[row * plan.gpuCols + col] = func(row, col, inputdm, plan.gpuCols, plan.gpuRows, inputpadding);
         }
     }
 

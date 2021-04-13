@@ -717,9 +717,9 @@ void msl::DM<T>::freeDevice() {
 #endif
 }
 template<typename T>
-void msl::DM<T>::printTime() {
-    printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f;t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; sum %.2f;",
-           t0, t1, t2, t3, t4, t5, t6,t10, t7, t8, t9, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
+void msl::DM<T>::printTime() {//t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; - t10, t7, t8, t9,
+    printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f; sum %.2f;",
+           t0, t1, t2, t3, t4, t5, t6, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
 }
 
 //*********************************** Maps ********************************
@@ -1660,10 +1660,28 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 //   cpuMemoryInSync = false;
 // }
 template<typename T>
+void msl::DM<T>::downloadupperpart(int paddingsize) {
+#ifdef __CUDACC__
+    cudaSetDevice(0);
+
+    // download data from device
+    CUDA_CHECK_RETURN(cudaMemcpyAsync(plans[0].h_Data, plans[0].d_Data,
+                                      paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
+                                      Muesli::streams[0]));
+
+    // wait until download is finished
+#endif
+}
+
+template<typename T>
 template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    float milliseconds = 0;
+    int debug = 1;
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -1680,8 +1698,11 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         padding_stencil = new T [padding_size * 2];
     }
 
+    downloadupperpart(padding_size);
+
     MPI_Status stat;
     MPI_Request req;
+
     if (msl::Muesli::num_total_procs > 1) {
 
         // Top down (send last stencil_size rows to successor):
@@ -1730,15 +1751,19 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         }
 
         if (Muesli::proc_id == Muesli::num_local_procs - 1) {
+
+
 #pragma omp parallel for
             for (int i = padding_size; i < padding_size * 2; i++) {
                 int offset = (nlocalRows + stencil_size) * ncol + ((padding_size * 2) - i);
+                // TODO adjust to process (copy gotten stencil)
                 padding_stencil[i] =
                         neutral_value_functor(offset / ncol + firstRow - stencil_size, offset % ncol);
             }
         }
     }
 
+    // TODO copy first GPU row to localPartition
     int tile_width = f.getTileWidth();
     if (!plinitMM) {
         d_dm = std::vector<T *>(Muesli::num_gpus);
@@ -1746,13 +1771,36 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaSetDevice(i);
             cudaMalloc(&d_dm[i], padding_size * 2 * sizeof(T));
         }
+
     }
+
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-        cudaMemcpyAsync(d_dm[i], padding_stencil,
-                        padding_size * 2 * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-        detail::printFromGPU<<<1,1>>>(d_dm[i],32);
 
+        // If it is the first GPU copy first part from CPU
+        if (i == 0) {
+            cudaMemcpyAsync(d_dm[i], plans[i].h_Data - padding_size,
+                            padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+        } else {
+            // Top must be copied from other GPU
+            cudaMemcpy(d_dm[i], plans[i-1].d_Data + (plans[i].nLocal-padding_size),
+                            padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
+        }
+        if (i == (Muesli::num_gpus - 1)) {
+            cudaMemcpyAsync(d_dm[i]+padding_size, padding_stencil + padding_size,
+                            padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+        } else {
+            // Bottom must be copied from other GPU
+            cudaMemcpy(d_dm[i]+padding_size, plans[i+1].d_Data,
+                            padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
+        }
+
+        /*gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
+        printf("\n%d -->", i);
+        detail::printFromGPU<<<1,1>>>(d_dm[i],16);
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );*/
     }
 
     // Map stencil
@@ -1764,25 +1812,22 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
          f.notify();
 
          cudaSetDevice(i);
-         // TODO (endizhupani@uni-muenster.de): Add logic to enable nonsquare tiles.
-         dim3 dimBlock(tile_width, tile_width);
-         // What des this calculation mean???
-         dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
-                      (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
-
+        /*dim3 dimBlock(tile_width, tile_width);
+        dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
+                     (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);*/
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        //printf("%d , %d \n\n", Muesli::threads_per_block, (plans[i].size + dimBlock.x) );
         detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-               result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, padding_stencil, f, tile_width,
+               result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, d_dm[i], f, tile_width,
                         tile_width, neutral_value_functor );
-        gpuErrchk( cudaPeekAtLastError() );
-        gpuErrchk( cudaDeviceSynchronize() );
-        //detail::printFromGPU<<<1,1>>>(result.getExecPlans()[i].d_Data,32);
 
     }
-    f.notify();
 
+    f.notify();
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
-        result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, 16, 16, padding_stencil));
+        result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol, padding_stencil));
     }
 
     plinitMM = true;

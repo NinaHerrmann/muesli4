@@ -661,6 +661,10 @@ public:
    * \brief Manually download the local partition from GPU memory.
    */
   void download();
+  /**
+   * \brief Manually download the local partition from GPU memory.
+   */
+  void downloadupperpart(int paddingsize);
 
   /**
    * \brief Manually free device memory.
