@@ -72,7 +72,7 @@ msl::DM<T>::DM(int row, int col) : ncol(col), nrow(row), n(col * row) {
     init();
 #ifdef __CUDACC__
 
-    CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+    (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
 #else
     localPartition = new T[nLocal];
@@ -86,7 +86,7 @@ msl::DM<T>::DM(int row, int col, bool rowComplete)
     init();
 
 #ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+    (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
 #else
     localPartition = new T[nLocal];
@@ -102,7 +102,7 @@ msl::DM<T>::DM(int row, int col, const T &v)
 #ifdef __CUDACC__
     localPartition = new T[nLocal];
     // TODO die CPU Elemente brauchen wir nicht unbedingt.
-    CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+    (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
 #else
 #endif
@@ -116,10 +116,9 @@ template<typename T>
 msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
         : ncol(col), nrow(row), n(col * row), rowComplete(rowComplete) {
     init();
-
 #ifdef __CUDACC__
     // TODO die CPU Elemente brauchen wir nicht unbedingt.
-    CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+    (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
 #else
     localPartition = new T[nLocal];
@@ -225,7 +224,7 @@ msl::DM<T> &msl::DM<T>::operator=(const DM <T> &other) {
 template<typename T>
 void msl::DM<T>::copyLocalPartition(const DM <T> &other) {
 #ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+    (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
 
 #else
     localPartition = new T[nLocal];
@@ -237,7 +236,7 @@ void msl::DM<T>::copyLocalPartition(const DM <T> &other) {
 template<typename T>
 void msl::DM<T>::freeLocalPartition() {
 #ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
+    (cudaFreeHost(localPartition));
 #else
     delete[] localPartition;
     localPartition = nullptr;
@@ -251,7 +250,7 @@ void msl::DM<T>::freePlans() {
         for (int i = 0; i < ng; i++) {
             if (plans[i].d_Data != 0) {
                 cudaSetDevice(i);
-                CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
+                (cudaFree(plans[i].d_Data));
             }
         }
         delete[] plans;
@@ -322,7 +321,7 @@ void msl::DM<T>::initGPUs() {
         }
 
         plans[i].h_Data = localPartition + gpuBase;
-        CUDA_CHECK_RETURN(cudaMalloc(&plans[i].d_Data, plans[i].bytes));
+        (cudaMalloc(&plans[i].d_Data, plans[i].bytes));
         gpuBase += plans[i].size;
     }
 #endif
@@ -333,12 +332,12 @@ template<typename T>
 msl::DM<T>::~DM() {
 // printf("TODO: Destroy Datastructure\n");
 #ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaFreeHost(localPartition));
+    (cudaFreeHost(localPartition));
     /*if (plans) {
         for (int i = 0; i < ng; i++) {
             if (plans[i].d_Data != 0) {
                 cudaSetDevice(i);
-                CUDA_CHECK_RETURN(cudaFree(plans[i].d_Data));
+                (cudaFree(plans[i].d_Data));
             }
         }
         delete[] plans;
@@ -379,7 +378,7 @@ T msl::DM<T>::get(int index) const {
             cudaSetDevice(device);
             // download element
             int offset = index - plans[device].first;
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(&message, plans[device].d_Data + offset,
+            (cudaMemcpyAsync(&message, plans[device].d_Data + offset,
                                               sizeof(T), cudaMemcpyDeviceToHost,
                                               Muesli::streams[device]));
         } else { // element is up to date in cpu memory
@@ -416,7 +415,7 @@ T msl::DM<T>::get_shared(int row, int column) const {
             cudaSetDevice(device);
             // download element
             int offset = index - plans[device].first;
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(&message, plans[device].d_Data + offset,
+            (cudaMemcpyAsync(&message, plans[device].d_Data + offset,
                                               sizeof(T), cudaMemcpyDeviceToHost,
                                               Muesli::streams[device]));
         } else { // element is up to date in cpu memory
@@ -488,7 +487,7 @@ void msl::DM<T>::setLocal(int localIndex, const T &v) {
         // %i\n", // debug
         //     localIndex, v, gpuId, idx, sizeof(T)); // debug
         cudaSetDevice(gpuId);
-        CUDA_CHECK_RETURN(cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T),
+        (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T),
                                      cudaMemcpyHostToDevice));
     }
 }
@@ -529,13 +528,13 @@ void msl::DM<T>::upload() {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
             // upload data
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data,
+            (cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data,
                                               plans[i].bytes, cudaMemcpyHostToDevice,
                                               Muesli::streams[i]));
         }
 
         for (int i = 0; i < ng; i++) {
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
+            (cudaStreamSynchronize(Muesli::streams[i]));
         }
         cpuMemoryInSync = false;
     //}
@@ -552,13 +551,13 @@ void msl::DM<T>::download() {
             cudaSetDevice(i);
 
             // download data from device
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
+            (cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
                                               plans[i].bytes, cudaMemcpyDeviceToHost,
                                               Muesli::streams[i]));
         }
         // wait until download is finished
         for (int i = 0; i < ng; i++) {
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
+            (cudaStreamSynchronize(Muesli::streams[i]));
         }
         cpuMemoryInSync = true;
     }
@@ -718,8 +717,8 @@ void msl::DM<T>::freeDevice() {
 }
 template<typename T>
 void msl::DM<T>::printTime() {//t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; - t10, t7, t8, t9,
-    printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f; sum %.2f;",
-           t0, t1, t2, t3, t4, t5, t6, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
+    printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f; t7%.2f; sum %.2f;",
+           t0, t1, t2, t3, t4, t5, t6,t7, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
 }
 
 //*********************************** Maps ********************************
@@ -977,12 +976,12 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f,
     if (!plinit) {
         plm = msl::PLMatrix<T>(nrow, ncol, nlocalRows, ncol, stencil_size, tile_width, tile_width);
     }
-if (debug) {cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    t5 += milliseconds;
-cudaEventRecord(start);
-}
+    if (debug) {cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        t5 += milliseconds;
+    cudaEventRecord(start);
+    }
     for (int i = 0; i < Muesli::num_gpus; i++) {
         int gpu_elements = (plans[i].gpuRows + 2 * stencil_size) * plans[i].gpuCols;
         cudaSetDevice(i);
@@ -1498,7 +1497,7 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         if (blocks[i] > maxBlocks) {
             blocks[i] = maxBlocks;
         }
-        CUDA_CHECK_RETURN(cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
+        (cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
     }
 
     // fold on gpus: step 1
@@ -1534,7 +1533,7 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     // copy final sum from device to host
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaMemcpyAsync(&gpu_results[i], d_odata[i], sizeof(T),
+        (cudaMemcpyAsync(&gpu_results[i], d_odata[i], sizeof(T),
                                           cudaMemcpyDeviceToHost,
                                           Muesli::streams[i]));
     }
@@ -1569,25 +1568,25 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
             cudaSetDevice(0);         // calculate local result on device 0
 
             // upload data
-            CUDA_CHECK_RETURN(
+            (
                     cudaMalloc((void **) &d_gpu_results, Muesli::num_gpus * sizeof(T)));
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     d_gpu_results, gpu_results, Muesli::num_gpus * sizeof(T),
                     cudaMemcpyHostToDevice, Muesli::streams[0]));
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+            (cudaStreamSynchronize(Muesli::streams[0]));
 
             // final (local) fold
             detail::reduce<T, FoldFunctor>(Muesli::num_gpus, d_gpu_results,
                                            d_gpu_results, Muesli::num_gpus, 1, f,
                                            Muesli::streams[0], 0);
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+            (cudaStreamSynchronize(Muesli::streams[0]));
 
             // copy result from device to host
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(&local_result, d_gpu_results, sizeof(T),
+            (cudaMemcpyAsync(&local_result, d_gpu_results, sizeof(T),
                                               cudaMemcpyDeviceToHost,
                                               Muesli::streams[0]));
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
-            CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+            (cudaStreamSynchronize(Muesli::streams[0]));
+            (cudaFree(d_gpu_results));
         } else {
             local_result = gpu_results[0];
         }
@@ -1598,22 +1597,22 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
             // calculate global result from local results
             // upload data
-            CUDA_CHECK_RETURN(cudaMalloc((void **) &d_gpu_results, np * sizeof(T)));
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results, local_results,
+            (cudaMalloc((void **) &d_gpu_results, np * sizeof(T)));
+            (cudaMemcpyAsync(d_gpu_results, local_results,
                                               np * sizeof(T), cudaMemcpyHostToDevice,
                                               Muesli::streams[0]));
 
             // final fold
             detail::reduce<T, FoldFunctor>(np, d_gpu_results, d_gpu_results, np, 1, f,
                                            Muesli::streams[0], 0);
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+            (cudaStreamSynchronize(Muesli::streams[0]));
 
             // copy final result from device to host
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(&final_result, d_gpu_results, sizeof(T),
+            (cudaMemcpyAsync(&final_result, d_gpu_results, sizeof(T),
                                               cudaMemcpyDeviceToHost,
                                               Muesli::streams[0]));
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
-            CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+            (cudaStreamSynchronize(Muesli::streams[0]));
+            cudaFree(d_gpu_results);
         } else {
             final_result = local_result;
         }
@@ -1622,8 +1621,8 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     // Cleanup
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
-        CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
+        cudaStreamSynchronize(Muesli::streams[i]);
+        cudaFree(d_odata[i]);
     }
     delete[] gpu_results;
     delete[] d_odata;
@@ -1665,7 +1664,7 @@ void msl::DM<T>::downloadupperpart(int paddingsize) {
     cudaSetDevice(0);
 
     // download data from device
-    CUDA_CHECK_RETURN(cudaMemcpyAsync(plans[0].h_Data, plans[0].d_Data,
+    (cudaMemcpyAsync(plans[0].h_Data, plans[0].d_Data,
                                       paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
                                       Muesli::streams[0]));
 
@@ -1677,11 +1676,7 @@ template<typename T>
 template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                                    NeutralValueFunctor &neutral_value_functor) {
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-    float milliseconds = 0;
-    int debug = 1;
+
     double t = MPI_Wtime();
 
     if (!rowComplete) {
@@ -1773,15 +1768,15 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         }
 
     }
-    if(debug){cudaEventRecord(stop);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&milliseconds, start, stop);
-        t4 += milliseconds;
-        cudaEventRecord(start);
-    }
+    float milliseconds = 0.0;
+
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-
+        /*if (i == 0) {
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            cudaEventRecord(start);
+        }*/
         // If it is the first GPU copy first part from CPU
         if (i == 0) {
             cudaMemcpyAsync(d_dm[i], padding_stencil,
@@ -1799,13 +1794,16 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaMemcpy(d_dm[i]+padding_size, plans[i+1].d_Data,
                             padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
         }
-
+        /*if (i == 0) {
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&milliseconds, start, stop);
+            t2 += milliseconds;
+        }*/
         /*gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
         printf("\n%d -->", i);
-        detail::printFromGPU<<<1,1>>>(d_dm[i],16);
-        gpuErrchk( cudaPeekAtLastError() );
-        gpuErrchk( cudaDeviceSynchronize() );*/
+        detail::printFromGPU<<<1,1>>>(d_dm[i],16);*/
     }
 
     // Map stencil
@@ -1817,6 +1815,11 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
          f.notify();
 
          cudaSetDevice(i);
+
+        /*if (i == 0) {
+            cudaEventRecord(start);
+        }*/
+
         /*dim3 dimBlock(tile_width, tile_width);
         dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
                      (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);*/
@@ -1827,6 +1830,12 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, d_dm[i], f, tile_width,
                         tile_width, neutral_value_functor );
 
+        /*if (i == 0) {
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&milliseconds, start, stop);
+            t3 += milliseconds;
+        }*/
     }
 
     f.notify();

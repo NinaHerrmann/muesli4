@@ -168,22 +168,52 @@ namespace msl {
             DM<float> test2_m(n, m, 75, true);
 
             int num_iter = 0;
+         /*   float  milliseconds, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
+            auto start = std::chrono::high_resolution_clock::now();
+            auto stop = std::chrono::high_resolution_clock::now();
+            double tstencil = 0, tinplace = 0, tzip= 0, tfold= 0, tmove= 0;
+            std::chrono::duration<double> tstencil1 = stop-start, tinplace1 = stop-start, tzip1= stop-start, tfold1= stop-start, tmove1= stop-start;
+
+*/
             //float milliseconds,maps , diffs, difffolds, move = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {
                 if (num_iter % 50 == 0) {
                     //printf("calc with test_m\n");
+                    //start = std::chrono::high_resolution_clock::now();
                     test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                 /*   stop = std::chrono::high_resolution_clock::now();
+                    tinplace1 = stop - start;
+                    tinplace += tstencil1.count();
+                    start = std::chrono::high_resolution_clock::now();*/
                     differences = test_m.zip(test2_m, difference_functor);
+                    /*stop = std::chrono::high_resolution_clock::now();
+                    tzip1 = stop - start;
+                    tzip += tstencil1.count();
+                    start = std::chrono::high_resolution_clock::now();*/
                     global_diff = differences.fold(max_functor, true);
+                    /*stop = std::chrono::high_resolution_clock::now();
+                    tfold1 = stop - start;
+                    tfold += tstencil1.count();*/
                 } else {
                     if (num_iter % 2 == 0) {
+                        //start = std::chrono::high_resolution_clock::now();
                         test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                        /*stop = std::chrono::high_resolution_clock::now();
+                        tinplace1 = stop - start;
+                        tinplace += tinplace1.count();*/
+
                     } else {
+                        //start = std::chrono::high_resolution_clock::now();
                         test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
+//                        stop = std::chrono::high_resolution_clock::now();
+//                        tinplace1 = stop - start;
+//                        tinplace += tinplace1.count();
                     }
                 }
                 num_iter++;
             }
+            //printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil * 1000, tinplace* 1000, tzip* 1000, tfold* 1000, tmove* 1000);
+
             /*test_m.download();
             test_m.show("test_m");
             test2_m.download();
@@ -196,6 +226,7 @@ namespace msl {
                 //test2_m.download();
                 //test2_m.show("transfer");
                 //test_m.printTime();
+                //test2_m.printTime();
                 //mat.download();
                 //mat.show("matrix");
                 //printf("\n mapstencil %.3fs;\n", maps / 1000);
