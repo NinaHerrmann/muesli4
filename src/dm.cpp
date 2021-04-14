@@ -1853,9 +1853,14 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaEventRecord(start);
         }*/
 
-        dim3 dimBlock(Muesli::threads_per_block);
-        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+        //dim3 dimBlock(Muesli::threads_per_block);
+        //dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        dim3 dimBlock(tile_width, tile_width); // 16x16
+        // What des this calculation mean???
+        dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
+                     (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
+	if(!plinitMM){printf("%d, %d\n", dimGrid.x, dimGrid.y);}
+	detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, d_dm[i], f, tile_width,
                         tile_width, neutral_value_functor );
         gpuErrchk( cudaPeekAtLastError() );
@@ -1871,7 +1876,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     f.notify();
 #pragma omp parallel for
     for (int i = 0; i < nCPU; i++) {
-        result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol, padding_stencil));
+       // result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol, padding_stencil));
     }
 
     plinitMM = true;

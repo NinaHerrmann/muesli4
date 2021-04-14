@@ -65,7 +65,7 @@ namespace msl {
 //
             MSL_USERFUNC
             float operator()(
-                    int rowIndex, int colIndex, float *input, int ncol, int nrow, float *paddingborder) const {
+                    int rowIndex, int colIndex, float *input, int ncol, int nrow, float *paddingborder,float *sidepaddingborder) const {
                 float sum = 0;
                 // Add top and bottom values.
 
@@ -77,7 +77,7 @@ namespace msl {
                     if (rowIndex + i < 0) {
                         value = paddingborder[colIndex];
                     } else {
-                        if (rowIndex + i > (nrow - 1)) {
+                        if (rowIndex + i > (nrow -1)) {
                             int where = ncol + colIndex;
                             value = paddingborder[where];
                         } else {
@@ -94,12 +94,17 @@ namespace msl {
                     if (i == 0)
                         continue;
                     float value = 0;
-                    if (colIndex + i < 0 || colIndex + i > (ncol - 1)) {
-                        value = 100;
+                    if (colIndex + i < 0) {
+                        value = sidepaddingborder[rowIndex];
                     } else {
-                        int index = rowIndex * ncol + colIndex + i;
-                        value = input[index];
-                    }
+			    if (colIndex + i > (ncol - 1)){
+				int where = nrow + rowIndex;
+	                        value = sidepaddingborder[where];
+			    }else {
+                        	int index = rowIndex * ncol + colIndex + i;
+                        	value = input[index];
+                    	   }
+		    }
                     sum += value;
                 }
                 return sum / (4 * stencil_size);
@@ -176,11 +181,13 @@ namespace msl {
 
 */
             //float milliseconds,maps , diffs, difffolds, move = 0;
-            while (global_diff > EPSILON && num_iter < MAX_ITER) {
+            while (global_diff > EPSILON && num_iter < 2) {
                 if (num_iter % 50 == 0) {
                     //printf("calc with test_m\n");
                     //start = std::chrono::high_resolution_clock::now();
-                    test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
+                    test_m.download();
+                        test_m.show("test_m");
+			test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
                  /*   stop = std::chrono::high_resolution_clock::now();
                     tinplace1 = stop - start;
                     tinplace += tstencil1.count();
@@ -197,6 +204,9 @@ namespace msl {
                 } else {
                     if (num_iter % 2 == 0) {
                         //start = std::chrono::high_resolution_clock::now();
+			test_m.download();
+		        test_m.show("test_m");
+
                         test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
                         /*stop = std::chrono::high_resolution_clock::now();
                         tinplace1 = stop - start;
@@ -204,23 +214,26 @@ namespace msl {
 
                     } else {
                         //start = std::chrono::high_resolution_clock::now();
-                        test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
+                         test2_m.download();
+		         test2_m.show("test2_m");
+
+			test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
 //                        stop = std::chrono::high_resolution_clock::now();
 //                        tinplace1 = stop - start;
 //                        tinplace += tinplace1.count();
                     }
                 }
-                test_m.download();
+                /*test_m.download();
                 test_m.show("test_m");
                 test2_m.download();
-                test2_m.show("test2_m");
+                test2_m.show("test2_m");*/
                 num_iter++;
             }
             //printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil * 1000, tinplace* 1000, tzip* 1000, tfold* 1000, tmove* 1000);
 
-            /*test_m.download();
+            test_m.download();
             test_m.show("test_m");
-            test2_m.download();
+            /*test2_m.download();
             test2_m.show("test2_m");
             differences.download();
             differences.show("othermatrix");*/
