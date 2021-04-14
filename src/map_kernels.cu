@@ -117,16 +117,23 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
     //  input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
 //                         plan.gpuRows, plan.gpuCols);
 
-/*    extern __shared__ float smem[];
+    extern __shared__ float smem[];
+    // 512 per block
+    // approximately 16.000 floats per SM Palma
     // printf("Thread y: %d, x: %d. GPU data size %d x %d\n", abs_ty, abs_tx,
     //        gpu_rows, gpu_columns);
    if (row < plan.gpuRows) {
         if (col < plan.gpuCols) {
-            int index = row * plan.gpuCols + col;
+            int localcol = threadIdx.x % plan.gpuCols;
+            int localrow = threadIdx.x / plan.gpuCols;
+
+            int index = localrow * plan.gpuCols + localcol;
             smem[index] = inputdm[index];
+            if (threadIdx.x == 1 || threadIdx.x == 4){printf("col %d row %d localcol %d localrow %d %d, %d, %d, %d\n",col, row, localcol, localrow, blockIdx.x, blockDim.x, threadIdx.x, index);}
+
         }
     }
-    __syncthreads();*/
+    __syncthreads();
     if (row < plan.gpuRows) {
         if (col < plan.gpuCols) {
             //printf("%d, %d , %d writeto %d -- \n", row,col,x, row * (plan.gpuCols) + col);

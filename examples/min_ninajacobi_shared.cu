@@ -210,6 +210,10 @@ namespace msl {
 //                        tinplace += tinplace1.count();
                     }
                 }
+                test_m.download();
+                test_m.show("test_m");
+                test2_m.download();
+                test2_m.show("test2_m");
                 num_iter++;
             }
             //printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil * 1000, tinplace* 1000, tzip* 1000, tfold* 1000, tmove* 1000);

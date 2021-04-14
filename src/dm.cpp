@@ -1737,6 +1737,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                   }
                   cudaMemcpyAsync(d_dm[j], padding_stencil,
                                   padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[j]);
+                  gpuErrchk( cudaPeekAtLastError() );
+                  gpuErrchk( cudaDeviceSynchronize() );
               }
           }
       }
@@ -1856,7 +1858,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, d_dm[i], f, tile_width,
                         tile_width, neutral_value_functor );
-
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
         /*if (i == 0) {
             cudaEventRecord(stop);
             cudaEventSynchronize(stop);
