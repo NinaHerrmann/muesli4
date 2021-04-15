@@ -1859,8 +1859,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         // What des this calculation mean???
         dim3 dimGrid((plans[i].gpuCols + dimBlock.x - 1) / dimBlock.x,
                      (plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y);
-	if(!plinitMM){printf("%d, %d\n", dimGrid.x, dimGrid.y);}
-	detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+	    detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                result.getExecPlans()[i].d_Data, plans[i], plans[i].d_Data, d_dm[i], f, tile_width,
                         tile_width, neutral_value_functor );
         gpuErrchk( cudaPeekAtLastError() );
