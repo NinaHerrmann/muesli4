@@ -15,9 +15,9 @@ namespace msl {
 
     namespace jacobi {
 
-        class JacobiNeutralValueFunctor : public Functor2<int, int, float> {
+        class NeutralValueFunctor : public Functor2<int, int, float> {
         public:
-            JacobiNeutralValueFunctor(int glob_rows, int glob_cols, float default_neutral)
+            NeutralValueFunctor(int glob_rows, int glob_cols, float default_neutral)
                     : glob_cols_(glob_cols), glob_rows_(glob_rows),
                       default_neutral(default_neutral) {}
 
@@ -58,15 +58,15 @@ namespace msl {
  * element
  *
  */
-        class JacobiSweepFunctor
-                : public MMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
+        class SweepFunctor
+                : public MMapStencilFunctor<float, float, NeutralValueFunctor> {
         public:
-            JacobiSweepFunctor() : MMapStencilFunctor() {}
+            SweepFunctor() : MMapStencilFunctor() {}
 
             MSL_USERFUNC
             float operator()(
                     int rowIndex, int colIndex,
-                    const msl::PLMatrix<float, JacobiNeutralValueFunctor> &input) const {
+                    const msl::PLMatrix<float, NeutralValueFunctor> &input) const {
                 float sum = 0;
                 // Add top and bottom values.
                 for (int i = -stencil_size; i <= stencil_size; i++) {
@@ -122,11 +122,11 @@ namespace msl {
             float global_diff = 10;
 
             // mapStencil
-            JacobiSweepFunctor jacobi;
+            SweepFunctor jacobi;
             jacobi.setStencilSize(1);
             CopyFunctor copy;
             // Neutral value provider
-            JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
+            NeutralValueFunctor neutral_value_functor(n, m, 75);
 
             int num_iter = 0;
             while (global_diff > EPSILON && num_iter < MAX_ITER) {

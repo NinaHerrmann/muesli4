@@ -167,16 +167,15 @@ public:
 
 template <typename T> class DM;
 template <typename T> class PLMatrix;
-template <typename T> class SimplePLMatrix;
 
-namespace jacobi {
-    class JacobiNeutralValueFunctor2 : public Functor2<int, int, float> {
+namespace NVF {
+    class NeutralValueFunctor2 : public Functor2<int, int, int> {
     public:
-        JacobiNeutralValueFunctor2(float default_neutral)
+        NeutralValueFunctor2(int default_neutral)
                 : default_neutral(default_neutral) {}
 
         MSL_USERFUNC
-        float operator()(int x, int y) const { // here, x represents rows
+        int operator()(int x, int y) const { // here, x represents rows
             return default_neutral;
         }
 
@@ -316,7 +315,7 @@ protected:
          * @return Output of the map stencil function.
          */
         MSL_USERFUNC
-        virtual R operator()(int rowIndex, int colIndex, T *input, int ncol, int nrow, float *paddingborder) const = 0;
+        virtual R operator()(int rowIndex, int colIndex, T *input, int ncol, int nrow, T *paddingborder) const = 0;
 
         /**
          * \brief Returns the stencil size.

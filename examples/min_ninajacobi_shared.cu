@@ -15,9 +15,9 @@ namespace msl {
 
     namespace jacobi {
 
-        class JacobiNeutralValueFunctor : public Functor2<int, int, float> {
+        class NeutralValueFunctor : public Functor2<int, int, float> {
         public:
-            JacobiNeutralValueFunctor(int glob_rows, int glob_cols, float default_neutral)
+            NeutralValueFunctor(int glob_rows, int glob_cols, float default_neutral)
                     : glob_cols_(glob_cols), glob_rows_(glob_rows),
                       default_neutral(default_neutral) {}
 
@@ -58,10 +58,10 @@ namespace msl {
  * element
  *
  */
-        class JacobiSweepFunctor
-                : public DMMapStencilFunctor<float, float, JacobiNeutralValueFunctor> {
+        class SweepFunctor
+                : public DMMapStencilFunctor<float, float, NeutralValueFunctor> {
         public:
-            JacobiSweepFunctor() : DMMapStencilFunctor(){}
+            SweepFunctor() : DMMapStencilFunctor(){}
 //
             MSL_USERFUNC
             float operator()(
@@ -149,7 +149,7 @@ namespace msl {
         };
 
         int run(int n, int m, int stencil_radius, int tile_width) {
-            JacobiNeutralValueFunctor neutral_value_functor(n, m, 75);
+            NeutralValueFunctor neutral_value_functor(n, m, 75);
             DM<float> mat(n, m, 75, true);
 
             AbsoluteDifference difference_functor;
@@ -157,7 +157,7 @@ namespace msl {
             float global_diff = 10;
 
             // mapStencil
-            JacobiSweepFunctor jacobi;
+            SweepFunctor jacobi;
             jacobi.setStencilSize(1);
             jacobi.setTileWidth(tile_width);
             //jacobi.setNVF(neutral_value_functor);

@@ -5,19 +5,19 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
-#SBATCH --job-name=GlobalMemoryOldThreads
-#SBATCH --outpu=/scratch/tmp/n_herr03/globalmem.txt
-#SBATCH --error=/scratch/tmp/n_herr03/globalmem.error
+#SBATCH --job-name=GameOfLife
+#SBATCH --outpu=/scratch/tmp/n_herr03/gol.txt
+#SBATCH --error=/scratch/tmp/n_herr03/gol.error
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=n_herr03@uni-muenster.de
 
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-cd /home/n/n_herr03/globalmem/
+cd /home/n/n_herr03/gol/
 
 ./build.sh
 export OMP_NUM_THREADS=4
@@ -49,15 +49,16 @@ export I_MPI_FABRICS=shm:tcp
 #	done
 #    done    
 #done
-for m_size in 512 1000 5000 10000; do
-    for cpu_p in 0.2; do
-    	for gpu_n in 1 2 4; do
-    	    for run in 1 2 3 4 5 6 7 8 9 10; do
-                for np in 1; do
-                        mpirun -np $np /home/n/n_herr03/globalmem/build/ninajacobi $m_size $m_size $gpu_n 1 $cpu_p "/scratch/tmp/n_herr03/next_realglobalmem.csv"
+printf "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n"
+for m_size in 1024 4096 8192 16384; do
+    for gpu_n in 1 2; do
+        for cpu_p in 0.00; do
+                for iterations in 1000 2000 3000 4000 5000 10000; do
+                        for run in 1 2 3 4 5 6 7 8 9 10; do
+                 	       mpirun -np $np /home/n/n_herr03/gol/build/gameoflife $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "afucking.csv"
+                        done
                 done
-            done
-    	done
+        done
     done
 done
 
