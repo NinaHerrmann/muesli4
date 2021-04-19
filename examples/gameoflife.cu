@@ -101,7 +101,8 @@ namespace msl {
         };
 
 
-        int run(int n, int m, int stencil_radius, int tile_width, int iterations, int iterations_used) {
+        int run(int n, int m, int stencil_radius, int tile_width, int iterations, int iterations_used, char *file) {
+            double start = MPI_Wtime();
             GoLNeutralValueFunctor dead_nvf(0);
             Max max_functor;
             int global_diff = 10;
@@ -124,6 +125,16 @@ namespace msl {
                 data1.set(i, rand() % 2);
             }
             data1.download();
+            double end = MPI_Wtime();
+            if (msl::isRootProcess()) {
+                if (file) {
+                    std::ofstream outputFile;
+                    outputFile.open(file, std::ios_base::app);
+                    outputFile << "" << (end-start) << ";";
+                    outputFile.close();
+                }
+            }
+            start = MPI_Wtime();
             //data1.show("start");
             while (global_diff > 0 && iterations_used < iterations && maxnumberalive > 0) {
                 if (iterations_used % 50 == 0) {
@@ -151,6 +162,16 @@ namespace msl {
                     printf("no difference any more;");
                 }
                 //printf("R:%d;", num_iter);
+            }
+            data1.download();
+            end = MPI_Wtime();
+            if (msl::isRootProcess()) {
+                if (file) {
+                    std::ofstream outputFile;
+                    outputFile.open(file, std::ios_base::app);
+                    outputFile << "" << (end-start) << ";" << std::to_string(iterations_used) + ";" ;
+                    outputFile.close();
+                }
             }
             return 0;
         }
@@ -197,18 +218,22 @@ int main(int argc, char **argv) {
         //printf("Config:\tSize:%d; #GPU:%d; CPU perc:%.2f;", n, nGPUs, msl::Muesli::cpu_fraction);
     }
     int iterations_used=0;
-    msl::startTiming();
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::run(n, m, stencil_radius, tile_width, iterations, iterations_used);
-        msl::splitTime(r);
+        msl::jacobi::run(n, m, stencil_radius, tile_width, iterations, iterations_used, file);
+        //msl::splitTime(r);
     }
 
     if (file) {
-        std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
+       // std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
                          ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";";
-        msl::printTimeToFile(id.c_str(), file);
+        std::ofstream outputFile;
+        outputFile.open(file, std::ios_base::app);
+        outputFile << "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" +
+        std::to_string(iterations) << ";" << "\n";
+        outputFile.close();
+       // msl::printTimeToFile(id.c_str(), file);
     } else {
-        msl::stopTiming();
+        //msl::stopTiming();
     }
     msl::terminateSkeletons();
     return 0;
