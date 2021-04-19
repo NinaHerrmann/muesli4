@@ -5,9 +5,9 @@ printf "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n"
 for m_size in 1024; do
     for gpu_n in 1 2; do
         for cpu_p in 0.00; do
-		for iterations in 1000 2000 3000 4000 5000 10000; do
+		for iterations in 1000 ; do
         		#for tile_width in 8 16 24 32; do
-			mpirun -np $np build/gol $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "afucking.csv"
+			mpirun -np 1  build/gol $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "afucking.csv"
 		#	done
 		done
         done
