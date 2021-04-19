@@ -55,7 +55,7 @@ for m_size in 1024 4096 8192 16384; do
         for cpu_p in 0.00; do
                 for iterations in 1000 2000 3000 4000 5000 10000; do
                         for run in 1 2 3 4 5 6 7 8 9 10; do
-                 	       mpirun -np $np /home/n/n_herr03/gol/build/gameoflife $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "afucking.csv"
+                 	       mpirun -np 1 /home/n/n_herr03/gol/build/gameoflife $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "/scratch/tmp/n_herr03/gol.csv"
                         done
                 done
         done
