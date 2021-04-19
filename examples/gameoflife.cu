@@ -101,7 +101,7 @@ namespace msl {
         };
 
 
-        int run(int n, int m, int stencil_radius, int tile_width, int iterations) {
+        int run(int n, int m, int stencil_radius, int tile_width, int iterations, int iterations_used) {
             GoLNeutralValueFunctor dead_nvf(0);
             Max max_functor;
             int global_diff = 10;
@@ -118,39 +118,39 @@ namespace msl {
 
             SelfReplication difference_functor;
 
-            int num_iter = 0;
+            //int num_iter = 0;
             int maxnumberalive = 1;
             for (int i = 0; i < n * m; i++) {
                 data1.set(i, rand() % 2);
             }
             data1.download();
             //data1.show("start");
-            while (global_diff > 0 && num_iter < iterations && maxnumberalive > 0) {
-                if (num_iter % 50 == 0) {
+            while (global_diff > 0 && iterations_used < iterations && maxnumberalive > 0) {
+                if (iterations_used % 50 == 0) {
                     data1.mapStencilMM(data2, GoL, dead_nvf);
                     differences = data1.zip(data2, difference_functor);
                     global_diff = data2.fold(max_functor, true);
                     maxnumberalive = differences.fold(max_functor, true);
                 } else {
-                    if (num_iter % 2 == 0) {
+                    if (iterations_used % 2 == 0) {
                         data1.mapStencilMM(data2, GoL, dead_nvf);
                     } else {
                         data2.mapStencilMM(data1, GoL, dead_nvf);
                     }
                 }
-                num_iter++;
+                iterations_used++;
             }
             if (msl::isRootProcess()) {
                 if (maxnumberalive == 0 ){
                     printf("no more living;");
                 }
-                if (num_iter < MAX_ITER){
+                if (iterations_used < MAX_ITER){
                     printf("iteration reached %d %d;", global_diff, maxnumberalive);
                 }
                 if (global_diff == 0){
                     printf("no difference any more;");
                 }
-                printf("R:%d;", num_iter);
+                //printf("R:%d;", num_iter);
             }
             return 0;
         }
@@ -196,14 +196,15 @@ int main(int argc, char **argv) {
 //        printf("%d; %d; %.2f; %d", n, nGPUs, msl::Muesli::cpu_fraction, msl::Muesli::num_runs);
         //printf("Config:\tSize:%d; #GPU:%d; CPU perc:%.2f;", n, nGPUs, msl::Muesli::cpu_fraction);
     }
+    int iterations_used=0;
     msl::startTiming();
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::run(n, m, stencil_radius, tile_width, iterations);
+        msl::jacobi::run(n, m, stencil_radius, tile_width, iterations, iterations_used);
         msl::splitTime(r);
     }
 
     if (file) {
-        std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +
+        std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
                          ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";";
         msl::printTimeToFile(id.c_str(), file);
     } else {
