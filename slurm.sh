@@ -2,7 +2,7 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:2
@@ -49,13 +49,14 @@ export I_MPI_FABRICS=shm:tcp
 #	done
 #    done    
 #done
-printf "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n"
+echo  "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n" >> "/scratch/tmp/n_herr03/timesplit_gol.csv"
 for m_size in 1024 4096 8192 16384; do
     for gpu_n in 1 2; do
-        for cpu_p in 0.00; do
+        for tile_width in 16; do
                 for iterations in 1000 2000 3000 4000 5000 10000; do
                         for run in 1 2 3 4 5 6 7 8 9 10; do
-                 	       mpirun -np 1 /home/n/n_herr03/gol/build/gameoflife $m_size $m_size $gpu_n 1 $cpu_p 16 $iterations "/scratch/tmp/n_herr03/gol.csv"
+				for np in 1 2;
+                 	       mpirun -np $np /home/n/n_herr03/gol/build/gameoflife $m_size $m_size $gpu_n 1 0.00 $tile_width $iterations "/scratch/tmp/n_herr03/timesplit_gol.csv"
                         done
                 done
         done
