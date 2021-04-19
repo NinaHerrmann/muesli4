@@ -1712,6 +1712,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             }
 
         }
+       
        // Fill first and last GPU in total with NVF
        if (!plinitMM) {
 
@@ -1786,19 +1787,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
           }
       }
 
-   if (!plinitMM) {
 
-        if (Muesli::proc_id == Muesli::num_local_procs - 1) {
-
-#pragma omp parallel for
-            for (int i = padding_size; i < padding_size * 2; i++) {
-                int offset = (nlocalRows + stencil_size) * ncol + ((padding_size * 2) - i);
-                // TODO adjust to process (copy gotten stencil)
-                padding_stencil[i] =
-                        neutral_value_functor(offset / ncol + firstRow - stencil_size, offset % ncol);
-            }
-        }
-    }
 
     // TODO copy first GPU row to localPartition
     int tile_width = f.getTileWidth();
