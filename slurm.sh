@@ -8,9 +8,9 @@
 #SBATCH --gres=gpu:2
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
-#SBATCH --job-name=GameOfLife
-#SBATCH --outpu=/scratch/tmp/n_herr03/gol.txt
-#SBATCH --error=/scratch/tmp/n_herr03/gol.error
+#SBATCH --job-name=GameOfLife_timesplit
+#SBATCH --outpu=/scratch/tmp/n_herr03/gol_timesplit.txt
+#SBATCH --error=/scratch/tmp/n_herr03/gol_timesplit.error
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=n_herr03@uni-muenster.de
 
