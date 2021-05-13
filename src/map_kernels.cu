@@ -113,7 +113,7 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
 
-    extern __shared__ float inputsm[];
+    extern __shared__ T inputsm[];
 
 
     // 512 threads per block --> assuming all in one line we need 512*3+2 numbers in shared memory = 1538 nicht so gut für die wiederverwendung
@@ -167,12 +167,12 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
                                          (blockIdx.x) * tile_width - 1];
         } else {
             // In case we are in the ad blockIdx.y == 0 we need to copy from padding_stencil
-            inputsm[tile_width + 2 + localindex * (tile_width+2)] = 100;
+            inputsm[tile_width + 2 + localindex * (tile_width+2)] = 0;
         }
 
         // In case we are the last tile we need to copy from the stencil otherwise we copy from the other gpu
         if (blockIdx.x == ((plan.gpuCols / tile_width)-1)){
-             inputsm[tile_width+1 + (tile_width + 2) + localindex * (tile_width+2)] = 100;
+             inputsm[tile_width+1 + (tile_width + 2) + localindex * (tile_width+2)] = 0;
         } else {
             // In case it is not the last tile we need to copy right hand side from other tile
             inputsm[tile_width+1 + (tile_width + 2) + localindex * (tile_width+2)] = inputdm[(blockIdx.y) * (plan.gpuCols) * tile_height + (plan.gpuCols * localindex) + (blockIdx.x +1) * tile_width];
@@ -180,18 +180,6 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
     }
     __syncthreads();
     if (localrow < tile_height) {
-//        if (y * plan.gpuCols + x - plan.firstCol == 0) {
-//            for(int u = 0; u<(tile_width+2)*(tile_height+2); u++){
-//                if (u % (tile_width+2) == 0){printf("\n!");}
-//                printf("%.2f;", inputsm[u]);
-//            }
-//        }
-       /* if (y * plan.gpuCols + x - plan.firstCol == 255) {
-            for(int u = 0; u<(tile_width+2)*(tile_height+2); u++){
-                if (u % (tile_width+2) == 0){printf("\n!");}
-                //printf("%.2f;", inputsm[u]);
-            }
-        }*/
         if (localcol < tile_width) {
             out[y * plan.gpuCols + x - plan.firstCol] = func(localrow, localcol, inputsm, tile_width, tile_height);
         }
