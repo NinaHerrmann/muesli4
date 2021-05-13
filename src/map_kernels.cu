@@ -133,49 +133,53 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan,
     int localcol = (x - (blockIdx.x * tile_height));
     int localrow = y - (blockIdx.y * tile_width);
     int localindex = localrow * tile_width + localcol;
-
+    int realdataoffset = tile_width + 3 + (localrow *  2);
+    int secondrealdataoffset = y * plan.gpuCols + x - plan.firstCol;
     // Copy all the "real data"
-    if (localrow < tile_height) {
-        if (localcol < tile_width) {
-             inputsm[localindex + tile_width + 3 + (localrow *  2)] = inputdm[y * plan.gpuCols + x - plan.firstCol];
-            // Wenn die blockIdx.y != 0 ist muss der obere Rand der GPU in padding_stencil kopiert werden
-        }
-    }
+
+    inputsm[localindex + realdataoffset] = __ldg(&inputdm[secondrealdataoffset]);
+
     // Copy borders
-    if (localindex < tile_width) {
-        if (blockIdx.y != 0) {
-            // In case we are not the first block vertical copy top from previous gpu
-            inputsm[localindex+1] = inputdm[((blockIdx.y) * (plan.gpuCols)) * tile_height - plan.gpuCols +
-                                          blockIdx.x * tile_width + localindex];
-        } else {
-            // In case we are in the ad blockIdx.y == 0 we need to copy the top from padding_stencil
-            inputsm[localindex+1] = inputpadding[localindex + blockIdx.x * tile_width];
-        }
-        // Top done ... continue with bottom
-        if (blockIdx.y == ((plan.gpuRows / tile_height)-1)){
-            inputsm[(tile_width + 2)*(tile_height+1)+1+localindex ] = inputpadding[localindex + blockIdx.x * tile_width + plan.gpuCols];
-        } else {
-            // In case it is not the last tile we need to copy bottom from top of other tile
-            inputsm[(tile_width + 2)*(tile_height +1)+1 +localindex ] = inputdm[(blockIdx.y + 1) * (plan.gpuCols) * tile_height+ blockIdx.x * tile_width+localindex];
-        }
+    int modulo = localindex % tile_width;
+
+    int inputoffset = modulo + blockIdx.x * tile_width;
+    if (blockIdx.y != 0) {
+        // In case we are not the first block vertical copy top from previous gpu
+        inputsm[modulo+1] =__ldg(&inputdm[((blockIdx.y) * (plan.gpuCols)) * tile_height - plan.gpuCols +
+                inputoffset]);
+    } else {
+        // In case we are in the end blockIdx.y == 0 we need to copy the top from padding_stencil
+        inputsm[modulo+1] = __ldg(&inputpadding[inputoffset]);
     }
+
+    int bottomoffset = (tile_width + 2)*(tile_height +1)+1 + modulo;
+    // Top done ... continue with bottom
+    if (blockIdx.y == ((plan.gpuRows / tile_height)-1)){
+        inputsm[bottomoffset] = __ldg(&inputpadding[inputoffset + plan.gpuCols]);
+    } else {
+        // In case it is not the last tile we need to copy bottom from top of other tile
+        inputsm[bottomoffset] = __ldg(&inputdm[(blockIdx.y + 1) * (plan.gpuCols) * tile_height + inputoffset]);
+    }
+
     if (localindex < tile_height) {
+        int inputoffset = (blockIdx.y) * (plan.gpuCols) * tile_height + (plan.gpuCols * localindex);
         // Same for left and right, if blockidX.x is != 0 we need to copy from left
         // If blockidx is not the last block we need to copy from right
+        int rightoffset = tile_width + 2 + localindex * (tile_width+2);
         if (blockIdx.x != 0) {
-            inputsm[tile_width + 2 + localindex * (tile_width+2)] = inputdm[(blockIdx.y) * (plan.gpuCols) * tile_height + (plan.gpuCols * localindex) +
-                                         (blockIdx.x) * tile_width - 1];
+            inputsm[rightoffset] = __ldg(&inputdm[inputoffset +
+                                         (blockIdx.x) * tile_width - 1]);
         } else {
             // In case we are in the ad blockIdx.y == 0 we need to copy from padding_stencil
-            inputsm[tile_width + 2 + localindex * (tile_width+2)] = 0;
+            inputsm[rightoffset] = 100;
         }
-
+        int leftoffset= tile_width+1 + (tile_width + 2) + localindex * (tile_width+2);
         // In case we are the last tile we need to copy from the stencil otherwise we copy from the other gpu
         if (blockIdx.x == ((plan.gpuCols / tile_width)-1)){
-             inputsm[tile_width+1 + (tile_width + 2) + localindex * (tile_width+2)] = 0;
+             inputsm[leftoffset] = 100;
         } else {
             // In case it is not the last tile we need to copy right hand side from other tile
-            inputsm[tile_width+1 + (tile_width + 2) + localindex * (tile_width+2)] = inputdm[(blockIdx.y) * (plan.gpuCols) * tile_height + (plan.gpuCols * localindex) + (blockIdx.x +1) * tile_width];
+            inputsm[leftoffset] =__ldg(&inputdm[inputoffset + (blockIdx.x +1) * tile_width]);
         }
     }
     __syncthreads();

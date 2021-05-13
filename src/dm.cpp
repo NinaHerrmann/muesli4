@@ -1843,6 +1843,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     int smem_size = (tile_width + 2 * stencil_size) *
                      (tile_width + 2 * stencil_size) * sizeof(T);
     for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+        cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
          f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
                 plans[i].firstCol);
          f.notify();
