@@ -161,20 +161,23 @@ namespace msl {
         {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
+            int localrow = row - firstRowGPU;
+            if (localrow >= rows) {return data_bottom[col+stencil_size];}
+            if (localrow < 0) {return data_top[col+stencil_size];}
+            if (col < 0) { return data_left[row];}
+            if (col >= m) {return data_right[row];}
+            return 0.0;
             int r = blockIdx.y * blockDim.y + threadIdx.y;
             int c = blockIdx.x * blockDim.x + threadIdx.x;
             int rowIndex = (row-firstRowGPU-r+stencil_size)+threadIdx.y;
             int colIndex = (col-c+stencil_size)+threadIdx.x;
             //printf("get  %d % d\n", row, col);
-
+            //printf("access %d\n", rowIndex*width + colIndex);
             return shared_data[rowIndex*width + colIndex];
             // TODO assumes row wise distribution
         /*    int localrow = row - firstRowGPU;
             // upper right corner has wrong value
-            if (localrow >= rows) {return data_bottom[col+stencil_size];}
-            if (localrow < 0) {return data_top[col+stencil_size];}
-            if (col < 0) { return data_left[row];}
-            if (col >= m) {return data_right[row];}
+
             else { return current_data[(row-firstRowGPU)*cols + col];}*/
 #else
             // CPU version: read from main memory.
@@ -190,9 +193,10 @@ namespace msl {
         MSL_USERFUNC
         void printSM(int size) const {
 #ifdef __CUDA_ARCH__
+            int tx = threadIdx.x;
+            int ty = threadIdx.y;
             for (int i = 0; i < size; i++) {
-                if (i %tile_width == 0){printf("\n");}
-                printf("%d;", shared_data[i]);
+             //   printf("%.2f;", shared_data[i]);
             }
 #endif
         }
@@ -209,97 +213,12 @@ namespace msl {
             //printf("%d;", ty + tx+stencil_size);
 
             smem[(ty+stencil_size)*width + tx+stencil_size] = current_data[(row+stencil_size)*cols + c];
+            smem[(ty+stencil_size)*width + tx+stencil_size +1] =current_data[(row+stencil_size)*cols + c +1];
+            smem[(ty+stencil_size)*width + tx+stencil_size -1] =current_data[(row+stencil_size)*cols + c -1];
+            smem[(ty+stencil_size+1)*width + tx+stencil_size] =current_data[(row+stencil_size+1)*cols + c];
+            smem[(ty+stencil_size-1)*width + tx+stencil_size] =current_data[(row+stencil_size-1)*cols + c];
             printf("%d--", (ty+stencil_size)*width + tx+stencil_size);
             // copy top
-            if (ty == 0) {
-                for (int i = 0; i < stencil_size; i++) {
-                    smem[i*width + stencil_size+tx] = data_top[c];
-                    printf("[read top %d;%d--> %d]", data_top[c], current_data[(row+i)*cols + c], i*width + stencil_size+tx);
-
-                }
-            }
-            // TODO HERE?
-            // last row of tile needs to read lower stencil_size rows of halo values
-            if (ty == tile_width-1) {
-                for (int i = 0; i < stencil_size; i++) {
-                    smem[(i+stencil_size+tile_width)*width + stencil_size+tx] =
-                            data_bottom[c];
-                    printf("[read bottom %d;%d--> %d]", data_bottom[c], current_data[(row+i)*cols + c], (i+stencil_size+tile_width)*width + stencil_size+tx);
-                }
-            }
-
-            // first column of tile needs to read left hand side stencil_size columns of halo values
-            if (tx == 0) {
-                for (int i = 0; i < stencil_size; i++) {
-                    if (c+i-stencil_size < 0) {
-                        smem[(ty+stencil_size)*width + i] = 0;
-                    }
-                    else
-                        smem[(ty+stencil_size)*width + i] =
-                                current_data[(row+stencil_size)*cols + c+i-stencil_size];
-                }
-            }
-
-            // last column of tile needs to read right hand side stencil_size columns of halo values
-            if (tx == tile_width-1) {
-                for (int i = 0; i < stencil_size; i++) {
-                    if (c+i+1 > m-1)
-                        smem[(ty+stencil_size)*width + i+tile_width+stencil_size] = 0;
-                    else
-                        smem[(ty+stencil_size)*width + i+tile_width+stencil_size] =
-                                current_data[(row+stencil_size)*cols + c+i+1];
-                }
-            }
-
-            // upper left corner
-            if (tx == 0 && ty == 0) {
-                for (int i = 0; i < stencil_size; i++) {
-                    for (int j = 0; j < stencil_size; j++) {
-                        if (c+j-stencil_size < 0)
-                            smem[i*width + j] = 0;
-                        else
-                            smem[i*width + j] = current_data[(row+i)*cols + c+j-stencil_size];
-                    }
-                }
-            }
-
-            // upper right corner
-            if (tx == tile_width-1 && ty == 0) {
-                for (int i = 0; i < stencil_size; i++) {
-                    for (int j = 0; j < stencil_size; j++) {
-                        if (c+j+1 > m-1)
-                            smem[i*width + j+stencil_size+tile_width] = 0;
-                        else
-                            smem[i*width + j+stencil_size+tile_width] = current_data[(row+i)*cols + c+j+1];
-                    }
-                }
-            }
-
-            // lower left corner
-            if (tx == 0 && ty == tile_width-1) {
-                for (int i = 0; i < stencil_size; i++) {
-                    for (int j = 0; j < stencil_size; j++) {
-                        if (c+j-stencil_size < 0)
-                            smem[(i+stencil_size+tile_width)*width + j] = 0;
-                        else
-                            smem[(i+stencil_size+tile_width)*width + j] =
-                                    current_data[(row+i+stencil_size+1)*cols + c+j-stencil_size];
-                    }
-                }
-            }
-
-            // lower right corner
-            if (tx == tile_width-1 && ty == tile_width-1) {
-                for (int i = 0; i < stencil_size; i++) {
-                    for (int j = 0; j < stencil_size; j++) {
-                        if (c+j+1 > m-1)
-                            smem[(i+stencil_size+tile_width)*width + j+stencil_size+tile_width] = 0;
-                        else
-                            smem[(i+stencil_size+tile_width)*width + j+stencil_size+tile_width] =
-                                    current_data[(row+i+stencil_size+1)*cols + c+j+1];
-                    }
-                }
-            }
             __syncthreads();
 
             shared_data = smem;
