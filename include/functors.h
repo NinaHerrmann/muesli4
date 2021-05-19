@@ -315,7 +315,7 @@ protected:
          * @return Output of the map stencil function.
          */
         MSL_USERFUNC
-        virtual R operator()(int rowIndex, int colIndex, T *input, int ncol, int nrow, T *paddingborder) const = 0;
+        virtual R operator()(int rowIndex, int colIndex, PLMatrix<T> *input, int ncol, int nrow) const = 0;
 
         /**
          * \brief Returns the stencil size.

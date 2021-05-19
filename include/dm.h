@@ -546,6 +546,15 @@ public:
    * @return The element at the given global index.
    */
   T get(int index) const;
+  /**
+   * \brief Returns the element at the given global index \em row, col.
+   *
+   * @param row The row index.
+   * @param col The col index.
+   * @return The element at the given global index.
+   */
+    MSL_USERFUNC
+    T get2D(int row, int col, int gpu) const;
     /**
      * \brief Returns the element at the given row \em row and column \em column.
      *
@@ -765,18 +774,14 @@ private:
   int nCPU;
   // firstIndex caclulated by GPU
   int indexGPU;
+  std::vector<PLMatrix<T>*> vplm;
 
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete;
-  bool plinit = false; // pl matrix initialized?
   bool plinitMM = false; // pl matrix initialized?
 
-  T *padded_local_matrix;
-  PLMatrix<T> plm; // plmatrix
-  std::vector<PLMatrix<T>*> d_plm; // plmatrix
-  std::vector<T*> d_dm; // plmatrix
-  std::vector<T*> d_padded_local_matrix; // plmatrix
+  std::vector<T*> d_dm;
   T* padding_stencil;
   cudaEvent_t start, stop;
   float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0, t9=0, t10=0;

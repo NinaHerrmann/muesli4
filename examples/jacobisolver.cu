@@ -24,22 +24,12 @@ namespace msl {
             MSL_USERFUNC
             float operator()(int x, int y) const { // here, x represents rows
                 // left and right column must be 100;
-                if (y < 0 || y > (glob_cols_ - 1)) {
-                    return 100;
-                }
-
+                if (y < 0 || y > (glob_cols_ - 1)) { return 100;}
                 // top broder must be 100;
-                if (x < 0) {
-                    return 100;
-                }
-
+                if (x < 0) { return 100; }
                 // bottom border must be 0
-                if (x > (glob_rows_ - 1)) {
-                    return 0;
-                }
-
+                if (x > (glob_rows_ - 1)) {return 0; }
                 // this should never be called if indexes don't represent border points
-                // inner values are 75
                 return default_neutral;
             }
 
@@ -65,43 +55,14 @@ namespace msl {
 //
             MSL_USERFUNC
             float operator()(
-                    int rowIndex, int colIndex, float *input, int ncol, int nrow, float *paddingborder) const {
+                    int rowIndex, int colIndex, PLMatrix<float> *input, int ncol, int nrow) const {
                 float sum = 0;
-                // Add top and bottom values.
 
-                for (int i = -stencil_size; i <= stencil_size; i++) {
-                    if (i == 0)
-                        continue;
-                    float value = 0;
-                    // top broder must be 100;
-                    if (rowIndex + i < 0) {
-                        value = paddingborder[colIndex];
-                    } else {
-                        if (rowIndex + i > (nrow - 1)) {
-                            int where = ncol + colIndex;
-                            value = paddingborder[where];
-                        } else {
-                            int index = (rowIndex + i) * ncol + colIndex;
-                            value = input[index];
-                        }
-                    }
+                sum += input->get(rowIndex+1, colIndex);
+                sum += input->get(rowIndex-1, colIndex);
+                sum += input->get(rowIndex, colIndex+1);
+                sum += input->get(rowIndex, colIndex-1);
 
-                    sum += value;
-                }
-
-                // Add left and right values.
-                for (int i = -stencil_size; i <= stencil_size; i++) {
-                    if (i == 0)
-                        continue;
-                    float value = 0;
-                    if (colIndex + i < 0 || colIndex + i > (ncol - 1)) {
-                        value = 100;
-                    } else {
-                        int index = rowIndex * ncol + colIndex + i;
-                        value = input[index];
-                    }
-                    sum += value;
-                }
                 return sum / (4 * stencil_size);
             }
         };
@@ -168,72 +129,31 @@ namespace msl {
             DM<float> test2_m(n, m, 75, true);
 
             int num_iter = 0;
-         /*   float  milliseconds, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
-            auto start = std::chrono::high_resolution_clock::now();
-            auto stop = std::chrono::high_resolution_clock::now();
-            double tstencil = 0, tinplace = 0, tzip= 0, tfold= 0, tmove= 0;
-            std::chrono::duration<double> tstencil1 = stop-start, tinplace1 = stop-start, tzip1= stop-start, tfold1= stop-start, tmove1= stop-start;
-
-*/
-            //float milliseconds,maps , diffs, difffolds, move = 0;
-            while (global_diff > EPSILON && num_iter < MAX_ITER) {
+            while (global_diff > EPSILON && num_iter < 2) {
                 if (num_iter % 50 == 0) {
-                    //printf("calc with test_m\n");
-                    //start = std::chrono::high_resolution_clock::now();
                     test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
-                 /*   stop = std::chrono::high_resolution_clock::now();
-                    tinplace1 = stop - start;
-                    tinplace += tstencil1.count();
-                    start = std::chrono::high_resolution_clock::now();*/
                     differences = test_m.zip(test2_m, difference_functor);
-                    /*stop = std::chrono::high_resolution_clock::now();
-                    tzip1 = stop - start;
-                    tzip += tstencil1.count();
-                    start = std::chrono::high_resolution_clock::now();*/
                     global_diff = differences.fold(max_functor, true);
-                    /*stop = std::chrono::high_resolution_clock::now();
-                    tfold1 = stop - start;
-                    tfold += tstencil1.count();*/
                 } else {
                     if (num_iter % 2 == 0) {
-                        //start = std::chrono::high_resolution_clock::now();
                         test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
-                        /*stop = std::chrono::high_resolution_clock::now();
-                        tinplace1 = stop - start;
-                        tinplace += tinplace1.count();*/
-
                     } else {
-                        //start = std::chrono::high_resolution_clock::now();
                         test2_m.mapStencilMM(test_m, jacobi, neutral_value_functor);
-//                        stop = std::chrono::high_resolution_clock::now();
-//                        tinplace1 = stop - start;
-//                        tinplace += tinplace1.count();
                     }
                 }
                 num_iter++;
             }
             //printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil * 1000, tinplace* 1000, tzip* 1000, tfold* 1000, tmove* 1000);
 
-            /*test_m.download();
+            test_m.download();
             test_m.show("test_m");
-            test2_m.download();
+            /*test2_m.download();
             test2_m.show("test2_m");
             differences.download();
             differences.show("othermatrix");*/
             if (msl::isRootProcess()) {
                 printf("R:%d;%.2f;", num_iter, global_diff);
 
-                //test2_m.download();
-                //test2_m.show("transfer");
-                //test_m.printTime();
-                //test2_m.printTime();
-                //mat.download();
-                //mat.show("matrix");
-                //printf("\n mapstencil %.3fs;\n", maps / 1000);
-                //printf("differences zip %.3fs;\n", diffs / 1000);
-                //printf("differences fold %.3fs;\n", difffolds / 1000);
-                //printf("Move %.3fs;\n", move / 1000);
-                //printf("It %d;\n", num_iter);
             }
             return 0;
         }

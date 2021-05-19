@@ -41,27 +41,15 @@ namespace msl {
 //
             MSL_USERFUNC
             int operator()(
-                    int rowIndex, int colIndex, int *input, int ncol, int nrow, int *paddingborder) const {
-                int value = 0;
+                    int rowIndex, int colIndex, PLMatrix<int> *input, int ncol, int nrow) const {
                 int sum = 0;
                 // top broder must be 100;
-                int index = (rowIndex) * ncol + colIndex;
-                int live_status = input[index];
-                for (int rowoffset = -stencil_size; rowoffset <= stencil_size; rowoffset++) {
-                    for (int coloffset = -stencil_size; coloffset <= stencil_size; coloffset++) {
-                        if (rowoffset == 0 && coloffset == 0)
-                            continue;
-                        if (rowIndex + rowoffset < 0 || colIndex + coloffset < 0 || colIndex + coloffset > (ncol - 1) ||
-                            rowIndex + rowoffset > (nrow - 1)) {
-                            // TODO: nvf
-                            value = 0;
-                        } else {
-                            int indexoffset = (rowIndex + rowoffset) * ncol + colIndex + coloffset;
-                            value = input[indexoffset];
-                        }
-                        sum += value;
-                    }
-                }
+                sum += input->get(rowIndex-1, colIndex) + input->get(rowIndex-1, colIndex-1)+ input->get(rowIndex-1, colIndex+1)
+                        + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
+                        + input->get(rowIndex, colIndex-1)+ input->get(rowIndex, colIndex+1);
+/*
+                int live_status = input->get(rowIndex, colIndex);
+
                 int future_live_status = 0;
                 // If the cell is alive and has 2-3 neighbours it survives
                 if (live_status == 1 && (sum == 2 || sum == 3 )) {
@@ -71,8 +59,9 @@ namespace msl {
                 if (live_status == 0 && sum == 3) {
                     future_live_status = 1;
                 }
+*/
 
-                return future_live_status;
+                return sum;
             }
         };
 
@@ -105,7 +94,6 @@ namespace msl {
             double start = MPI_Wtime();
             GoLNeutralValueFunctor dead_nvf(0);
             Max max_functor;
-            int global_diff = 10;
 
             // mapStencil
             GoLFunctor GoL;
@@ -120,9 +108,8 @@ namespace msl {
             SelfReplication difference_functor;
 
             //int num_iter = 0;
-            int maxnumberalive = 1;
             for (int i = 0; i < n * m; i++) {
-                data1.set(i, rand() % 2);
+                data1.set(i, 1);//data1.set(i, rand() % 2);
             }
             data1.download();
             double end = MPI_Wtime();
@@ -136,33 +123,25 @@ namespace msl {
             }
             start = MPI_Wtime();
             //data1.show("start");
-            while (global_diff > 0 && iterations_used < iterations && maxnumberalive > 0) {
+            while (iterations_used < 2) {
                 if (iterations_used % 50 == 0) {
                     data1.mapStencilMM(data2, GoL, dead_nvf);
-                    differences = data1.zip(data2, difference_functor);
-                    global_diff = data2.fold(max_functor, true);
-                    maxnumberalive = differences.fold(max_functor, true);
+                    data2.download();
+                    data2.show("data2");
                 } else {
                     if (iterations_used % 2 == 0) {
                         data1.mapStencilMM(data2, GoL, dead_nvf);
+                        data2.download();
+                        data2.show("data2");
                     } else {
                         data2.mapStencilMM(data1, GoL, dead_nvf);
+                        data1.download();
+                        data1.show("data1");
                     }
                 }
                 iterations_used++;
             }
-            if (msl::isRootProcess()) {
-                if (maxnumberalive == 0 ){
-                    printf("no more living;");
-                }
-                if (iterations_used < MAX_ITER){
-                    printf("iteration reached %d %d;", global_diff, maxnumberalive);
-                }
-                if (global_diff == 0){
-                    printf("no difference any more;");
-                }
-                //printf("R:%d;", num_iter);
-            }
+
             data1.download();
             end = MPI_Wtime();
             if (msl::isRootProcess()) {
