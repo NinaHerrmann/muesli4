@@ -1390,10 +1390,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
         plm.addDevicePtr(d_dm[i], d_dm[i]+padding_size, d_dm[i]+(2*padding_size),d_dm[i]+(3*padding_size), plans[i].d_Data);
     }
-  /*  for (int u = 0; u<(4*padding_size); u++){
-        if (u%padding_size == 0){printf("\n");}
-        printf("%d;", padding_stencil[u]);
-    }*/
+    cudaDeviceSynchronize();
+
     for (int i = 0; i < msl::Muesli::num_gpus; i++) {
         cudaSetDevice(i);
         plm.setFirstRowGPU(plans[i].firstRow);
@@ -1407,7 +1405,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
-                     (tile_width + 2 * stencil_size) * sizeof(T);
+                     (tile_width + 2 * stencil_size) * sizeof(T) * 2;
     for (int i = 0; i < Muesli::num_gpus; i++) {
          f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
                 plans[i].firstCol);
@@ -1423,8 +1421,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                      (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);
         printf("\n%d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size);
         detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-               result.getExecPlans()[i].d_Data, plans[i], vplm[i], d_dm[i], f, tile_width,
-                        tile_width, neutral_value_functor);
+               result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width,
+                        msl::Muesli::elem_per_thread);
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
     }

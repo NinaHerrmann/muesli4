@@ -48,6 +48,7 @@ int msl::Muesli::num_gpus;
 int msl::Muesli::max_gpus;
 double msl::Muesli::cpu_fraction = 0.2; // fraction of each DA partition handled
                                         // by CPU cores (rather than GPUs)
+int msl::Muesli::elem_per_thread = 1;
 int msl::Muesli::threads_per_block;
 int msl::Muesli::tpb_x;
 int msl::Muesli::tpb_y;

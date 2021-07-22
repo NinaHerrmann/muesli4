@@ -158,6 +158,8 @@ public:
   static bool use_timer;           // use a timer?
   static bool farm_statistics;     // collect statistics of how many task were
                                    // processed by CPU/GPU
+  static int elem_per_thread;     // collect statistics of how many task were
+
 #ifdef __CUDACC__
   static std::vector<cudaStream_t> streams; // cuda streams for multi-gpu
 #endif

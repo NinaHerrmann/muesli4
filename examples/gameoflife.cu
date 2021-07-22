@@ -44,11 +44,17 @@ namespace msl {
                     int rowIndex, int colIndex, PLMatrix<int> *input, int ncol, int nrow) const {
                 int sum = 0;
                 // top broder must be 100;
+
                 sum += input->get(rowIndex-1, colIndex) + input->get(rowIndex-1, colIndex-1)+ input->get(rowIndex-1, colIndex+1)
                         + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
                         + input->get(rowIndex, colIndex-1)+ input->get(rowIndex, colIndex+1);
-/*
-                int live_status = input->get(rowIndex, colIndex);
+                if (rowIndex == 4 && colIndex == 5){
+                    printf("\n");
+                    printf("%d; %d; %d; %d; %d; %d;", input->get(rowIndex-1, colIndex), input->get(rowIndex+1, colIndex), input->get(rowIndex, colIndex+1), input->get(rowIndex, colIndex-1), input->get(rowIndex+1, colIndex-1), input->get(rowIndex-1, colIndex-1));
+                    printf("\nsum->%d", sum);
+                }
+                //printf("%d;%d;%d\n", rowIndex, colIndex, sum);
+                /*int live_status = input->get(rowIndex, colIndex);
 
                 int future_live_status = 0;
                 // If the cell is alive and has 2-3 neighbours it survives
@@ -123,7 +129,7 @@ namespace msl {
             }
             start = MPI_Wtime();
             //data1.show("start");
-            while (iterations_used < 2) {
+            while (iterations_used < 1) {
                 if (iterations_used % 50 == 0) {
                     data1.mapStencilMM(data2, GoL, dead_nvf);
                     data2.download();
@@ -183,7 +189,6 @@ int main(int argc, char **argv) {
         }
         tile_width = atoi(argv[6]);
         iterations = atoi(argv[7]);
-
     }
     if (argc == 9) {
         file = argv[8];
