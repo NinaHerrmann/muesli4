@@ -171,46 +171,45 @@ namespace msl {
         {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
+            if(shared_mem) {
+                if (row >= rows) {
+                    return data_bottom[col + stencil_size];
+                }
+                if (row < 0) {
+                    return data_top[col + stencil_size];
+                }
+                if (col < 0) {
+                    return data_left[row];
+                }
+                if (col >= m) {
+                    return data_right[row];
+                }
+                int r = blockIdx.y * blockDim.y + threadIdx.y;
+                int c = blockIdx.x * blockDim.x + threadIdx.x;
+                int rowIndex = (row - firstRowGPU - r + stencil_size) + threadIdx.y;
+                int colIndex = (col - c + stencil_size) + threadIdx.x;
+                if (shared_data[(rowIndex) * width + colIndex] == 0 ||
+                    shared_data[(rowIndex) * width + colIndex] > 100 ||
+                    shared_data[(rowIndex) * width + colIndex] < (-100)) {
+                    return current_data[(row - firstRowGPU) * cols + col];
+                }
+                return shared_data[(rowIndex) * width + colIndex];
 
-            if (row >= rows) {
-                if (data_bottom[col+stencil_size]> 100 || data_bottom[col+stencil_size]<(-100)){
-                    printf("%d-%d;\n", row, col);
+                return shared_data[rowIndex * width + colIndex];
+            } else {
+                // TODO If GPU first GPU top nvf
+
+                if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row >= n && firstRowGPU == (n-rows))) {
+                    // out of bounds -> return neutral value
+                    return 0;
+                } else if(row >= rows && firstRowGPU == 0) {
+                    return data_bottom[col + stencil_size];
+                } else if(row < 0 && firstRowGPU != 0){
+                    return data_top[col + stencil_size];
+                } else { // in bounds -> return desired value
+                    return current_data[(row-firstRow)*cols + col];
                 }
-                return data_bottom[col+stencil_size];}
-            if (row < 0) {
-                if (data_top[col+stencil_size] > 100 || data_top[col+stencil_size]<(-100)){
-                    printf("%d-%d;\n", row, col);
-                }
-                return data_top[col+stencil_size];}
-            if (col < 0) {
-                if (data_left[row] > 100 || data_left[row]<(-100)){
-                    printf("%d-%d;\n", row, col);
-                }
-                if( col == -1 && row == 2) {
-                    printf("\n");
-                    for (int i =0; i<6 ;i++){
-                        printf("%d;",data_left[i]);
-                    }
-                    printf("\n");
-                }
-                return data_left[row];}
-            if (col >= m) {
-                if (data_right[row] > 100 || data_right[row]<(-100)){
-                    printf("%d-%d;\n", row, col);
-                }
-                return data_right[row];}
-            int r = blockIdx.y * blockDim.y + threadIdx.y;
-            int c = blockIdx.x * blockDim.x + threadIdx.x;
-            int rowIndex = (row-firstRowGPU-r+stencil_size)+threadIdx.y;
-            int colIndex = (col-c+stencil_size)+threadIdx.x;
-            if (shared_data[(rowIndex) * width + colIndex] ==0 ||shared_data[(rowIndex) * width + colIndex] > 100 || shared_data[(rowIndex) * width + colIndex]<(-100)){
-                return current_data[(row-firstRowGPU)*cols + col];
             }
-            return shared_data[(rowIndex) * width + colIndex];
-
-            //printf("get  %d % d\n", row, col);
-            //printf("access %d\n", rowIndex*width + colIndex);
-            return shared_data[rowIndex*width + colIndex];
             // TODO assumes row wise distribution
         /*    int localrow = row - firstRowGPU;
             // upper right corner has wrong value
@@ -237,6 +236,10 @@ namespace msl {
 #endif
         }
 #ifdef __CUDACC__
+        MSL_USERFUNC
+        void readToGlobalMemory() {
+            shared_mem = false;
+        }
         /**
          * \brief Load (tile_width+stencil)*(tile_height+stencil)
          */
@@ -247,7 +250,6 @@ namespace msl {
             int ty = threadIdx.y;
             int row = r-firstRowGPU;
             int rowoffset = 0;
-            //printf("%d;", ty + tx+stencil_size);
             // TODO write for multiple elements per thread
             for (int i = 0; i < num_elements; i ++) {
                 smem[((ty + stencil_size+rowoffset) * width) + tx + stencil_size] = current_data[(row) * cols + c];
@@ -272,6 +274,7 @@ namespace msl {
             }
 
             __syncthreads();
+            shared_mem = true;
 
             shared_data = smem;
         }
@@ -381,7 +384,7 @@ namespace msl {
             }
 
             __syncthreads();
-
+            shared_mem = true;
             shared_data = smem;
         }
 #endif
@@ -399,6 +402,15 @@ namespace msl {
         T* getcurrentData(){
             return current_data;
         }
+        MSL_USERFUNC
+        void printcurrentData(){
+            for (int i = 0; i < rows * cols; i++){
+                if(i%cols == 0){
+                    printf("\n");
+                }
+                printf("%d;", current_data[i]);
+            }
+        }
     private:
         std::vector<T*> ptrs;
         typename std::vector<T*>::iterator it;
@@ -413,6 +425,7 @@ namespace msl {
         T* current_data, *shared_data, *data_bottom, *data_top, *data_left, *data_right;
         int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, width;
         T neutral_value;
+        bool shared_mem;
     };
 
 }

@@ -64,6 +64,9 @@ __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 template <typename T, typename R, typename F>
 __global__ void mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
                                  F func, int tile_width, int num_elements);
+template <typename T, typename R, typename F>
+__global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
+                                 F func, int i);
 template <typename T> __global__ void printFromGPU(T *A, int size);
 // template <typename T, typename R, typename F>
 //__global__ void mapStencilKernel(T* in,

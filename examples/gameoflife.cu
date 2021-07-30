@@ -48,11 +48,7 @@ namespace msl {
                 sum += input->get(rowIndex-1, colIndex) + input->get(rowIndex-1, colIndex-1)+ input->get(rowIndex-1, colIndex+1)
                         + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
                         + input->get(rowIndex, colIndex-1)+ input->get(rowIndex, colIndex+1);
-                if (rowIndex == 4 && colIndex == 5){
-                    printf("\n");
-                    printf("%d; %d; %d; %d; %d; %d;", input->get(rowIndex-1, colIndex), input->get(rowIndex+1, colIndex), input->get(rowIndex, colIndex+1), input->get(rowIndex, colIndex-1), input->get(rowIndex+1, colIndex-1), input->get(rowIndex-1, colIndex-1));
-                    printf("\nsum->%d", sum);
-                }
+
                 //printf("%d;%d;%d\n", rowIndex, colIndex, sum);
                 /*int live_status = input->get(rowIndex, colIndex);
 
@@ -183,7 +179,6 @@ int main(int argc, char **argv) {
         nGPUs = atoi(argv[3]);
         nRuns = atoi(argv[4]);
         msl::Muesli::cpu_fraction = atof(argv[5]);
-        //printf("pass %.2f", atof(argv[5]));
         if (msl::Muesli::cpu_fraction > 1) {
             msl::Muesli::cpu_fraction = 1;
         }

@@ -34,7 +34,6 @@ namespace msl {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
                 return 1;
             }
-
             // Read magic number.
             std::string magic;
             getline(ifs, magic);
@@ -57,6 +56,7 @@ namespace msl {
             std::stringstream(inputLine) >> cols >> rows;
             getline(ifs, inputLine);
             std::stringstream(inputLine) >> max_color;
+            std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
 
             // Read image.
             if (ascii) {
@@ -69,7 +69,6 @@ namespace msl {
                 input_image_char = new char[rows*cols];
                 ifs.read(input_image_char, rows*cols);
             }
-
             return 0;
         }
 
@@ -92,7 +91,7 @@ namespace msl {
             // Write image
             for (int x = 0; x < rows; x++) {
                 for (int y = 0; y < cols; y++) {
-                    unsigned char intensity = static_cast<unsigned char> (img[x][y]);
+                    unsigned char intensity = static_cast<unsigned char> (out_image.get(x*cols + y));
                     ofs << intensity;
                 }
             }
@@ -154,50 +153,47 @@ namespace msl {
 
 
 //         msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used);
-        int testGaussian(std::string in_file, std::string out_file, int kw, bool output, int tile_width, int iterations, int iterations_used) {
+        int testGaussian(std::string in_file, std::string out_file, int kw, bool output, int tile_width, int iterations, int iterations_used, std::string file) {
             int max_color;
-            double gauss_time = 0.0, t_upload = 0.0, t_padding =  0.0, t_kernel = 0.0;
 
             // Read image
             readPGM(in_file, rows, cols, max_color);
-            msl::startTiming();
-            for (int run = 0; run < Muesli::num_runs; ++run) {
+            DM<int> gs_image(rows, cols, 0, true);
+            DM<int> gs_image_result(rows, cols, 0, true);
+            if (ascii) {
+                for (int i = 0; i < rows*cols; i++) {
+                    gs_image.set(i,input_image_int[i]);
+                }
+            } else {
+                for (int i = 0; i < rows*cols; i++) {
+                    gs_image.set(i,input_image_char[i] - '0');
+                }
+            }
+            double start = MPI_Wtime();
+
+            // Gaussian blur
+            //Gaussian g(kw);
+            Gaussian g;
+            g.setStencilSize(1);
+            g.setTileWidth(tile_width);
+            GoLNeutralValueFunctor dead_nvf(0);
+            for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
-                DM<int> gs_image(rows, cols, 1);
-                DM<int> gs_image_result(rows, cols, 1);
-                //writePGM("original.pgm", gs_image, rows, cols, max_color);
-
-                double t = MPI_Wtime();
-                // Gaussian blur
-                //Gaussian g(kw);
-                Gaussian g;
-
-                g.setStencilSize(1);
-                g.setTileWidth(tile_width);
-                GoLNeutralValueFunctor dead_nvf(0);
-
                 gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
-                //writePGM("afterGaussian.pgm", gs_image, rows, cols, max_color);
-
-                // timing
-                gauss_time += MPI_Wtime() - t;
-                gauss_time = gauss_time;
-            /*    t_upload += gs_image.getStencilTimes()[0];
-                t_padding +=  gs_image.getStencilTimes()[1];
-                t_kernel += gs_image.getStencilTimes()[2];*/
-
-                if (output && msl::isRootProcess())
-                    writePGM(out_file, gs_image, rows, cols, max_color);
-
-                msl::splitTime(run);
+                //gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
             }
-            msl::stopTiming();
+            double end = MPI_Wtime();
             if (msl::isRootProcess()) {
-                std::cout << "Gaussian time: " << gauss_time/Muesli::num_runs << std::endl
-                          << "Upload time: " << t_upload/Muesli::num_runs << std::endl
-                          << "Kernel time: " << t_kernel/Muesli::num_runs << std::endl
-                          << "Padding time " << t_padding/Muesli::num_runs << std::endl;
+                if (output) {
+                    std::ofstream outputFile;
+                    outputFile.open(file, std::ios_base::app);
+                    outputFile << "" << (end-start) << ";";
+                    outputFile.close();
+                }
             }
+            gs_image_result.download();
+            //gs_image_result.show();
+            writePGM(out_file, gs_image_result, rows, cols, max_color);
             return 0;
         }
 
@@ -210,6 +206,8 @@ int init(int row, int col)
     else return input_image_char[row*cols+col];
 }
 int main(int argc, char **argv) {
+    std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
+
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
     int nRuns = 1;
@@ -219,7 +217,7 @@ int main(int argc, char **argv) {
     //bool warmup = false;
     bool output = false;
 
-    std::string in_file, out_file, file; //int kw = 10;
+    std::string in_file, out_file, file, nextfile; //int kw = 10;
     file = "result.csv";
     if (argc >= 6) {
         nGPUs = atoi(argv[1]);
@@ -235,30 +233,32 @@ int main(int argc, char **argv) {
         in_file = argv[8];
         size_t pos = in_file.find(".");
         out_file = in_file;
-        out_file.insert(pos, "_gaussian");
+        std::stringstream ss;
+        ss << "_" << nGPUs << "_" << iterations << "_gaussian";
+        out_file.insert(pos, ss.str());
     } else {
         in_file = "lena.pgm";
-        out_file = "lena_gaussian.pgm";
-        output = true;
-        printf("I will take lena\n");
+        std::stringstream oo;
+        oo << in_file << "_" << nGPUs << "_" << iterations << "_gaussian.pgm";
+        out_file = oo.str();
     }
-
+    output = true;
+    std::stringstream ss;
+    ss << file << "_" << nGPUs << "_" << iterations;
+    nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::testGaussian(in_file, out_file, 10, output, tile_width, iterations, iterations_used);
+        msl::jacobi::testGaussian(in_file, out_file, 10, output, tile_width, iterations, iterations_used, nextfile);
     }
 
     if (output) {
-/*        std::string id = "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
-                         ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";\n";
-        msl::printTimeToFile(id.c_str(), file);*/
         std::ofstream outputFile;
-        outputFile.open(file, std::ios_base::app);
-        outputFile << "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
-                      ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";\n";
+        outputFile.open(nextfile, std::ios_base::app);
+        outputFile << "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" +
+        std::to_string(iterations_used) + ";\n";
         outputFile.close();
     } else {
         msl::stopTiming();

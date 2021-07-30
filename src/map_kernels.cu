@@ -83,6 +83,25 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
   }
 }
 
+template <typename T, typename R, typename F>
+__global__ void
+msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm, F func, int i) {
+
+    size_t thread = threadIdx.x + blockIdx.x * blockDim.x;
+
+    int y = thread /plan.gpuCols;
+    int x = thread % plan.gpuCols;
+
+    dm->readToGlobalMemory();
+
+    if ((y) < plan.gpuRows) {
+        if (x < plan.gpuCols) {
+
+            out[thread] = func(y, x, dm, plan.gpuCols, plan.gpuRows);
+        }
+    }
+}
+
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
@@ -113,22 +132,19 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *d
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int col = x % plan.gpuCols;
     int row = x / plan.gpuCols;
-    //if (x == 1){ dm->print();printf("\n");}
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (y < plan.gpuRows) {
         if (x < plan.gpuCols) {
             dm->readToSM(y+plan.firstRow, x+plan.firstCol, num_elements);
             __syncthreads();
-            //printf("call with %d %d\n", row + plan.firstRow, col + plan.firstCol);
             out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, dm, plan.gpuCols, plan.gpuRows);
             __syncthreads();
-
         }
     }
 
 }
 template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size) {
   for (int i = 0; i < size; i++) {
-      printf("[%.1f];", A[i]);
+      printf("%d;", A[i]);
   }
 }
