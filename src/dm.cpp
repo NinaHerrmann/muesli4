@@ -1405,26 +1405,41 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T) * 2;
-    for (int i = 0; i < Muesli::num_gpus; i++) {
-        f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
-               plans[i].firstCol);
-        f.notify();
-
-        cudaSetDevice(i);
-
-        dim3 dimBlock(Muesli::threads_per_block);
-        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-
-        /*dim3 dimBlock(tile_width, tile_width);
-        dim3 dimGrid((plans[i].nLocal + dimBlock.y - 1) / dimBlock.y,
-                     (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);*/
-        printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size, i);
-        detail::mapStencilGlobalMem<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-        cudaDeviceSynchronize();
-        //result.show();
+    if(Muesli::shared_mem) {
+        for (int i = 0; i < Muesli::num_gpus; i++) {
+            f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
+                   plans[i].firstCol);
+            f.notify();
+            cudaSetDevice(i);
+            dim3 dimBlock(tile_width, tile_width);
+            dim3 dimGrid((plans[i].nLocal + dimBlock.y - 1) / dimBlock.y,
+                         (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);
+            if (Muesli::debug) {printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, plans[i].nLocal, i);}
+          /*  detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i, tile_width);*/
+            if(Muesli::debug) {
+                gpuErrchk(cudaPeekAtLastError());
+                gpuErrchk(cudaDeviceSynchronize());
+            }
+            cudaDeviceSynchronize();
+        }
+    } else {
+        for (int i = 0; i < Muesli::num_gpus; i++) {
+            f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
+                   plans[i].firstCol);
+            f.notify();
+            cudaSetDevice(i);
+            dim3 dimBlock(Muesli::threads_per_block);
+            dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+            if (Muesli::debug) {printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size, i);}
+            detail::mapStencilGlobalMem<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i);
+            if (Muesli::debug) {
+                gpuErrchk(cudaPeekAtLastError());
+                gpuErrchk(cudaDeviceSynchronize());
+            }
+            cudaDeviceSynchronize();
+        }
     }
 
     f.notify();

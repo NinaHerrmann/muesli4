@@ -52,15 +52,15 @@ int msl::Muesli::elem_per_thread = 1;
 int msl::Muesli::threads_per_block;
 int msl::Muesli::tpb_x;
 int msl::Muesli::tpb_y;
-bool msl::Muesli::debug_communication;
+bool msl::Muesli::debug = false;
 bool msl::Muesli::use_timer;
-bool msl::Muesli::farm_statistics = false;
+bool msl::Muesli::shared_mem = false;
 #ifdef __CUDACC__
 std::vector<cudaStream_t> msl::Muesli::streams;
 #endif
 msl::Timer *timer;
 
-void msl::initSkeletons(int argc, char **argv, bool debug_communication) {
+void msl::initSkeletons(int argc, char **argv, bool debug) {
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &Muesli::num_total_procs);
   MPI_Comm_rank(MPI_COMM_WORLD, &Muesli::proc_id);
@@ -94,7 +94,7 @@ void msl::initSkeletons(int argc, char **argv, bool debug_communication) {
   Muesli::num_threads = 1;
 #endif
 
-  Muesli::debug_communication = debug_communication;
+  Muesli::debug = debug;
   Muesli::num_runs = DEFAULT_NUM_RUNS;
   Muesli::num_local_procs = Muesli::num_total_procs;
   Muesli::proc_entrance = 0;
@@ -248,7 +248,9 @@ void msl::printTimeToFile(const char *id, const char *file_name) {
 
 bool msl::isRootProcess() { return Muesli::proc_id == 0; }
 
-void msl::setFarmStatistics(bool val) { Muesli::farm_statistics = val; }
+void msl::setSharedMem(bool val) { Muesli::shared_mem = val; }
+
+void msl::setDebug(bool val) { Muesli::debug = val; }
 
 void msl::fail_exit() {
   MPI_Barrier(MPI_COMM_WORLD);

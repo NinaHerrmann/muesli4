@@ -154,9 +154,9 @@ public:
       threads_per_block; // for one dimensional GPU thread blocks (DArray)
   static int tpb_x;      // for two dimensional GPU thread blocks (DMatrix)
   static int tpb_y;      // for two dimensional GPU thread blocks (DMatrix)
-  static bool debug_communication; // farm skeleton
+  static bool debug; // farm skeleton
   static bool use_timer;           // use a timer?
-  static bool farm_statistics;     // collect statistics of how many task were
+  static bool shared_mem;     // collect statistics of how many task were
                                    // processed by CPU/GPU
   static int elem_per_thread;     // collect statistics of how many task were
 
@@ -181,7 +181,7 @@ static const int DEFAULT_TILE_WIDTH = 16;
 /**
  * \brief Initializes Muesli. Needs to be called before any skeleton is used.
  */
-void initSkeletons(int argc, char **argv, bool debug_communication = 0);
+void initSkeletons(int argc, char **argv, bool debug = 0);
 
 /**
  * \brief Terminates Muesli. Needs to be called at the end of a Muesli
@@ -286,10 +286,14 @@ void printTimeToFile(const char *id, const char *file_name);
 bool isRootProcess();
 
 /**
- * \brief Switches on or off (depending on the value of \em val) collecting farm
- *        statistics.
+ * \brief Switches on or off (depending on the value of \em val) using the shared memory
  */
-void setFarmStatistics(bool val);
+void setSharedMem(bool val);
+
+/**
+ * \brief Switches on or off (depending on the value of \em val) debugging printfs
+ */
+void setDebug(bool val);
 
 /**
  * \brief Returns a unique thread id.

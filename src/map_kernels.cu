@@ -130,14 +130,13 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *d
 
     //int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int col = x % plan.gpuCols;
-    int row = x / plan.gpuCols;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (y < plan.gpuRows) {
         if (x < plan.gpuCols) {
-            dm->readToSM(y+plan.firstRow, x+plan.firstCol, num_elements);
+            // TODO do we really need firstRow firstCol?
+            //dm->readToSM(y+plan.firstRow, x+plan.firstCol);
             __syncthreads();
-            out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, dm, plan.gpuCols, plan.gpuRows);
+            //out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, dm, plan.gpuCols, plan.gpuRows);
             __syncthreads();
         }
     }

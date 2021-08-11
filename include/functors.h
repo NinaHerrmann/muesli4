@@ -40,7 +40,6 @@
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 #include "plmatrix.h"
-#include "smmatrix.h"
 #include <utility>
 
 #ifdef __CUDACC__

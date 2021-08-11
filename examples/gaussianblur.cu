@@ -248,6 +248,8 @@ int main(int argc, char **argv) {
     nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
+    msl::setSharedMem(true);
+    msl::setDebug(true);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
