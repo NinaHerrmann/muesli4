@@ -96,7 +96,6 @@ msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *
 
     if ((y) < plan.gpuRows) {
         if (x < plan.gpuCols) {
-
             out[thread] = func(y, x, dm, plan.gpuCols, plan.gpuRows);
         }
     }
@@ -125,19 +124,17 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 }
 template <typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
+msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl,
                                 F func, int tile_width, int num_elements) {
 
     //int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (y < plan.gpuRows) {
         if (x < plan.gpuCols) {
+            pl->readToSM(y+plan.firstRow, x+plan.firstCol);
             // TODO do we really need firstRow firstCol?
-            //dm->readToSM(y+plan.firstRow, x+plan.firstCol);
-            __syncthreads();
-            //out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, dm, plan.gpuCols, plan.gpuRows);
-            __syncthreads();
+            out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
         }
     }
 

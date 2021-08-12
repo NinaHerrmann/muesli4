@@ -336,6 +336,12 @@ protected:
          * @param value The new stencil size.
          */
         bool getSharedMemory() { return shared_memory; }
+/**
+         * \brief Sets the stencil size.
+         *
+         * @param value The new stencil size.
+         */
+        void setSharedMemory(bool value) { shared_memory = value; }
 
         /**
          * \brief Destructor.

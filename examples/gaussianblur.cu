@@ -146,14 +146,12 @@ namespace msl {
                                EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
                     }
                 }
-
                 return (int)sum/weight;
             }
         };
 
 
-//         msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used);
-        int testGaussian(std::string in_file, std::string out_file, int kw, bool output, int tile_width, int iterations, int iterations_used, std::string file) {
+        int testGaussian(std::string in_file, std::string out_file, int kw, bool output, int tile_width, int iterations, int iterations_used, std::string file, bool shared_mem) {
             int max_color;
 
             // Read image
@@ -171,16 +169,15 @@ namespace msl {
             }
             double start = MPI_Wtime();
 
-            // Gaussian blur
-            //Gaussian g(kw);
             Gaussian g;
             g.setStencilSize(1);
             g.setTileWidth(tile_width);
+            g.setSharedMemory(shared_mem);
             GoLNeutralValueFunctor dead_nvf(0);
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
                 gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
-                //gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
+                gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
             }
             double end = MPI_Wtime();
             if (msl::isRootProcess()) {
@@ -188,6 +185,7 @@ namespace msl {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end-start) << ";";
+                    printf("%.2f", end-start);
                     outputFile.close();
                 }
             }
@@ -216,10 +214,11 @@ int main(int argc, char **argv) {
     msl::Muesli::cpu_fraction = 0.0;
     //bool warmup = false;
     bool output = false;
+    bool shared_mem = false;
 
     std::string in_file, out_file, file, nextfile; //int kw = 10;
-    file = "result.csv";
-    if (argc >= 6) {
+    file = "result_travel.csv";
+    if (argc >= 7) {
         nGPUs = atoi(argv[1]);
         nRuns = atoi(argv[2]);
         msl::Muesli::cpu_fraction = atof(argv[3]);
@@ -228,32 +227,36 @@ int main(int argc, char **argv) {
         }
         tile_width = atoi(argv[4]);
         iterations = atoi(argv[5]);
+        if (atoi(argv[6]) == 1) {
+            shared_mem = true;
+        }
     }
-    if (argc == 7) {
-        in_file = argv[8];
+    std::string shared = shared_mem ? "SM" : "GM";
+
+    if (argc == 8) {
+        in_file = argv[9];
         size_t pos = in_file.find(".");
         out_file = in_file;
         std::stringstream ss;
-        ss << "_" << nGPUs << "_" << iterations << "_gaussian";
+        ss << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "lena.pgm";
+        in_file = "travelsquaresquare.pgm";
         std::stringstream oo;
-        oo << in_file << "_" << nGPUs << "_" << iterations << "_gaussian.pgm";
+        oo << in_file << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_gaussian.pgm";
         out_file = oo.str();
     }
     output = true;
     std::stringstream ss;
-    ss << file << "_" << nGPUs << "_" << iterations;
+    ss << file << "_" << iterations;
     nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
-    msl::setSharedMem(true);
-    msl::setDebug(true);
+    msl::setDebug(false);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::testGaussian(in_file, out_file, 10, output, tile_width, iterations, iterations_used, nextfile);
+        msl::jacobi::testGaussian(in_file, out_file, 10, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
     }
 
     if (output) {

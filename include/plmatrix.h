@@ -56,7 +56,7 @@ namespace msl {
         PLMatrix(int n, int m, int r, int c, int ss, int tw)
                 : ArgumentType(), current_data(0), shared_data(0), n(n), m(m), rows(r),
                   cols(c), stencil_size(ss), firstRow(Muesli::proc_id*r), firstRowGPU(0),
-                  tile_width(tw), width(2*stencil_size+tile_width)
+                  tile_width(tw)
         {
         }
 
@@ -71,32 +71,12 @@ namespace msl {
          * \brief Adds another pointer to data residing in GPU or in CPU memory,
          *        respectively.
          */
-        void addDevicePtr(T* d_ptr, T* d_ptr1, T* d_ptr2, T* d_ptr3, T* d_ptr4)
+        void addDevicePtr(T* d_ptr)
         {
             ptrs.push_back(d_ptr);
             if (it != ptrs.begin()) {
                 it = ptrs.begin();
-                data_top = *it;
-            }
-            ptrs1.push_back(d_ptr1);
-            if (it1 != ptrs1.begin()) {
-                it1 = ptrs1.begin();
-                data_bottom = *it1;
-            }
-            ptrs2.push_back(d_ptr2);
-            if (it2 != ptrs2.begin()) {
-                it2 = ptrs2.begin();
-                data_left = *it2;
-            }
-            ptrs3.push_back(d_ptr3);
-            if (it3 != ptrs3.begin()) {
-                it3 = ptrs3.begin();
-                data_right = *it3;
-            }
-            ptrs4.push_back(d_ptr4);
-            if (it4 != ptrs4.begin()) {
-                it4 = ptrs4.begin();
-                current_data = *it4;
+                current_data = *it;
             }
         }
 
@@ -109,23 +89,7 @@ namespace msl {
             if (++it == ptrs.end()) {
                 it = ptrs.begin();
             }
-            data_top = *it;
-            if (++it1 == ptrs1.end()) {
-                it1 = ptrs1.begin();
-            }
-            data_bottom = *it1;
-            if (++it2 == ptrs2.end()) {
-                it2 = ptrs2.begin();
-            }
-            data_left = *it2;
-            if (++it3 == ptrs3.end()) {
-                it3 = ptrs3.begin();
-            }
-            data_right = *it3;
-            if (++it4 == ptrs4.end()) {
-                it4 = ptrs4.begin();
-            }
-            current_data = *it4;
+            current_data = *it;
         }
 
         /**
@@ -171,68 +135,40 @@ namespace msl {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
             if(shared_mem) {
-                if (!sminit){
-                    int tx = threadIdx.x;
-                    int ty = threadIdx.y;
-                    // Very simple approach write middle data to sm
-                    for (int i = 0; i < tile_width*tile_width; i++) {
-                        int row = i / tile_width;
-                        //smem[((ty) * tile_width) + tx] = current_data[(row) * cols + i%tile_width];
-                    }
-                    __syncthreads();
-                    sminit = true;
-                }
+                // global row and col
+                size_t g_col = blockIdx.x * blockDim.x + threadIdx.x;
+                size_t g_row = blockIdx.y * blockDim.y + threadIdx.y;
+                int firstrowofblock = g_row - (g_row % tile_width);
+                int firstcolofblock = g_col - (g_col % tile_width);
                 // check if we need to catch data from other GPU
                 if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row >= n && firstRowGPU == (n-rows))) {
                     // out of bounds -> return neutral value
                     return 0;
-                } else if(row >= rows && firstRowGPU == 0 || row < 0 && firstRowGPU != 0) {
+                } else if(row >= rows && firstRowGPU == 0 || row < 0 && firstRowGPU != 0 || row < firstrowofblock || row >= (firstrowofblock + tile_width) ||
+                col < firstcolofblock || col >= (firstcolofblock + tile_width)) {
                     // get "bottom" or "top"
                     return current_data[(row-firstRow)*cols + col];
                 } else { // in bounds -> return from current data or sm
                     // if data is on other gpu
-                    if (row >= rows && firstRowGPU == 0 || row < 0 && firstRowGPU != 0) {
-                        // get "bottom" or "top"
-                        return current_data[(row - firstRow) * cols + col];
-                    }
-                    int r = blockIdx.y * blockDim.y + threadIdx.y;
-                    int c = blockIdx.x * blockDim.x + threadIdx.x;
-                    int rowIndex = (row - firstRowGPU - r) + threadIdx.y;
-                    int colIndex = (col - c) + threadIdx.x;
-                    int indextotake = (rowIndex) * tile_width + colIndex;
-                    // if data is not in SM (outside of tile) take current_data
-                    if (indextotake >= tile_width*tile_width){
-                        //return current_data[(row - firstRow) * cols + col];
-                    }
-
-                    if (rowIndex == 19 && colIndex == 19 && r == 15 && c == 15) {
-                        // 15 - 31
-                        printf("%d-%d-%d-%d= row %d firrowgpu %d threadidxy %d;", rowIndex, colIndex, r, c, row , firstRowGPU , threadIdx.y);
-                    }
-                    if (rowIndex > 100){
-                        printf("Got you! %d \n", rowIndex);
-                    }
-                    return 2;//smem[15];
+                    int smallrow = row % tile_width;
+                    int smallcol = col % tile_width;
+                    return shared_data[smallrow * tile_width + smallcol];
                 }
             } else {
                 // TODO If GPU first GPU top nvf
-
+                //printf("n");
                 if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row >= n && firstRowGPU == (n-rows))) {
                     // out of bounds -> return neutral value
                     return 0;
-                } else if(row >= rows && firstRowGPU == 0) {
+                } /*else if(row >= rows && firstRowGPU == 0) {
                     return data_bottom[col + stencil_size];
                 } else if(row < 0 && firstRowGPU != 0){
                     return data_top[col + stencil_size];
-                } else { // in bounds -> return desired value
+                }*/ else { // in bounds -> return desired value
                     return current_data[(row-firstRow)*cols + col];
                 }
             }
-            // TODO assumes row wise distribution
-        /*    int localrow = row - firstRowGPU;
-            // upper right corner has wrong value
 
-            else { return current_data[(row-firstRowGPU)*cols + col];}*/
 #else
             // CPU version: read from main memory.
 	  // bounds check
@@ -263,8 +199,14 @@ namespace msl {
          */
         __device__
         void readToSM(int r, int c) {
-            sminit = false;
+            T *smem = SharedMemory<T>();
+            int tx = threadIdx.x;
+            int ty = threadIdx.y;
+            int row = r-firstRowGPU;
+            smem[((ty) * tile_width) + tx] = current_data[(row) * cols + c];
             shared_mem = true;
+            __syncthreads();
+            shared_data = smem;
         }
 #endif
 
@@ -293,19 +235,10 @@ namespace msl {
     private:
         std::vector<T*> ptrs;
         typename std::vector<T*>::iterator it;
-        std::vector<T*> ptrs1;
-        typename std::vector<T*>::iterator it1;
-        std::vector<T*> ptrs2;
-        typename std::vector<T*>::iterator it2;
-        std::vector<T*> ptrs3;
-        typename std::vector<T*>::iterator it3;
-        std::vector<T*> ptrs4;
-        typename std::vector<T*>::iterator it4;
-        T* current_data, *shared_data, *data_bottom, *data_top, *data_left, *data_right;
-        T *smem = SharedMemory<T>();
-        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, width;
+        T* current_data, *shared_data, *data_bottom, *data_top;
+        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width;
         T neutral_value;
-        bool shared_mem, sminit;
+        bool shared_mem;
     };
 
 }

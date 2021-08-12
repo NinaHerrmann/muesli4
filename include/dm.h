@@ -262,17 +262,6 @@ public:
   template <typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
   void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
-  // /**
-  //  * \brief Non-inplace variant of the mapStencil skeleton.
-  //  *
-  //  * @see mapStencilInPlace()
-  //  * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
-  //  * @tparam MapFunctor Functor type.
-  //  * @tparam R Return type.
-  //  * @return The newly created distributed array.
-  //  */
-  // template <typename R, typename MapStencilFunctor>
-  // DM<R> mapStencil(MapStencilFunctor &f, T neutral_value);
 
   /**
    * @brief Non-inplace variant of the mapStencil skeleton.

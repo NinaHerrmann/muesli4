@@ -54,7 +54,6 @@ int msl::Muesli::tpb_x;
 int msl::Muesli::tpb_y;
 bool msl::Muesli::debug = false;
 bool msl::Muesli::use_timer;
-bool msl::Muesli::shared_mem = false;
 #ifdef __CUDACC__
 std::vector<cudaStream_t> msl::Muesli::streams;
 #endif
@@ -247,8 +246,6 @@ void msl::printTimeToFile(const char *id, const char *file_name) {
 }
 
 bool msl::isRootProcess() { return Muesli::proc_id == 0; }
-
-void msl::setSharedMem(bool val) { Muesli::shared_mem = val; }
 
 void msl::setDebug(bool val) { Muesli::debug = val; }
 

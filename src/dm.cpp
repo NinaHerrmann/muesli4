@@ -1241,12 +1241,12 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                      "use the map stencil skeleton\n";
         fail_exit();
     }
-    if (msl::getDebug()) {
+    if (Muesli::debug) {
         if(f.getSharedMemory()){
-            printf("Shared Memory is set to %s", f.getSharedMemory() ? "true" : "false");
+            //printf("Shared Memory is set to %s\n\n", f.getSharedMemory() ? "true" : "false");
         }
         if(!f.getSharedMemory()){
-            printf("Using GM");
+            //printf("Using GM");
         }
     }
     // Obtain stencil size.
@@ -1393,8 +1393,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         cudaMemcpyAsync(d_dm[i] + (2 * padding_size), padding_stencil + (2 * padding_size),
                         2 * padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
 
-        plm.addDevicePtr(d_dm[i], d_dm[i] + padding_size, d_dm[i] + (2 * padding_size), d_dm[i] + (3 * padding_size),
-                         plans[i].d_Data);
+        plm.addDevicePtr(plans[i].d_Data);
     }
     cudaDeviceSynchronize();
 
@@ -1422,11 +1421,12 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
         if (f.getSharedMemory()) {
             dim3 dimBlock(tile_width, tile_width);
-            dim3 dimGrid((plans[i].nLocal + dimBlock.y - 1) / dimBlock.y,
-                         (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);
+            dim3 dimGrid((plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y,
+                         (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
+            printf("%d %d %d %d %d \n", plans[i].gpuRows, dimGrid.x, dimGrid.y,dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                     result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,i);
-            if (msl::getDebug()) {
+            if (Muesli::debug) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -1434,11 +1434,9 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         if (!f.getSharedMemory()){
             dim3 dimBlock(Muesli::threads_per_block);
             dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-            if (msl::getDebug())
-                printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size, i);
             detail::mapStencilGlobalMem<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                     result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i);
-            if (msl::getDebug()) {
+            if (Muesli::debug) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -1448,7 +1446,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
     f.notify();
     if (nCPU != 0) {
-        if (msl::getDebug())
+        if (Muesli::debug)
             printf("Calculating %d Elements on the CPU ... \n", nCPU);
         #pragma omp parallel for
         for (int i = 0; i < nCPU; i++) {

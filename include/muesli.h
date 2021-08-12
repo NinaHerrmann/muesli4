@@ -156,8 +156,7 @@ public:
   static int tpb_y;      // for two dimensional GPU thread blocks (DMatrix)
   static bool debug; // farm skeleton
   static bool use_timer;           // use a timer?
-  static bool shared_mem;     // collect statistics of how many task were
-                                   // processed by CPU/GPU
+
   static int elem_per_thread;     // collect statistics of how many task were
 
 #ifdef __CUDACC__
@@ -284,11 +283,6 @@ void printTimeToFile(const char *id, const char *file_name);
  * @return True if process id equals 0.
  */
 bool isRootProcess();
-
-/**
- * \brief Switches on or off (depending on the value of \em val) using the shared memory
- */
-void setSharedMem(bool val);
 
 /**
  * \brief Switches on or off (depending on the value of \em val) debugging printfs
