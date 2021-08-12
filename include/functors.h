@@ -335,7 +335,7 @@ protected:
          *
          * @param value The new stencil size.
          */
-        //void setNVF(NeutralValueFunctor &nv) { nvf = nv; }
+        bool getSharedMemory() { return shared_memory; }
 
         /**
          * \brief Destructor.
@@ -344,5 +344,6 @@ protected:
 
     protected:
         int stencil_size;
+        bool shared_memory = false;
     };
 } // namespace msl

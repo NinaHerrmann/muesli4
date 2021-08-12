@@ -266,5 +266,7 @@ int main(int argc, char **argv) {
         msl::stopTiming();
     }
     msl::terminateSkeletons();
+    std::cout << "\n************* Finished the Gaussian Blur *************\n ";
+
     return 0;
 }

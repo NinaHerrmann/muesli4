@@ -1241,14 +1241,21 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                      "use the map stencil skeleton\n";
         fail_exit();
     }
-
+    if (msl::getDebug()) {
+        if(f.getSharedMemory()){
+            printf("Shared Memory is set to %s", f.getSharedMemory() ? "true" : "false");
+        }
+        if(!f.getSharedMemory()){
+            printf("Using GM");
+        }
+    }
     // Obtain stencil size.
     int stencil_size = f.getStencilSize();
 
     int padding_size = (stencil_size * ncol) + (2 * stencil_size);
     int col_size = (stencil_size * ncol);
     if (!plinitMM) {
-        // TODO bigger stneilcs than 1
+        // TODO bigger stencils than 1
         padding_stencil = new T[(padding_size) * 4];
         d_dm = std::vector<T *>(Muesli::num_gpus);
         vplm = std::vector<PLMatrix < T> * > (Muesli::num_gpus);
@@ -1405,49 +1412,48 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     // Map stencil
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T) * 2;
-    if(Muesli::shared_mem) {
-        for (int i = 0; i < Muesli::num_gpus; i++) {
-            f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
-                   plans[i].firstCol);
-            f.notify();
-            cudaSetDevice(i);
+
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
+               plans[i].firstCol);
+        f.notify();
+
+        cudaSetDevice(i);
+
+        if (f.getSharedMemory()) {
             dim3 dimBlock(tile_width, tile_width);
             dim3 dimGrid((plans[i].nLocal + dimBlock.y - 1) / dimBlock.y,
                          (plans[i].nLocal + dimBlock.y - 1) / dimBlock.y);
-            if (Muesli::debug) {printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, plans[i].nLocal, i);}
-          /*  detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i, tile_width);*/
-            if(Muesli::debug) {
+            detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,i);
+            if (msl::getDebug()) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
-            cudaDeviceSynchronize();
         }
-    } else {
-        for (int i = 0; i < Muesli::num_gpus; i++) {
-            f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
-                   plans[i].firstCol);
-            f.notify();
-            cudaSetDevice(i);
+        if (!f.getSharedMemory()){
             dim3 dimBlock(Muesli::threads_per_block);
             dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-            if (Muesli::debug) {printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size, i);}
+            if (msl::getDebug())
+                printf("\n%d %d %d %d %d %d\n", dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y, smem_size, i);
             detail::mapStencilGlobalMem<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                     result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i);
-            if (Muesli::debug) {
+            if (msl::getDebug()) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
-            cudaDeviceSynchronize();
         }
+        cudaDeviceSynchronize();
     }
 
     f.notify();
     if (nCPU != 0) {
-        printf("nCPU %d", nCPU);
+        if (msl::getDebug())
+            printf("Calculating %d Elements on the CPU ... \n", nCPU);
         #pragma omp parallel for
         for (int i = 0; i < nCPU; i++) {
-            // result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol, padding_stencil));
+            // TODO CPU PLM Matrix
+            //result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol));
         }
     }
 
