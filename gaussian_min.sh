@@ -4,11 +4,13 @@ nvcc examples/gaussianblur.cu -I include/ -I/usr/lib/x86_64-linux-gnu/openmpi/in
 #printf "randgentime;calctime;iterations_reachedn;Gpus;tile_width;iterations;\n"
 for gpu_n in 1 ; do
     for cpu_p in 0.00; do
-	for iterations in 1 5; do
-            for tile_width in 8 16 32; do
-	        mpirun -np 1 build/gaussian $gpu_n 1 $cpu_p $tile_width $iterations 1
+	for iterations in 5 10; do
+	    for kw in 10 20; do
+                for tile_width in 8 16 32; do
+	            mpirun -np 1 build/gaussian $gpu_n 1 $cpu_p $tile_width $iterations 1 $kw
+	        done
+	        mpirun -np 1 build/gaussian $gpu_n 1 $cpu_p 12 $iterations 0 $kw
 	    done
-	    mpirun -np 1 build/gaussian $gpu_n 1 $cpu_p 12 $iterations 0
         done
     done
 done

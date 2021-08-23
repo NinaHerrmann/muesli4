@@ -1423,7 +1423,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             dim3 dimBlock(tile_width, tile_width);
             dim3 dimGrid((plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y,
                          (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
-            printf("%d %d %d %d %d \n", plans[i].gpuRows, dimGrid.x, dimGrid.y,dimBlock.x, dimBlock.y);
+            //printf("%d %d %d %d %d \n", plans[i].gpuRows, dimGrid.x, dimGrid.y,dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                     result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,i);
             if (Muesli::debug) {
