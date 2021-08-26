@@ -476,7 +476,7 @@ public:
    *
    * @param b The array to store the elements of the distributed array.
    */
-  void gather(T *b);
+  T* gather();
 
   /**
    * \brief Transforms a distributed array to a copy distributed distributed

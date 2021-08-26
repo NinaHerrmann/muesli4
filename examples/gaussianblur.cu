@@ -56,8 +56,9 @@ namespace msl {
             std::stringstream(inputLine) >> cols >> rows;
             getline(ifs, inputLine);
             std::stringstream(inputLine) >> max_color;
-            std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
-
+            if (msl::isRootProcess()) {
+                std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
+            }
             // Read image.
             if (ascii) {
                 input_image_int = new int[rows*cols];
@@ -72,7 +73,7 @@ namespace msl {
             return 0;
         }
 
-        int writePGM(const std::string& filename, DM<int>& out_image, int rows, int cols, int max_color)
+        int writePGM(const std::string& filename, int * out_image, int rows, int cols, int max_color)
         {
             std::ofstream ofs(filename, std::ios::binary);
             if (!ofs) {
@@ -91,7 +92,7 @@ namespace msl {
             // Write image
             for (int x = 0; x < rows; x++) {
                 for (int y = 0; y < cols; y++) {
-                    unsigned char intensity = static_cast<unsigned char> (out_image.get(x*cols + y));
+                    unsigned char intensity = static_cast<unsigned char> (out_image[x*cols + y]);
                     ofs << intensity;
                 }
             }
@@ -140,11 +141,12 @@ namespace msl {
                 float mean = (float)kw/2;
 
                 // Convolution
-                int sum = 0;
+                float sum = 0;
                 for (int r = 0; r < kw; ++r) {
                     for (int c = 0; c < kw; ++c) {
                         sum += input->get(row+r-offset, col+c-offset) *
-                               EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
+                                EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
+
                     }
                 }
                 return (int)sum/weight;
@@ -178,14 +180,14 @@ namespace msl {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end_init-start_init) << ";";
-                    printf("%.2f", end-start);
+                    printf("%.2f;", end_init-start_init);
                     outputFile.close();
                 }
             }
             double start = MPI_Wtime();
 
             Gaussian g(kw);
-            g.setStencilSize(kw);
+            g.setStencilSize(kw/2);
             g.setTileWidth(tile_width);
             g.setSharedMemory(shared_mem);
             GoLNeutralValueFunctor dead_nvf(0);
@@ -200,12 +202,18 @@ namespace msl {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end-start) << ";";
-                    printf("%.2f", end-start);
+                    printf("%.2f;", end-start);
                     outputFile.close();
                 }
             }
             gs_image_result.download();
-            writePGM(out_file, gs_image_result, rows, cols, max_color);
+            int *b = new int[rows*cols];
+            b = gs_image_result.gather();
+            if (msl::isRootProcess()) {
+                if (output) {
+                    writePGM(out_file, b, rows, cols, max_color);
+                }
+            }
             return 0;
         }
 
@@ -254,12 +262,12 @@ int main(int argc, char **argv) {
         size_t pos = in_file.find(".");
         out_file = in_file;
         std::stringstream ss;
-        ss << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
+        ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "travelsquaresquare.pgm";
+        in_file = "lena.pgm";
         std::stringstream oo;
-        oo << in_file << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
+        oo << in_file << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
     }
     output = true;
@@ -268,7 +276,7 @@ int main(int argc, char **argv) {
     nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
-    msl::setDebug(false);
+    msl::setDebug(true);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {

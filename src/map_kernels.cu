@@ -127,17 +127,13 @@ __global__ void
 msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl,
                                 F func, int tile_width, int num_elements) {
 
-    //int y = blockIdx.y * blockDim.y + threadIdx.y;
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-    if (y < plan.gpuRows) {
-        if (x < plan.gpuCols) {
-            pl->readToSM(y+plan.firstRow, x+plan.firstCol);
-            // TODO do we really need firstRow firstCol?
-            out[y * plan.gpuRows + x] = func(y + plan.firstRow, x + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
-        }
-    }
 
+    if (x < plan.gpuRows && y < plan.gpuCols) {
+        pl->readToSM(x+plan.firstRow, y+plan.firstCol);
+        out[x * plan.gpuCols + y] = func(x + plan.firstRow, y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+    }
 }
 template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size) {
   for (int i = 0; i < size; i++) {
