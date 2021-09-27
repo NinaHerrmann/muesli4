@@ -2,15 +2,15 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:4
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
-#SBATCH --job-name=GaussianBlurBIG
-#SBATCH --output=/scratch/tmp/n_herr03/gaussian/muesli/errorandoutput/GaussianBIG.txt
-#SBATCH --error=/scratch/tmp/n_herr03/gaussian/muesli/errorandoutput/GaussianBIG.error
+#SBATCH --job-name=GaussianBlur
+#SBATCH --output=/scratch/tmp/n_herr03/gaussian/muesli/errorandoutput/Gaussian.txt
+#SBATCH --error=/scratch/tmp/n_herr03/gaussian/muesli/errorandoutput/Gaussian.error
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=n_herr03@uni-muenster.de
 
@@ -54,7 +54,7 @@ export I_MPI_FABRICS=shm:tcp
 #    done
 #done
 
-for np in 1 2 4; do
+for np in 1; do
     for gpu_n in 1 2 4; do
         for cpu_p in 0.00; do
             for iterations in 1 5 10 20; do

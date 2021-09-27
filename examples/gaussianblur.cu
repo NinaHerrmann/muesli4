@@ -180,7 +180,7 @@ namespace msl {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end_init-start_init) << ";";
-                    printf("%.2f;", end_init-start_init);
+            //        printf("%.2f;", end_init-start_init);
                     outputFile.close();
                 }
             }
@@ -202,16 +202,25 @@ namespace msl {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end-start) << ";";
-                    printf("%.2f;", end-start);
+             //       printf("%.2f;", end-start);
                     outputFile.close();
                 }
             }
-            gs_image_result.download();
+            double start_end = MPI_Wtime();
+ 
+	   gs_image_result.download();
             int *b = new int[rows*cols];
             b = gs_image_result.gather();
-            if (msl::isRootProcess()) {
+            double end_end = MPI_Wtime();
+	    if (msl::isRootProcess()) {
                 if (output) {
-                    writePGM(out_file, b, rows, cols, max_color);
+		     std::ofstream outputFile;
+                    outputFile.open(file, std::ios_base::app);
+                    outputFile << "" << (end_end-start_end) << ";\n";
+             //       printf("%.2f;", end-start);
+                    outputFile.close();
+            
+      //  writePGM(out_file, b, rows, cols, max_color);
                 }
             }
             return 0;
@@ -241,7 +250,7 @@ int main(int argc, char **argv) {
 
     std::string in_file, out_file, file, nextfile;
     file = "result_travel.csv";
-    if (argc >= 7) {
+    if (argc >= 8) {
         nGPUs = atoi(argv[1]);
         nRuns = atoi(argv[2]);
         msl::Muesli::cpu_fraction = atof(argv[3]);
@@ -257,7 +266,7 @@ int main(int argc, char **argv) {
     }
     std::string shared = shared_mem ? "SM" : "GM";
 
-    if (argc == 9) {
+    if (argc == 10) {
         in_file = argv[9];
         size_t pos = in_file.find(".");
         out_file = in_file;
