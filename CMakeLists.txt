@@ -27,7 +27,7 @@ endforeach (flag ${OpenMP_CXX_FLAGS})
 string(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_HOST_FLAGS})
 string(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_HOST_LINKER_FLAGS})
 
-set( CMAKE_CUDA_FLAGS_BENCHMARKPALMA "-O3 -arch=compute_61 --expt-extended-lambda -code=sm_61 -use_fast_math -w -restrict -Xptxas -O3 -Xcompiler -O3,-DNDEBUG,-march=broadwell,-DMPICH_IGNORE_CXX_SEEK,-std=c++14")
+set( CMAKE_CUDA_FLAGS_BENCHMARKPALMA "-O3 -arch=compute_75 --expt-extended-lambda -code=sm_75 -use_fast_math -w -restrict -Xptxas -O3 -Xcompiler -O3,-DNDEBUG,-march=broadwell,-DMPICH_IGNORE_CXX_SEEK,-std=c++14")
 
 # add muesli libs
 
@@ -42,7 +42,7 @@ set(MUESLI_INCLUDE_DETAIL_INSTALL_DIR ${MUESLI_INCLUDE_INSTALL_DIR}/detail)
 
 ## install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src DESTINATION ${MUESLI_INSTALL_DIR})
 
-set(Example examples/gameoflife.cu)
+set(Example examples/gaussianblur.cu)
 ## set(Example examples/mandelbrotDA.cu)
 ## set(Example examples/piDA.cu)
 ##set(Example examples/dm_test.cu)
