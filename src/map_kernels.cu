@@ -129,17 +129,22 @@ __global__ void
 msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl,
                                 F func, int tile_width, int reps) {
 
-    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    // wie viele bloecke hatten wir schon? ((blockIdx.x * blockDim.x + threadIdx.x) / reps)
+    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
     // TODO
-    if (x < tile_width && y < plan.gpuCols) {
-        pl->readToSM(x+plan.firstRow, y+plan.firstCol, reps);
+    /*if (x == 17 & y == 0) {
+        printf("\nRows %d;%d + %d * %d\n", global_row, x, (x / tile_width) , reps*tile_width);
+    }*/
+    if (global_row < plan.gpuRows && y < plan.gpuCols) {
+        pl->readToSM(global_row, y+plan.firstCol, reps);
+
         for (int j = 0; j < reps; j++) {
-//            if (x == 0 & y == 0 & j<3) {
-//                printf("%d;%d\n", out[(x + (j * tile_width)) * plan.gpuCols + y],
-//                       func(x + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows));}
-            out[(x + (j * tile_width)) * plan.gpuCols + y] = func(x + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+            if (global_row == 15 & y == 0 & j == 1) {
+                pl->printSM(400);
+                printf("\n fiiirst %d: %d:%d\n",j,global_row + plan.firstRow + (tile_width*j), y + plan.firstCol);}
+            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
         }
     }
 }

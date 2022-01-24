@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
         ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "ungaro4k.pgm";
+        in_file = "lena.pgm";
         std::stringstream oo;
         oo << in_file << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
     nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
-    msl::setDebug(false);
+    msl::setDebug(true);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {

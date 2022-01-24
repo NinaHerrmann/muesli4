@@ -1513,12 +1513,36 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
         if (f.getSharedMemory()) {
             dim3 dimBlock(tile_width, tile_width);
-            dim3 dimGrid((plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y,
+            //dim3 dimGrid((plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y,
+             //            (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
+            //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
+            int divisor = plans[i].gpuRows/tile_width;
+            int kw = stencil_size / 2;
+            printf("%d, %d\n", plans[i].gpuRows, plans[i].gpuRows/tile_width);
+            if (plans[i].gpuRows % tile_width != 0){
+                printf("\nRight now number of rows must be dividable bz tile width\n");
+                return;
+            }
+            if (plans[i].gpuCols % tile_width != 0) {
+                printf("\nRight now number of columns must be dividable bz tile width\n");
+                return;
+            }
+            printf("\nfor tw %d kw %d reps %d alloc %d \n\n", ncol, kw, divisor, ((plans[i].gpuRows)+kw) *(plans[i].gpuCols +kw));
+            divisor = plans[i].gpuRows/tile_width;
+            cudaDeviceProp prop;
+            cudaGetDeviceProperties(&prop, i);
+            // 68 for Palma. -> each SM can start one block TODO for opt.
+            int sms = prop.multiProcessorCount;
+            // We assume that this is an even number
+            printf("%d, %d\n", plans[i].gpuRows, plans[i].gpuRows/tile_width);
+            divisor = 2;
+            printf("\nStarting %d x %d blocks %d reps\n", ((plans[i].gpuRows))/divisor,
+                   (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y, divisor);
+            dim3 dimGrid(((plans[i].gpuRows))/divisor,
                          (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,i);
-            if (Muesli::debug) {
+                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,divisor); if (Muesli::debug) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
