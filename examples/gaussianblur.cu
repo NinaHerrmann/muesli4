@@ -57,7 +57,7 @@ namespace msl {
             getline(ifs, inputLine);
             std::stringstream(inputLine) >> max_color;
             if (msl::isRootProcess()) {
-                std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
+                //std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
             }
             // Read image.
             if (ascii) {
@@ -170,10 +170,14 @@ namespace msl {
                     gs_image.set(i,input_image_int[i]);
                 }
             } else {
+                input_image_int = new int[rows*cols];
                 for (int i = 0; i < rows*cols; i++) {
-                    gs_image.set(i,input_image_char[i] - '0');
+                    input_image_int[i] = input_image_char[i] - '0';
                 }
+                gs_image.setLocalPartition(input_image_int);
+
             }
+            cudaDeviceSynchronize();
             double end_init = MPI_Wtime();
             if (msl::isRootProcess()) {
                 if (output) {
@@ -235,7 +239,7 @@ int init(int row, int col)
     else return input_image_char[row*cols+col];
 }
 int main(int argc, char **argv) {
-    std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
+    //std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
 
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
@@ -249,8 +253,8 @@ int main(int argc, char **argv) {
     int kw = 2;
 
     std::string in_file, out_file, file, nextfile;
-    file = "result_travel.csv";
-    if (argc >= 8) {
+    file = "result_lena.csv";
+    if (argc >= 7) {
         nGPUs = atoi(argv[1]);
         nRuns = atoi(argv[2]);
         msl::Muesli::cpu_fraction = atof(argv[3]);
@@ -274,7 +278,7 @@ int main(int argc, char **argv) {
         ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "lena.pgm";
+        in_file = "ungaro4k.pgm";
         std::stringstream oo;
         oo << in_file << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
@@ -302,7 +306,8 @@ int main(int argc, char **argv) {
         msl::stopTiming();
     }
     msl::terminateSkeletons();
-    std::cout << "\n************* Finished the Gaussian Blur *************\n ";
+    std::cout << "" + std::to_string(cols) + ";" + std::to_string(rows) + ";" + std::to_string(tile_width) + ";" + std::to_string(nGPUs) + "\n ";
+    //std::cout << "\n************* Finished the Gaussian Blur *************\n ";
 
     return 0;
 }

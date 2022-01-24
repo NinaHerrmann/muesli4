@@ -52,11 +52,12 @@ namespace msl {
     public:
         /**
          * \brief Constructor: creates a PLMatrix.
+         * Called with //nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth()
          */
         PLMatrix(int n, int m, int r, int c, int ss, int tw)
                 : ArgumentType(), current_data(0), shared_data(0), n(n), m(m), rows(r),
                   cols(c), stencil_size(ss), firstRow(Muesli::proc_id*n), firstRowGPU(0),
-                  tile_width(tw)
+                  tile_width(tw), new_tile_width(tw+stencil_size), inside_elements(tw * tw), total_elements(tw+stencil_size*tw+stencil_size)
         {
         }
 
@@ -152,7 +153,9 @@ namespace msl {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
             if(shared_mem) {
-                // global row and col
+                // TODO : For runtime purposes this really really has to be shorter
+                // TODO goal move logic to read to shared mem (only called once) and then access shared data
+                // TODO (cols + stencil) * row + col + upper offset
                 size_t g_row = blockIdx.x * blockDim.x + threadIdx.x;
                 size_t g_col = blockIdx.y * blockDim.y + threadIdx.y;
                 int firstrowofblock = g_row - (g_row % tile_width) + firstRowGPU;
@@ -160,9 +163,9 @@ namespace msl {
                 int smallrow = row % tile_width;
                 int smallcol = col % tile_width;
                 // check if we need to catch data from other GPU
-                if (firstRowGPU > 0 && g_row == 160 && g_col == 32) {
+               /* if (firstRowGPU > 0 && g_row == 160 && g_col == 32) {
                     //printf("\n Get %d col %d - %d - %d", row, col, firstrowofblock, firstcolofblock);
-                }
+                }*/
                 if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row >= n && firstRowGPU == (n-rows))) {
                     // out of bounds -> return neutral value
                     return 0;
@@ -180,9 +183,12 @@ namespace msl {
                 }
             } else {
                 // TODO If GPU first GPU top nvf
-                if (col == 0 && row == 256) {
+                /*if (col == 0 && row == 256) {
                     //printf("row %d calc index %d >= %d n %d >= %d\n", row, (row), rows, (row+firstRowGPU), n);
                 }
+                if (firstRowGPU == 0 && row == 256 && col == 128){
+                    printf("Get %d index %d", data_bottom[col + stencil_size]);
+                }*/
                 if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row+firstRowGPU) >= n) {
                     // out of bounds -> return neutral value
                     return 0;
@@ -233,15 +239,34 @@ namespace msl {
          * \brief Load (tile_width+stencil)*(tile_height+stencil)
          */
         __device__
-        void readToSM(int r, int c) {
+        void readToSM(int r, int c, int reps) {
             T *smem = SharedMemory<T>();
+            T *data = SharedMemory<T>();
             int tx = threadIdx.x;
             int ty = threadIdx.y;
+            // TODO offset x GPUs?
+            int global_col = blockIdx.y * blockDim.y + threadIdx.y;
+            int global_row = (blockIdx.x * blockDim.x + threadIdx.x) +
+                    (tile_width * ((blockIdx.x * blockDim.x + threadIdx.x) / tile_width));
             int row = r-firstRowGPU;
-            smem[((tx) * tile_width) + ty] = current_data[(row) * cols + c];
+            const int iterations = reps * ((new_tile_width * new_tile_width)
+                    / (inside_elements)) + 1;
+            for (int r = 0; r <= iterations; ++r) {
+                int local_index = (r * (inside_elements)) + (tx) * tile_width + (ty);
+                int row = local_index / new_tile_width;
+                int firstcol = global_col - ty;
+                int g_col = firstcol + ((local_index) % new_tile_width);
+                int readfrom = (((global_row-tx) + row) * (cols+(stencil_size*2))) + g_col;
+                if (local_index <= total_elements) {
+                    data[local_index] = current_data[readfrom];
+                }
+            }
+            for (int j = 0; j < reps; j++) {
+                smem[((tx ) * tile_width) + ty] = current_data[(row) * cols + c];
+            }
             shared_mem = true;
             __syncthreads();
-            shared_data = smem;
+            shared_data = data;
         }
 #endif
 
@@ -267,7 +292,7 @@ namespace msl {
         std::vector<T*> ptrs_data, ptrs_top, ptrs_bottom;
         typename std::vector<T*>::iterator it_data, it_top, it_bottom;
         T* current_data, *shared_data, *data_bottom, *data_top;
-        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width;
+        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, new_tile_width, inside_elements, total_elements;
         T neutral_value;
         bool shared_mem;
         int counter;

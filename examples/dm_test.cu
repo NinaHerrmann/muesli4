@@ -35,7 +35,6 @@
 #include <cmath>
 
 #include "muesli.h"
-#include "da.h"
 #include "dm.h"
 
 namespace msl {
@@ -127,14 +126,6 @@ namespace msl {
           Sum3 sum3;
           a.zipInPlace3(b,c,sum3);
           a.show("a4");
-          
-          DA<int> ar1(10,0);
-          ar1.mapIndexInPlace(sum);
-          ar1.show("ar1");
-          
-          Square sqr;
-          DA<int>  ar2 = ar1.map(sqr);
-          ar2.show("ar2");
           
           /*Proj1 pr1;
           a.zipInPlaceAAM(ar1,ar2,b,pr1);

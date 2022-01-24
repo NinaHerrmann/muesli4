@@ -48,10 +48,12 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
   int i = (k + first) / ncols;
   int j = (k + first) % ncols;
   if (k < size) {
+      // TODO for array only two arguments
     out[k] = func(i, j, in[k]);
   }
 }
 
+/*
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
                                             size_t first, F func,
@@ -63,7 +65,7 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
   if (x < size) {
     out[x] = func(x + indexOffset, in[x]);
   }
-}
+}*/
 
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T *in, R *out,
@@ -125,18 +127,39 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 template <typename T, typename R, typename F>
 __global__ void
 msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl,
-                                F func, int tile_width, int num_elements) {
+                                F func, int tile_width, int reps) {
 
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x < plan.gpuRows && y < plan.gpuCols) {
-        pl->readToSM(x+plan.firstRow, y+plan.firstCol);
-        out[x * plan.gpuCols + y] = func(x + plan.firstRow, y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+    // TODO
+    if (x < tile_width && y < plan.gpuCols) {
+        pl->readToSM(x+plan.firstRow, y+plan.firstCol, reps);
+        for (int j = 0; j < reps; j++) {
+//            if (x == 0 & y == 0 & j<3) {
+//                printf("%d;%d\n", out[(x + (j * tile_width)) * plan.gpuCols + y],
+//                       func(x + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows));}
+            out[(x + (j * tile_width)) * plan.gpuCols + y] = func(x + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+        }
     }
 }
-template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size) {
+template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size, int breaker) {
   for (int i = 0; i < size; i++) {
+      if (i%breaker==0){ printf("\n");}
+      //printf("%d;", A[i] ? "true" : "false");
       printf("%d;", A[i]);
   }
+}
+template <typename T> __global__ void msl::detail::printStructFromGPU(T *A, int size, int breaker) {
+  for (int i = 0; i < size; i++) {
+      if (i%breaker==0){ printf("\n");}
+      printf("%d %d;", A[i].starting, A[i].no_of_edges);
+  }
+}
+template <typename T> __global__ void msl::detail::printsingleGPUElement(T *A, int index) {
+      printf("%d:%d;\n", index, A[index]);
+}
+__global__ void msl::detail::teststh(int Size, int t) {
+    if(threadIdx.x + blockIdx.x * blockDim.x >= Size-1-t) return;
+    printf(" write to %d t: %d Size: %d\n", Size*(blockDim.x*blockIdx.x+threadIdx.x+t+1)+t, t, Size);
 }

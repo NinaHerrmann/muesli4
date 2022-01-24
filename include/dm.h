@@ -386,6 +386,17 @@ public:
    */
   template <typename T2, typename ZipIndexFunctor>
   void zipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
+  /**
+   * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+   * *b[]). Note that besides the elements themselves also the index is passed
+   * to the functor. Also note that the whole column is passed.
+   *
+   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+   * @tparam T2 Element type of the distributed matrix to zip with.
+   * @tparam ZipIndexFunctor Functor type.
+   */
+  template <typename T2, typename ZipIndexFunctor>
+  void crossZipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
 
   /**
    * \brief Non-inplace variant of the zip skeleton.
@@ -615,6 +626,12 @@ public:
    * @param v The new value.
    */
   void setLocal(int localIndex, const T &v);
+  /**
+   * \brief returns CPU pointer
+   *
+   * @param index the index.
+   */
+  T& operator[](int index);
 
   /**
    * \brief Returns the GPU execution plans that store information about size,
@@ -713,6 +730,15 @@ public:
    * \brief Each process prints its local partition of the distributed array.
    */
   void printLocal();
+
+  /**
+   * \brief Each process prints the GPU part.
+   */
+  void printGPU();
+  /**
+   * \brief Each process prints the GPU part.
+   */
+  void printsingleGPUElement(int index);
 
 private:
   //

@@ -36,6 +36,8 @@
 #include <chrono>
 #include <iostream>
 #include <thread> // std::this_thread::sleep_for
+#include <dm.h>
+
 
 template<typename T>
 msl::DM<T>::DM()
@@ -109,6 +111,7 @@ template<typename T>
 msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
         : ncol(col), nrow(row), n(col * row), rowComplete(rowComplete) {
     init();
+
 #ifdef __CUDACC__
     // TODO die CPU Elemente brauchen wir nicht unbedingt.
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
@@ -351,6 +354,7 @@ T *msl::DM<T>::getLocalPartition() {
 template<typename T>
 void msl::DM<T>::setLocalPartition(T *elements) {
     localPartition = elements;
+    initGPUs();
     upload();
     return;
 }
@@ -364,6 +368,7 @@ T msl::DM<T>::get(int index) const {
     if (isLocal(index)) {
 #ifdef __CUDACC__
         // element might not be up to date in cpu memory
+        //cpuMemoryInSync = false;
         if (!cpuMemoryInSync) {
             // find GPU that stores the desired element
             int device = getGpuId(index);
@@ -467,12 +472,15 @@ template<typename T>
 T msl::DM<T>::getLocal(int localIndex) {
     if (localIndex >= nLocal)
         throws(detail::NonLocalAccessException());
-    if ((!cpuMemoryInSync) && (localIndex >= nCPU))
-        download(); // easy, but inefficient, if random, non-consecutive access of
-    // elements
+    if ((!cpuMemoryInSync) && (localIndex >= nCPU)) {
+        download();}
     return localPartition[localIndex];
 }
 
+template<typename T>
+T& msl::DM<T>::operator[](int index) {
+    return localPartition[index];
+}
 // TODO:adjust to new structure
 template<typename T>
 void msl::DM<T>::setLocal(int localIndex, const T &v) {
@@ -490,9 +498,8 @@ void msl::DM<T>::setLocal(int localIndex, const T &v) {
         // TODO adjust to new!
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
-        // printf("setLocal: localIndex: %i, v:, %i, gpuId: %i, idx: %i, size:
-        // %i\n", // debug
-        //     localIndex, v, gpuId, idx, sizeof(T)); // debug
+        //printf("gpuid %d idx %d \n", (localIndex - nCPU) / nGPU, localIndex - nCPU - gpuId * nGPU);
+        //printf("setLocal: localIndex: %i, gpuId: %i, idx: %i - %d - %d\n", localIndex, gpuId, idx, nCPU, nGPU); // debug
         cudaSetDevice(gpuId);
         (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T),
                                      cudaMemcpyHostToDevice));
@@ -557,16 +564,23 @@ void msl::DM<T>::download() {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
             // download data from device
-            (cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
+            gpuErrchk(cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
                                               plans[i].bytes, cudaMemcpyDeviceToHost,
                                               Muesli::streams[i]));
         }
+
         // wait until download is finished
         for (int i = 0; i < ng; i++) {
             (cudaStreamSynchronize(Muesli::streams[i]));
         }
+
         cpuMemoryInSync = true;
+
     }
+    //CUDA_CHECK_RETURN(cudaMemcpyAsync(&localPartition[64], plans[0].d_Data, plans[0].bytes, cudaMemcpyDeviceToHost, Muesli::streams[0]));
+    //gpuErrchk( cudaPeekAtLastError() );
+    //gpuErrchk( cudaDeviceSynchronize() );
+
 #endif
 }
 
@@ -598,9 +612,28 @@ void msl::DM<T>::showLocal(const std::string &descr) {
         printf("%s", s.str().c_str());
     }
 }
-
+// method (only) useful for debbuging
+template<typename T>
+void msl::DM<T>::printGPU(){
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        detail::printFromGPU<<<1, 1, 0, Muesli::streams[i]>>>(plans[i].d_Data, plans[i].size, 16); // in, out, #bytes, function
+    }
+    //printf("\n\n*******************CPPUUU %s*****************\n\n", localPartition[2] ? "true" : "false");
+    for (int j = 0; j < plans[0].size; j++){
+        //printf("%d, %d;", localPartition[j].starting, localPartition[j].no_of_edges);
+    }
+}// method (only) useful for debbuging
+template<typename T>
+void msl::DM<T>::printsingleGPUElement(int index){
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        detail::teststh<<<128,1, 0, Muesli::streams[i]>>>(8, index); // in, out, #bytes, function
+    }
+}
 template<typename T>
 void msl::DM<T>::show(const std::string &descr) {
+    cudaDeviceSynchronize();
     T *b = new T[n];
     std::cout.precision(2);
     std::ostringstream s;
@@ -609,8 +642,15 @@ void msl::DM<T>::show(const std::string &descr) {
     if (!cpuMemoryInSync) {
         download();
     } else {
-        std::cout << "CPU in sync" << std::endl;
+        //std::cout << "CPU in sync" << std::endl;
     }
+    // localPartition, plans[0].h_Data[i]
+/*    int gpuBase = indexGPU;
+      for(int i = 0; i < ng; i++){
+        localPartition+gpuBase = &plans[i].h_Data;
+        gpuBase += plans[i].size;
+    }*/
+
     msl::allgather(localPartition, b, nLocal);
 
     if (msl::isRootProcess()) {
@@ -653,7 +693,7 @@ T* msl::DM<T>::gather() {
     if (!cpuMemoryInSync) {
         download();
     } else {
-        std::cout << "CPU in sync" << std::endl;
+        //std::cout << "CPU in sync" << std::endl;
     }
     msl::allgather(localPartition, b, nLocal);
 
@@ -916,23 +956,56 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        // **************Test******************
+      /*  int blockSize2d, gridSize2d;
+        blockSize2d = Muesli::threads_per_block;
+        gridSize2d = (plans[i].size/blockSize2d) + (!(plans[i].size%blockSize2d?0:1));
+
+        dim3 dimBlockXY(blockSize2d,blockSize2d);
+        dim3 dimGridXY(gridSize2d,gridSize2d);*/
+        // **************Test******************
+
         detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data,
                         plans[i].nLocal, plans[i].first, f, ncol);
     }
-
-    T2 *bPartition = b.getLocalPartition();
-#pragma omp parallel for
-    for (int k = 0; k < nCPU; k++) {
-        int i = (k + firstIndex) / ncol;
-        int j = (k + firstIndex) % ncol;
-        localPartition[k] = f(i, j, localPartition[k], bPartition[k]);
+    if (nCPU > 0){
+        /*    T2 *bPartition = b.getLocalPartition();
+        #pragma omp parallel for
+            for (int k = 0; k < nCPU; k++) {
+                int i = (k + firstIndex) / ncol;
+                int j = (k + firstIndex) % ncol;
+                localPartition[k] = f(i, j, localPartition[k], bPartition[k]);
+            }*/
     }
     // check for errors during gpu computation
-    msl::syncStreams();
     cpuMemoryInSync = false;
 }
-
+template<typename T>
+template<typename T2, typename ZipIndexFunctor>
+void msl::DM<T>::crossZipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
+    // zip on GPUs
+    for (int i = 0; i < ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        //grid_size = (plans[i].size/block_size) + (!(Size%block_size)? 0:1);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::crossZipInPlaceIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                plans[i].d_Data, b.getExecPlans()[i].d_Data,
+                plans[i].nLocal, plans[i].first, f, ncol);
+    }
+    if (nCPU > 0){
+        T2 *bPartition = b.getLocalPartition();
+#pragma omp parallel for
+        for (int k = 0; k < nCPU; k++) {
+            int i = (k + firstIndex) / ncol;
+            int j = (k + firstIndex) % ncol;
+            //localPartition[k] = f(i, j, localPartition, bPartition);
+        }
+    }
+    // check for errors during gpu computation
+    cpuMemoryInSync = false;
+}
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
 msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {

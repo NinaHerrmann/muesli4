@@ -164,6 +164,36 @@ public:
    */
   virtual ~Functor4() {}
 };
+/**************************************************************************
+ * \brief Class Functor4P represents a 4ary functor with 2 Pointers
+ *
+ * @tparam T1 1st input data type.
+ * @tparam T2 2nd input data type.
+ * @tparam T3 3rd input data type.
+ * @tparam T4 4th input data type.
+ * @tparam R output data type.
+ */
+template <typename T1, typename T2, typename T3, typename T4, typename R>
+class Functor4P {
+
+public:
+  /**
+   * \brief Function call operator has to be implemented by the user.
+   *
+   * @param x 1st input for the operator.
+   * @param y 2nd input for the operator.
+   * @param z 3rd input for the operator.
+   * @param v 4th input for the operator.
+   * @return Output of the operator.
+   */
+  MSL_USERFUNC
+  virtual void operator()(T1 x, T2 y, T3* z, T4* v) const = 0;
+
+  /**
+   * \brief Destructor.
+   */
+  virtual ~Functor4P() {}
+};
 
 template <typename T> class DM;
 template <typename T> class PLMatrix;

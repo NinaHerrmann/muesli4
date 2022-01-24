@@ -44,7 +44,6 @@ msl::DA<T>::DA():                  // distributed array (resides on GPUs until d
       plans(0),                    // GPU execution plans
       dist(Distribution::DIST),    // distribution of DA: DIST (distributed) or COPY (for now: always DIST)
       gpuCopyDistributed(0),       // is GPU copy distributed? (for now: always "false")
-// new: for combined usage of CPU and GPUs on every MPI-node
       ng(0),                       // number of GPUs per node (= Muesli::num_gpus)
       nGPU(0),                     // number of elements per GPU (all the same!)
       nCPU(0)                      // number of elements on CPU = nLocal - ng*nGPU
