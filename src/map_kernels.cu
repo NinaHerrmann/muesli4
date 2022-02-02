@@ -102,7 +102,22 @@ msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *
         }
     }
 }
+template <typename T, typename R, typename F>
+__global__ void
+msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm, F func, int i, int reps, int tile_width) {
 
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
+
+    dm->readToGlobalMemory();
+    for (int j = 0; j < reps; j++) {
+
+        if (global_row < plan.gpuRows && y < plan.gpuCols) {
+            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, dm, plan.gpuCols, plan.gpuRows);
+        }
+    }
+}
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
@@ -132,8 +147,8 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *p
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     // wie viele bloecke hatten wir schon? ((blockIdx.x * blockDim.x + threadIdx.x) / reps)
-    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
-    // TODO
+    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
+    // TODO where is the 16
     /*if (x == 17 & y == 0) {
         printf("\nRows %d;%d + %d * %d\n", global_row, x, (x / tile_width) , reps*tile_width);
     }*/
@@ -141,11 +156,13 @@ msl::detail::mapStencilMMKernel(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *p
         pl->readToSM(global_row, y+plan.firstCol, reps);
 
         for (int j = 0; j < reps; j++) {
-            if (global_row == 15 & y == 0 & j == 1) {
-                pl->printSM(400);
-                printf("\n fiiirst %d: %d:%d\n",j,global_row + plan.firstRow + (tile_width*j), y + plan.firstCol);}
             out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+          /*  if ((global_row + (j * tile_width)) > 286 && (global_row + (j * tile_width)) < 290 && y == 416){
+                printf("r %d c %d -->%d\n", (global_row + (j * tile_width)), y, out[(global_row + (j * tile_width)) * plan.gpuCols + y]);
+                printf("%d, %d, %d, %d\n", pl->get((global_row + (j * tile_width)),y-1), pl->get((global_row + (j * tile_width))-1,y), pl->get((global_row + (j * tile_width))+1,y), pl->get((global_row + (j * tile_width))+1,y));
+            }*/
         }
+
     }
 }
 template <typename T> __global__ void msl::detail::printFromGPU(T *A, int size, int breaker) {

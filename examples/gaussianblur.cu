@@ -212,7 +212,7 @@ namespace msl {
             }
             double start_end = MPI_Wtime();
  
-	   gs_image_result.download();
+            gs_image_result.download();
             int *b = new int[rows*cols];
             b = gs_image_result.gather();
             double end_end = MPI_Wtime();
@@ -221,10 +221,10 @@ namespace msl {
 		     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (end_end-start_end) << ";\n";
-             //       printf("%.2f;", end-start);
+                    printf("%.2f;", end-start);
                     outputFile.close();
             
-      //  writePGM(out_file, b, rows, cols, max_color);
+                writePGM(out_file, b, rows, cols, max_color);
                 }
             }
             return 0;
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
         ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "lena.pgm";
+        in_file = "ungaro4k.pgm";
         std::stringstream oo;
         oo << in_file << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
     nextfile = ss.str();
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
-    msl::setDebug(true);
+    msl::setDebug(false);
 
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {

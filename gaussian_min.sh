@@ -8,9 +8,9 @@ for np in 1; do
             for iterations in 1; do
 	        for kw in 2; do
                     for tile_width in 16; do
-	                mpirun -np $np build/gaussian $gpu_n 1 $cpu_p $tile_width $iterations 1 $kw
+	                build/gaussian $gpu_n 1 $cpu_p $tile_width $iterations 1 $kw
 	            done
-	            mpirun -np $np build/gaussian $gpu_n 1 $cpu_p 12 $iterations 0 $kw
+	            mpirun -np $np build/gaussian $gpu_n 1 $cpu_p 16 $iterations 0 $kw
 	        done
 	    done
         done

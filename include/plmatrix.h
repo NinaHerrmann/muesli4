@@ -54,10 +54,10 @@ namespace msl {
          * \brief Constructor: creates a PLMatrix.
          * Called with //nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth()
          */
-        PLMatrix(int n, int m, int r, int c, int ss, int tw)
+        PLMatrix(int n, int m, int r, int c, int ss, int tw, int rep)
                 : ArgumentType(), current_data(0), shared_data(0), n(n), m(m), rows(r),
-                  cols(c), stencil_size(ss), firstRow(Muesli::proc_id*n), firstRowGPU(0),
-                  tile_width(tw), new_tile_width(tw+stencil_size), inside_elements(tw * tw), total_elements(tw+stencil_size*tw+stencil_size)
+                cols(c), stencil_size(ss), firstRow(Muesli::proc_id*n), firstRowGPU(0), reps(rep),
+                  tile_width(tw), new_tile_width(tw+(stencil_size*2)), inside_elements(tw * tw), total_elements(tw+stencil_size*tw+stencil_size)
         {
         }
 
@@ -158,20 +158,17 @@ namespace msl {
                 // TODO (cols + stencil) * row + col + upper offset
                 size_t g_row = blockIdx.x * blockDim.x + threadIdx.x;
                 size_t g_col = blockIdx.y * blockDim.y + threadIdx.y;
-                int smallrow = row % (tile_width*2);
+                int previous_rows = (reps*tile_width * (g_row / tile_width));
+                // TODO 2 is a hotfix
+                int smallrow = row - previous_rows;
                 int smallcol = col % tile_width;
-                const int offset = new_tile_width * (stencil_size / 2);
-                if (offset + smallrow * tile_width + smallcol > 0){
+                const int offset = new_tile_width * (stencil_size);
+                if ((offset + (smallrow * new_tile_width) + smallcol) > 0 && (offset + (smallrow * new_tile_width) + smallcol) < 612){
                     return shared_data[offset + (smallrow * new_tile_width) + smallcol];
-                } else {return 255;}
+                } else {// not happening
+                    return 255;}
             } else {
                 // TODO If GPU first GPU top nvf
-                /*if (col == 0 && row == 256) {
-                    //printf("row %d calc index %d >= %d n %d >= %d\n", row, (row), rows, (row+firstRowGPU), n);
-                }
-                if (firstRowGPU == 0 && row == 256 && col == 128){
-                    printf("Get %d index %d", data_bottom[col + stencil_size]);
-                }*/
                 if ((col < 0) || (col >= m) || (row < 0 && firstRowGPU == 0) || (row+firstRowGPU) >= n) {
                     // out of bounds -> return neutral value
                     return 0;
@@ -208,7 +205,7 @@ namespace msl {
         void printSM(int size) const {
 #ifdef __CUDA_ARCH__
             for (int i = 1; i < size; i++) {
-                if (i%new_tile_width==0){printf("\n");}
+                if (i%new_tile_width==0){printf("\n%d:",i/new_tile_width);}
                 printf("%d;", shared_data[i]);
             }
 #endif
@@ -223,61 +220,87 @@ namespace msl {
          */
         __device__
         void readToSM(int r, int c, int reps) {
-            T *smem = SharedMemory<T>();
+            //T *smem = SharedMemory<T>();
+            shared_data = SharedMemory<T>();
             int x = blockIdx.x * blockDim.x + threadIdx.x;
 
             int tx = threadIdx.x;
             int ty = threadIdx.y;
-            int g_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
+            int g_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
             size_t g_col = blockIdx.y * blockDim.y + threadIdx.y;
 
             // TODO offset x GPUs?
             int global_col = blockIdx.y * blockDim.y + threadIdx.y;
 
             const int offset = new_tile_width * (stencil_size);
-
-            for (int i = 0; i < (stencil_size); i++) {
-                smem[ty + (i*new_tile_width)] = data_top[i + (i*cols)];
+            // you are the first row of blocks?
+            if ((g_row-threadIdx.x) == firstRowGPU) {
+                for (int i = 0; i < (stencil_size); i++) {
+                    shared_data[ty + (i*new_tile_width)] = data_top[ty + (i*cols)];
+                }
+                for (int i = 0; i < (stencil_size); i++) {
+                    shared_data[ty + (i*new_tile_width) + stencil_size] = data_top[ty + (i*cols) +stencil_size];
+                    shared_data[ty + (i*new_tile_width) + (stencil_size*2)] = data_top[ty + (i*cols) +(stencil_size*2)];
+                }
+            } else {
+                for (int i = 0; i < stencil_size; i++) {
+                    shared_data[ty + (i*new_tile_width) + stencil_size] = current_data[((g_row - threadIdx.x)*cols) - ((i + 1) * cols) + global_col];
+                }
+                for (int i = 0; i < (stencil_size); i++) {
+                    shared_data[ty + (i*new_tile_width) + stencil_size] = current_data[((g_row - threadIdx.x)*cols) - ((i + 1) * cols) + global_col + stencil_size];
+                    shared_data[ty + (i*new_tile_width) + (stencil_size*2)] = current_data[((g_row - threadIdx.x)*cols) - ((i + 1) * cols) + global_col + (stencil_size*2)];
+                }
             }
             for (int j = 0; j < reps; j++) {
-                smem[offset + ((tx + (j*tile_width)) * new_tile_width) + ty + (stencil_size)] = current_data[(g_row + (j*tile_width)) * cols + global_col];
+                shared_data[offset + ((tx + (j*tile_width)) * new_tile_width) + ty + (stencil_size)] = current_data[(g_row + (j*tile_width)) * cols + global_col];
             }
-            // TODO assumption that we never have only one column of blocks
             if (g_col < tile_width){
                 for (int i = 0; i < reps; i++) {
                     // TODO nvf
-                    smem[offset + ((tx+(i*tile_width)) * new_tile_width)] = 0;
+                    shared_data[offset + ((tx+(i*tile_width)) * new_tile_width)] = 0;
                 }
             } else {
                 for (int i = 0; i < reps; i++) {
                     for (int j = 0; j < (stencil_size); j++) {
-                        smem[offset + ((tx+(i*tile_width)) * new_tile_width) + j] = current_data[(g_row + (i*tile_width)) * cols + global_col - (stencil_size -j)];
+                        shared_data[offset + ((tx+(i*tile_width)) * new_tile_width) + j] = current_data[(g_row + (i*tile_width)) * cols + global_col - (stencil_size -j)];
                     }
                 }
             }
+            // TODO assumption that we never have only one column of blocks
             if (g_col > (cols - tile_width)){
                 for (int i = 0; i < reps; i++) {
-                    smem[offset + (((tx+(i*tile_width)+1) * new_tile_width) -1)] = 0;
+                    shared_data[offset + (((tx+(i*tile_width)+1) * new_tile_width) -1)] = 0;
                 }
             } else {
                 for (int i = 0; i < reps; i++) {
-                    if ((new_tile_width * (stencil_size) + (((tx+(i*tile_width)+1) * new_tile_width)) -1) == 35) {printf("\nhate love%d; %d\n", (((tx+(i*tile_width)+1) * new_tile_width)),(g_row + (i*tile_width)) * cols + global_col);}
-                    //if (tx == 0 & i == 0) {printf("\nhate %d love%d; %d\n", stencil_size, (offset + (((tx+(i*tile_width)+1) * new_tile_width)) -1),((tx+(i*tile_width)+1) * new_tile_width));}
-
                     for (int j = 0; j < (stencil_size); j++) {
-                        smem[offset + (((tx+(i*tile_width)+1) * new_tile_width) - 1 - j)] = current_data[(g_row + (i*tile_width)) * cols + global_col + (j)];
+                        shared_data[offset + (((tx+(i*tile_width)+1) * new_tile_width) - 1 - j)] = current_data[(g_row + (i*tile_width)) * cols + global_col + (j)];
                     }
                 }
             }
-
-
-            const int secondoffset = offset + ((reps * tile_width)*tile_width);
-            for (int i = 0; i < stencil_size; i++) {
-                smem[ty + (i*new_tile_width) + secondoffset] = data_bottom[i + (i*cols)];
+            int secondoffset = offset + ((reps * tile_width)*new_tile_width);
+            // you are the last block of the gpu
+            if ((g_row-threadIdx.x) < ((firstRowGPU + rows)-(tile_width*reps))){
+                for (int i = 0; i < stencil_size; i++) {
+                    shared_data[ty + (i*new_tile_width) + secondoffset] = current_data[((g_row - threadIdx.x)*cols) + ((reps + i) * cols) + global_col];
+                }
+                for (int i = 0; i < stencil_size; i++) {
+                    shared_data[ty + (i*new_tile_width) + secondoffset + stencil_size] = current_data[((g_row - threadIdx.x)*cols) + ((reps + i) * cols) + global_col + (stencil_size)];
+                    shared_data[ty + (i*new_tile_width) + secondoffset+ (stencil_size*2)] = current_data[((g_row - threadIdx.x)*cols) + ((reps + i) * cols) + global_col + (stencil_size*2)];
+                }
+            } else {
+                for (int i = 0; i < stencil_size; i++) {
+                    shared_data[ty + (i*new_tile_width) + secondoffset] = data_bottom[i + (i*cols)];
+                }
+                for (int i = 0; i < stencil_size; i++) {
+                    shared_data[ty + (i*new_tile_width) + secondoffset + stencil_size] = data_bottom[ty + (i*cols) + (stencil_size)];
+                    shared_data[ty + (i*new_tile_width) + secondoffset+ (stencil_size*2)] = data_bottom[ty + (i*cols)+ (stencil_size*2)];
+                }
             }
+
             shared_mem = true;
             __syncthreads();
-            shared_data = smem;
+            //shared_data = smem;
         }
 #endif
 
@@ -303,7 +326,7 @@ namespace msl {
         std::vector<T*> ptrs_data, ptrs_top, ptrs_bottom;
         typename std::vector<T*>::iterator it_data, it_top, it_bottom;
         T* current_data, *shared_data, *data_bottom, *data_top;
-        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, new_tile_width, inside_elements, total_elements;
+        int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, new_tile_width, inside_elements, total_elements, reps;
         T neutral_value;
         bool shared_mem;
         int counter;

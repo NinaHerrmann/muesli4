@@ -1444,7 +1444,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         }
     }
     // overall rows and column, gpu rows and columns
-    msl::PLMatrix<T> plm(nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth());
+    msl::PLMatrix<T> plm(nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth(), 2);
 
     // TODO copy first GPU row to localPartition
     int tile_width = f.getTileWidth();
@@ -1533,11 +1533,13 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaGetDeviceProperties(&prop, i);
             // 68 for Palma. -> each SM can start one block TODO for opt.
             int sms = prop.multiProcessorCount;
+            float smpp = prop.sharedMemPerBlock;
+            printf("  Shared memory per block (Kbytes) %.1f\n",(float)(prop.sharedMemPerBlock)/1024.0);
             // We assume that this is an even number
             printf("%d, %d\n", plans[i].gpuRows, plans[i].gpuRows/tile_width);
             divisor = 2;
-            printf("\nStarting %d x %d blocks %d reps\n", ((plans[i].gpuRows))/divisor,
-                   (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y, divisor);
+            printf("\nStarting %d x %d blocks %d reps %.2f shared mem, %d SMs\n", ((plans[i].gpuRows))/divisor,
+                   (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y, divisor, smpp, sms);
             dim3 dimGrid(((plans[i].gpuRows))/divisor,
                          (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
