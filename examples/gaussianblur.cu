@@ -80,7 +80,6 @@ namespace msl {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
                 return 1;
             }
-
             // Gather full image
             int** img = new int*[rows];
             for (int i = 0; i < rows; i++)
@@ -133,7 +132,7 @@ namespace msl {
             }
 
             MSL_USERFUNC
-            int operator() (int row, int col, PLMatrix<int> *input, int ncol, int nrow) const
+            int operator() (int row, int col, PLMatrix<int> *input, int * s) const
             {
                 int offset = kw/2;
                 float weight = 1.0f;
@@ -144,7 +143,7 @@ namespace msl {
                 float sum = 0;
                 for (int r = 0; r < kw; ++r) {
                     for (int c = 0; c < kw; ++c) {
-                        sum += input->get(row+r-offset, col+c-offset) *
+                        sum += input->get(row+r-offset, col+c-offset, s) *
                                 EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
 
                     }
@@ -188,8 +187,11 @@ namespace msl {
                     outputFile.close();
                 }
             }
-            double start = MPI_Wtime();
-
+            //double start = MPI_Wtime();
+            cudaEvent_t start, stop;
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            cudaEventRecord(start);
             Gaussian g(kw);
             g.setStencilSize(kw/2);
             g.setTileWidth(tile_width);
@@ -200,34 +202,37 @@ namespace msl {
                 gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
                 gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
             }
-            double end = MPI_Wtime();
+            float milliseconds = 0;
+
+            //double end = MPI_Wtime();
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&milliseconds, start, stop);
+
             if (msl::isRootProcess()) {
                 if (output) {
                     std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
-                    outputFile << "" << (end-start) << ";";
-             //       printf("%.2f;", end-start);
+                    outputFile << "" << (milliseconds/1000) << ";";
+                    //       printf("%.2f;", end-start);
                     outputFile.close();
                 }
             }
-            double start_end = MPI_Wtime();
- 
             gs_image_result.download();
             int *b = new int[rows*cols];
             b = gs_image_result.gather();
-            double end_end = MPI_Wtime();
-	    if (msl::isRootProcess()) {
+            //double end_end = MPI_Wtime();
+	        if (msl::isRootProcess()) {
                 if (output) {
-		     std::ofstream outputFile;
+		            std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
-                    outputFile << "" << (end_end-start_end) << ";\n";
-                    printf("%.2f;", end-start);
+                    outputFile << "" << (milliseconds/1000) << ";\n";
+                    //printf("%.2f;", milliseconds/1000);
                     outputFile.close();
-            
-                writePGM(out_file, b, rows, cols, max_color);
+                    writePGM(out_file, b, rows, cols, max_color);
                 }
             }
-            return 0;
+	        return milliseconds;
         }
 
     } // namespace jacobi
@@ -251,9 +256,11 @@ int main(int argc, char **argv) {
     bool output = false;
     bool shared_mem = false;
     int kw = 2;
+    int reps = 1;
 
     std::string in_file, out_file, file, nextfile;
     file = "result_lena.csv";
+
     if (argc >= 7) {
         nGPUs = atoi(argv[1]);
         nRuns = atoi(argv[2]);
@@ -267,6 +274,9 @@ int main(int argc, char **argv) {
             shared_mem = true;
         }
         kw = atoi(argv[7]);
+        if (argc >= 9) {
+            reps = atoi(argv[8]);
+        }
     }
     std::string shared = shared_mem ? "SM" : "GM";
 
@@ -279,8 +289,9 @@ int main(int argc, char **argv) {
         out_file.insert(pos, ss.str());
     } else {
         in_file = "ungaro4k.pgm";
+        //in_file = "lena.pgm";
         std::stringstream oo;
-        oo << in_file << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw <<"_gaussian.pgm";
+        oo << in_file << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "_" << shared <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
     }
     output = true;
@@ -290,11 +301,14 @@ int main(int argc, char **argv) {
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
     msl::setDebug(false);
-
+    msl::setReps(reps);
     int iterations_used=0;
+    printf("%d;%d;%d;", tile_width,kw,reps);
+    float miliseconds = 0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
+        miliseconds = msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
     }
+    printf("%.2f;\n", (miliseconds/msl::Muesli::num_runs));
 
     if (output) {
         std::ofstream outputFile;
@@ -306,7 +320,8 @@ int main(int argc, char **argv) {
         msl::stopTiming();
     }
     msl::terminateSkeletons();
-    std::cout << "" + std::to_string(cols) + ";" + std::to_string(rows) + ";" + std::to_string(tile_width) + ";" + std::to_string(nGPUs) + "\n ";
+    // + std::to_string(cols) + ";" + std::to_string(rows) + ";" + ";" + std::to_string(nGPUs)
+    //std::cout << ""  + std::to_string(tile_width)  + ";KW_" + std::to_string(kw) + ";Reps_" + std::to_string(reps)+ "\n ";
     //std::cout << "\n************* Finished the Gaussian Blur *************\n ";
 
     return 0;

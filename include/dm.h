@@ -797,6 +797,8 @@ private:
   bool plinitMM = false; // pl matrix initialized?
 
   std::vector<T*> d_dm;
+  // points to the right data?
+  std::vector<T*> all_data;
   T* padding_stencil;
   cudaEvent_t start, stop;
   float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0, t9=0, t10=0;

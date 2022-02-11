@@ -52,6 +52,7 @@ int msl::Muesli::elem_per_thread = 1;
 int msl::Muesli::threads_per_block;
 int msl::Muesli::tpb_x;
 int msl::Muesli::tpb_y;
+int msl::Muesli::reps;
 bool msl::Muesli::debug = false;
 bool msl::Muesli::use_timer;
 #ifdef __CUDACC__
@@ -94,6 +95,7 @@ void msl::initSkeletons(int argc, char **argv, bool debug) {
 #endif
 
   Muesli::debug = debug;
+  Muesli::reps = 1;
   Muesli::num_runs = DEFAULT_NUM_RUNS;
   Muesli::num_local_procs = Muesli::num_total_procs;
   Muesli::proc_entrance = 0;
@@ -248,6 +250,7 @@ void msl::printTimeToFile(const char *id, const char *file_name) {
 bool msl::isRootProcess() { return Muesli::proc_id == 0; }
 
 void msl::setDebug(bool val) { Muesli::debug = val; }
+void msl::setReps(int val) { Muesli::reps = val; }
 
 void msl::fail_exit() {
   MPI_Barrier(MPI_COMM_WORLD);

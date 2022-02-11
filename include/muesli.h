@@ -147,6 +147,7 @@ public:
   static int num_threads;       // number of CPU threads
   static int num_runs;          // number of runs, for benchmarking
   static int num_gpus;          // number of GPUs
+  static int reps;          // Repitions of map stencil
   static double cpu_fraction;   // fraction of each DA partition handled by CPU
                                 // cores (rather than GPUs)
   static int max_gpus;          // maximum number of GPUs of each process
@@ -288,6 +289,11 @@ bool isRootProcess();
  * \brief Switches on or off (depending on the value of \em val) debugging printfs
  */
 void setDebug(bool val);
+
+/**
+ * \brief How often MapStencil is repeated
+ */
+void setReps(int val);
 
 /**
  * \brief Returns a unique thread id.

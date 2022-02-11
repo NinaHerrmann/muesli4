@@ -564,7 +564,7 @@ void msl::DM<T>::download() {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
             // download data from device
-            gpuErrchk(cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
+            (cudaMemcpyAsync(plans[i].h_Data, plans[i].d_Data,
                                               plans[i].bytes, cudaMemcpyDeviceToHost,
                                               Muesli::streams[i]));
         }
@@ -1321,6 +1321,31 @@ void msl::DM<T>::downloadlowerpart(int paddingsize) {
     // wait until download is finished
 #endif
 }
+/*template<typename T>
+void msl::DM<T>::matchloadall(int paddingsize) {
+#ifdef __CUDACC__
+    int gpu = Muesli::num_gpus - 1;
+    cudaSetDevice(gpu);
+
+    // download data from device
+    (cudaMemcpyAsync(plans[gpu].h_Data + (plans[gpu].nLocal - paddingsize), plans[gpu].d_Data + (plans[gpu].nLocal-paddingsize),
+                     paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
+                     Muesli::streams[gpu]));
+
+    // wait until download is finished
+#endif
+}
+template<typename T>
+void msl::DM<T>::updatecenter(T * destination, T* source) {
+#ifdef __CUDACC__
+    int gpu = Muesli::num_gpus - 1;
+    cudaSetDevice(gpu);
+
+    // TODO
+
+    // wait until download is finished
+#endif
+}*/
 
 template<typename T>
 template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
@@ -1347,17 +1372,22 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
     int padding_size = (stencil_size * ncol) + (2 * stencil_size);
     int col_size = (stencil_size * ncol);
+    int kw = 2 * stencil_size;
     if (!plinitMM) {
         // TODO bigger stencils than 1
         padding_stencil = new T[(padding_size) * 4];
         d_dm = std::vector<T *>(Muesli::num_gpus);
+        all_data = std::vector<T *>(Muesli::num_gpus);
         vplm = std::vector<PLMatrix < T> * > (Muesli::num_gpus);
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
-            cudaMalloc(&d_dm[i], padding_size * 4 * sizeof(T));
+            (cudaMalloc(&d_dm[i], padding_size * 4 * sizeof(T)));
+            (cudaMalloc(&all_data[i], ((plans[i].gpuRows+kw) * (plans[i].gpuCols+kw)) * sizeof(T)));
+            //printf("\nSize: %d\n\n", ((padding_size * 4) + (plans[0].gpuRows * plans[0].gpuCols)));
         }
     }
-
+    int rowoffset = plans[0].gpuCols + (2*stencil_size);
+    int coloffset = plans[0].gpuRows + (2*stencil_size);
     // Fill first and last GPU in total with NVF
     if (!plinitMM) {
         for (int j = 0; j < Muesli::num_gpus; j++) {
@@ -1382,6 +1412,10 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 }
                 cudaMemcpyAsync(d_dm[j], padding_stencil,
                                 padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[j]);
+                dim3 fillthreads(Muesli::threads_per_block);
+                dim3 fillblocks((coloffset) / fillthreads.x);
+                // int paddingoffset, int gpuRows, int ss
+                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(all_data[j], rowoffset, plans[j].gpuCols, stencil_size);
             }
         }
     }
@@ -1444,7 +1478,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         }
     }
     // overall rows and column, gpu rows and columns
-    msl::PLMatrix<T> plm(nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth(), 2);
+    msl::PLMatrix<T> plm(nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
 
     // TODO copy first GPU row to localPartition
     int tile_width = f.getTileWidth();
@@ -1483,10 +1517,26 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             padding_stencil[k + 3 * padding_size] =
                     neutral_value_functor(k, nrow + 1);
         }
+
         cudaMemcpyAsync(d_dm[i] + (2 * padding_size), padding_stencil + (2 * padding_size),
                         2 * padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-
-        plm.addDevicePtr(plans[i].d_Data, d_dm[i], d_dm[i] + padding_size);
+        cudaMemcpyAsync(all_data[i], padding_stencil,
+                        padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+        cudaMemcpyAsync(all_data[i]+((plans[i].gpuRows+stencil_size)*(plans[i].gpuCols+kw)), padding_stencil + padding_size,
+                        padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
+       dim3 fillthreads(tile_width, tile_width);
+       dim3 fillblocks((plans[i].gpuRows + fillthreads.x - 1) / fillthreads.x, (plans[i].gpuCols + fillthreads.y - 1) / fillthreads.y);
+       // int paddingoffset, int gpuRows, int ss
+       if (Muesli::debug) {
+           gpuErrchk(cudaPeekAtLastError());
+           gpuErrchk(cudaDeviceSynchronize());
+       }
+       detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(all_data[i], plans[i].d_Data, stencil_size * (plans[i].gpuCols + (2*stencil_size)), plans[i].gpuCols, stencil_size);
+        if (Muesli::debug) {
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
+        }
+        plm.addDevicePtr(all_data[i]);
     }
     cudaDeviceSynchronize();
 
@@ -1494,13 +1544,15 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         cudaSetDevice(i);
         plm.setFirstRowGPU(plans[i].firstRow);
         cudaMalloc((void **) &vplm[i], sizeof(PLMatrix < T > ));
-        cudaMemcpyAsync(vplm[i], &plm, sizeof(PLMatrix < T > ),
-                                cudaMemcpyHostToDevice, Muesli::streams[i]);
+        (cudaMemcpyAsync(vplm[i], &plm, sizeof(PLMatrix < T > ),
+                                cudaMemcpyHostToDevice, Muesli::streams[i]));
         plm.update();
     }
     cudaDeviceSynchronize();
 
     // Map stencil
+    /*int smem_size = (tile_width + 2 * stencil_size) *
+                    (tile_width + 2 * stencil_size) * sizeof(T) * 2;*/
     int smem_size = (tile_width + 2 * stencil_size) *
                     (tile_width + 2 * stencil_size) * sizeof(T) * 2;
 
@@ -1510,50 +1562,53 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
         f.notify();
 
         cudaSetDevice(i);
-
+        int divisor = 1;
         if (f.getSharedMemory()) {
             dim3 dimBlock(tile_width, tile_width);
-            //dim3 dimGrid((plans[i].gpuRows + dimBlock.y - 1) / dimBlock.y,
-             //            (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
-            //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
-            int divisor = plans[i].gpuRows/tile_width;
-            int kw = stencil_size / 2;
-            printf("%d, %d\n", plans[i].gpuRows, plans[i].gpuRows/tile_width);
+            int kw = stencil_size * 2;
             if (plans[i].gpuRows % tile_width != 0){
-                printf("\nRight now number of rows must be dividable bz tile width\n");
-                return;
+                //printf("\nRight now number of rows must be dividable by tile width\n");
             }
             if (plans[i].gpuCols % tile_width != 0) {
-                printf("\nRight now number of columns must be dividable bz tile width\n");
-                return;
+                //printf("\nRight now number of columns must be dividable by tile width\n");
             }
-            printf("\nfor tw %d kw %d reps %d alloc %d \n\n", ncol, kw, divisor, ((plans[i].gpuRows)+kw) *(plans[i].gpuCols +kw));
-            divisor = plans[i].gpuRows/tile_width;
-            cudaDeviceProp prop;
-            cudaGetDeviceProperties(&prop, i);
+            // cudaDeviceProp prop;
+            // cudaGetDeviceProperties(&prop, i);
             // 68 for Palma. -> each SM can start one block TODO for opt.
-            int sms = prop.multiProcessorCount;
-            float smpp = prop.sharedMemPerBlock;
-            printf("  Shared memory per block (Kbytes) %.1f\n",(float)(prop.sharedMemPerBlock)/1024.0);
+            // int sms = prop.multiProcessorCount;
+            // float smpp = prop.sharedMemPerBlock;
             // We assume that this is an even number
-            printf("%d, %d\n", plans[i].gpuRows, plans[i].gpuRows/tile_width);
-            divisor = 2;
-            printf("\nStarting %d x %d blocks %d reps %.2f shared mem, %d SMs\n", ((plans[i].gpuRows))/divisor,
-                   (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y, divisor, smpp, sms);
-            dim3 dimGrid(((plans[i].gpuRows))/divisor,
+            //printf("  Shared memory per block (Kbytes) %.1f\n",(float)(prop.sharedMemPerBlock)/1024.0);
+            if (Muesli::debug) {
+                gpuErrchk(cudaPeekAtLastError());
+                gpuErrchk(cudaDeviceSynchronize());
+            }
+            divisor = Muesli::reps;
+            // printf("\ncurrent size %d Previous size %d %d\n", ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T), (tile_width + 2 * stencil_size) *
+            // (tile_width + 2 * stencil_size) * sizeof(T) * 2, stencil_size);
+            dim3 dimGrid(((plans[i].gpuRows))/divisor/dimBlock.x,
                          (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
+            smem_size = ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T);
+            //printf("\n %d %d; %d %d \n\n", dimBlock.x, dimBlock.y, dimGrid.x, dimGrid.y);
             //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, tile_width ,divisor); if (Muesli::debug) {
+                    result.getExecPlans()[i].d_Data, plans[i].gpuRows, plans[i].gpuCols, plans[i].firstCol, plans[i].firstRow, vplm[i],all_data[i], f, tile_width, divisor, kw);
+            if (Muesli::debug) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
         }
         if (!f.getSharedMemory()){
-            dim3 dimBlock(Muesli::threads_per_block);
-            dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-            detail::mapStencilGlobalMem<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i);
+            //dim3 dimBlock(Muesli::threads_per_block);
+            //dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+            dim3 dimBlock(tile_width, tile_width);
+
+            divisor = Muesli::reps;
+
+            dim3 dimGrid(((plans[i].gpuRows))/divisor,
+                         (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
+            detail::mapStencilGlobalMem_rep<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
+                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i, divisor, tile_width);
             if (Muesli::debug) {
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
