@@ -308,7 +308,7 @@ int main(int argc, char **argv) {
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
         miliseconds = msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
     }
-    printf("%.2f;\n", (miliseconds/msl::Muesli::num_runs));
+    printf("%.2f;", (miliseconds/1000/msl::Muesli::num_runs));
 
     if (output) {
         std::ofstream outputFile;
