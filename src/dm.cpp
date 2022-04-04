@@ -101,9 +101,11 @@ msl::DM<T>::DM(int row, int col, const T &v)
     initGPUs();
 #else
 #endif
-#pragma omp parallel for
-    for (int i = 0; i < nLocal; i++)
+    #pragma omp parallel for
+    for (int i = 0; i<nrow*ncol; i++){
         localPartition[i] = v;
+    }
+    initGPUs();
     upload();
 }
 
@@ -358,13 +360,25 @@ void msl::DM<T>::setLocalPartition(T *elements) {
     upload();
     return;
 }
-
+template<typename T>
+void msl::DM<T>::fill(const T &element) {
+    #pragma omp parallel for
+    for (int i = 0; i<nrow*ncol; i++){
+        localPartition[i] = element;
+    }
+    initGPUs();
+    upload();
+    return;
+}
 template<typename T>
 T msl::DM<T>::get(int index) const {
     int idSource;
     T message;
     // TODO: adjust to new structure
     // element with global index is locally stored
+    if (index < indexGPU) {
+        return localPartition[index];
+    }
     if (isLocal(index)) {
 #ifdef __CUDACC__
         // element might not be up to date in cpu memory
@@ -536,8 +550,6 @@ template<typename T>
 void msl::DM<T>::upload() {
     std::vector<T *> dev_pointers;
 #ifdef __CUDACC__
-    // TODO (endizhupani@uni-muenster.de): Why was this looking for a CPU memory
-    // not in sync?
     //if (cpuMemoryInSync) {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
@@ -840,7 +852,7 @@ template<typename T>
 template<typename F>
 msl::DM<T> msl::DM<T>::map(
         F &f) {        // preliminary simplification in order to avoid type error
-    DM <T> result(n); // should be: DM<R>
+    DM <T> result(nrow, ncol); // should be: DM<R>
 
     // map
     for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -956,27 +968,19 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        // **************Test******************
-      /*  int blockSize2d, gridSize2d;
-        blockSize2d = Muesli::threads_per_block;
-        gridSize2d = (plans[i].size/blockSize2d) + (!(plans[i].size%blockSize2d?0:1));
-
-        dim3 dimBlockXY(blockSize2d,blockSize2d);
-        dim3 dimGridXY(gridSize2d,gridSize2d);*/
-        // **************Test******************
 
         detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data,
                         plans[i].nLocal, plans[i].first, f, ncol);
     }
     if (nCPU > 0){
-        /*    T2 *bPartition = b.getLocalPartition();
+        T2 *bPartition = b.getLocalPartition();
         #pragma omp parallel for
             for (int k = 0; k < nCPU; k++) {
                 int i = (k + firstIndex) / ncol;
                 int j = (k + firstIndex) % ncol;
                 localPartition[k] = f(i, j, localPartition[k], bPartition[k]);
-            }*/
+            }
     }
     // check for errors during gpu computation
     cpuMemoryInSync = false;

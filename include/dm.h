@@ -158,7 +158,7 @@ public:
    *
    * @param value The value.
    */
-  void fill(const T &value);
+  void fill(const T &element);
 
   /**
    * \brief Initializes the elements of the distributed matrix with the elements

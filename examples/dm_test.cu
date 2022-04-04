@@ -54,7 +54,16 @@ namespace msl {
         };
 
         struct Produkt : public Functor3<int, int, int, int>{ 
-            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * 10) + j;}
+            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * j * Ai);}
+        };
+
+        class Mult4 : public Functor4<int, int, int, int, int> {
+        private: int y;
+        public:
+            Mult4(int factor):
+            y(factor){}
+
+            MSL_USERFUNC int operator() (int i, int j, int Ai, int Bi) const {return (i * j * Ai * Bi * y);}
         };
 
         class Sum : public Functor2<int, int, int>{
@@ -90,43 +99,195 @@ namespace msl {
         };
 
         void dm_test(int dim) {
-          printf("Starting dm_test...\n");
-          // TODO test if filling works
-          DM<int> a(10,10, 2);
-          a.show("a1");
-          
-          DM<int> b(10,10, 0);
-          b.show("b1");
- 
-          Produkt pr;
-          a.mapIndexInPlace(pr);
-          a.show("a2");
+            printf("Starting dm_test...\n");
+            const char *errors[10];
 
-          Sum sum;
-          int result = a.fold(sum,true);
-          printf("result: %i\n",result);
+            // ************* Init *********************** //
+            for (int i = 0; i < 4; i ++) {
+                errors[i] = "";
+            }
+            DM<int> a(10, 10);
+            a.fill(2);
+            for (int i = 0; i < 10*10; i++){
+              if (a.get(i) != 2){
+                  printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i, a.get(i));
+                  errors[0] = "Fill ";
+                  break;
+              }
+              if (i == (10*10)-1) {
+                  printf("Fill \t\t\t \xE2\x9C\x93\n");
+              }
+            }
 
-          b.zipInPlace(a,sum);
-          b.show("b2");
+            DM<int> b(10, 10, 5);
+            for (int i = 0; i < 10*10; i++){
+              if (b.get(i) != 5){
+                  printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i, b.get(i));
+                  errors[1] = "Init ";
+                  break;
+              }
+              if (i == (10*10)-1) {
+                  printf("Initialize+fill \t \xE2\x9C\x93\n");
+              }
+            }
 
-          DM<int> c = a.zip(b,sum);
-          c.show("c1");
+            // ************* Map *********************** //
+            // mapIndexInPlace, mapInPlace, map, mapIndex
+            Produkt pr;
+            Mult4 mul4(3);
+            Mult mult(3);
+            Sum sum;
+            Sum3 sum3;
+            Sum4 sum4;
 
-          Sum4 sum4;
-          c.zipIndexInPlace(b,sum4);
-          c.show("c2");
-          
-          DM<int> d = a.zipIndex(b,sum4);
-          d.show("d1");
+            DM<int> map(10, 10, 3);
+            DM<int> map_dest = map.map(mult);
+            for (int i = 0; i < 10*10; i++) {
+                if (map_dest.get(i) != 9){
+                    printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, map_dest.get(i), 9);
+                    errors[4] = "map ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("map \t\t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> mapInPlace(10, 10, 2);
+            mapInPlace.mapInPlace(mult);
+            for (int i = 0; i < 10*10; i++) {
+                if (mapInPlace.get(i) != 6){
+                    printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapInPlace.get(i), 6);
+                    errors[4] = "mapInPlace ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("mapInPlace \t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> mapIndex(10, 10, 6);
+            DM<int> mapIndex_dest = mapIndex.mapIndex(sum3);
+            int *mapIndex_comp = new int[10*10];
+            for (int j = 0; j < 10 * 10; j++) {
+                mapIndex_comp[j] = int(j/10) + (j%10) + 6;
+            }
+            for (int i = 0; i < 10*10; i++) {
+                if (mapIndex_dest.get(i) != mapIndex_comp[i]){
+                    printf("mapIndex \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapIndex_dest.get(i), mapIndex_comp[i]);
+                    errors[4] = "mapIndex ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("mapIndex \t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> amap(10, 10, 2);
+            int *amap_comp = new int[10*10];
+            for (int j = 0; j < 10 * 10; j++) {
+                amap_comp[j] = 2 * int(j/10) * (j%10);
+            }
+            amap.mapIndexInPlace(pr);
+            for (int i = 0; i < 10*10; i++){
+                if (amap.get(i) != amap_comp[i]){
+                    printf("MapIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, amap.get(i), amap_comp[i]);
+                    errors[2] = "MapIndexInPlace ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("MapIndexInPlace \t \xE2\x9C\x93\n");
+                }
+            }
 
-          Mult mult(3);
-          a.mapInPlace(mult);
-          a.show("a3");
-          
-          Sum3 sum3;
-          a.zipInPlace3(b,c,sum3);
-          a.show("a4");
-          
+
+            // ************* Fold *********************** //
+            int result = amap.fold(sum, true);
+            int compresult = 0;
+            for (int j = 0; j < 10 * 10; j++) {
+                compresult += amap_comp[j];
+            }
+            if (compresult == result) {
+                printf("Fold  \t\t\t \xE2\x9C\x93\n");
+            } else {
+                printf("Fold \t\t\t\t \xE2\x9C\x97  \t\t parallel = %d seq = %d! \n", result, compresult);
+                errors[3] = "Fold ";
+            }
+            // ************* Zip *********************** //
+
+            DM<int> zip(10, 10);
+            DM<int> zip_param(10, 10);
+            zip.fill(10);
+            zip_param.fill(20);
+            DM<int> zip_dest = zip.zip(zip_param,sum);
+            for (int i = 0; i < 10*10; i++){
+                if (zip_dest.get(i) != 30){
+                    printf("Zip \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zip_dest.get(i), 30);
+                    errors[4] = "Zip ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("Zip \t\t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> zipIndex(10, 10, 7);
+            DM<int> zipIndex_param(10, 10, 8);
+            DM<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
+            int *zipIndex_comp = new int[10*10];
+            for (int j = 0; j < 10 * 10; j++) {
+                zipIndex_comp[j] = int(j/10) + (j%10) + 7 + 8;
+            }
+            for (int i = 0; i < 10*10; i++){
+                if (zipIndex_dest.get(i) != zipIndex_comp[i]){
+                    printf("ZipIndex \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndex_dest.get(i), zipIndex_comp[i]);
+                    errors[6] = "ZipIndex ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("ZipIndex \t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> zipInPlace(10, 10);
+            DM<int> zipInPlace_dest(10, 10);
+            zipInPlace.fill(10);
+            zipInPlace_dest.fill(10);
+            zipInPlace_dest.zipInPlace(zipInPlace, sum);
+            for (int i = 0; i < 10*10; i++){
+                if (zipInPlace_dest.get(i) != 20){
+                    printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipInPlace_dest.get(i), 20);
+                    errors[4] = "ZipInPlace ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("ZipInPlace \t\t \xE2\x9C\x93\n");
+                }
+            }
+            DM<int> zipIndexInPlace(10, 10, 4);
+            DM<int> zipIndexInPlace_param(10, 10, 2);
+            int *zipIndexInPlace_comp = new int[10*10];
+            for (int j = 0; j < 10 * 10; j++) {
+                zipIndexInPlace_comp[j] = 4 * int(j/10) * (j%10) * 3 * 2;
+            }
+            zipIndexInPlace.zipIndexInPlace(zipIndexInPlace_param, mul4);
+            for (int i = 0; i < 10*10; i++){
+                if (zipIndexInPlace.get(i) != zipIndexInPlace_comp[i]){
+                    printf("ZipIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndexInPlace.get(i), zipIndexInPlace_comp[i]);
+                    errors[2] = "ZipIndexInPlace ";
+                    break;
+                }
+                if (i == (10*10)-1) {
+                    printf("ZipIndexInPlace \t \xE2\x9C\x93\n");
+                }
+            }
+
+            int length = 0;
+            for (int i = 0; i < 4; i ++) {
+                length += strlen(errors[i]);
+            }
+            if (length == 0){
+                printf("\nNo obvious Errors... Finished the dm test.\n\n");
+            } else {
+                printf("\xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97 Failed %d features \xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97\n", length);
+                printf("\xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97\xE2\x9C\x97 ");
+            };
+
           /*Proj1 pr1;
           a.zipInPlaceAAM(ar1,ar2,b,pr1);
           a.show("a5");
@@ -154,7 +315,7 @@ int main(int argc, char** argv){
   msl::initSkeletons(argc, argv);
   msl::Muesli::cpu_fraction = 0.2;
 
-  printf("Starting Program %c with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
+  printf("Starting Program %s with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
   msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
   msl::test::dm_test(16);
   msl::terminateSkeletons();
