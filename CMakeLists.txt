@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.10.2)
 project(Muesli VERSION 4.01)
-enable_language(CXX CUDA)
+enable_language(CXX)
 message("Muesli Version " ${PROJECT_VERSION})
 
 # required macros
