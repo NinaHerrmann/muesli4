@@ -56,7 +56,7 @@
 
 namespace msl {
 /**
- * \brief Class DA represents a distributed array.
+ * \brief Class DM represents a distributed array.
  *
  * A distributed array represents a one-dimensional parallel container and is
  * distributed among all MPI processes the application was started with. It
@@ -107,7 +107,7 @@ public:
    */
   DM(int row, int col, const T &initial_value, bool rowComplete);
 
-#pragma region Rule of five
+//#pragma region Rule of five
   /**
    * For more details see https://cpppatterns.com/patterns/rule-of-five.html
    * The 5 functions here are needed to perform operations such as std::move.
@@ -150,7 +150,7 @@ public:
    */
   ~DM();
 
-#pragma endregion
+//#pragma endregion
 
   /**
    * \brief Initializes the elements of the distributed array with the value \em
@@ -276,91 +276,7 @@ public:
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   DM<T> mapStencil(MapStencilFunctor &f,
                    NeutralValueFunctor &neutral_value_functor);
-#ifndef __CUDACC__
 
-  // SKELETONS / COMPUTATION / MAP / INPLACE
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map functor, must be a 'curried' function pointer.
-   * @tparam F Function type.
-   */
-  template <typename F> void mapInPlace(const msl::Fct1<T, T, F> &f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapInPlace(T (*f)(T));
-
-  // SKELETONS / COMPUTATION / MAP / INDEXINPLACE
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor. Also note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex functor, must be a 'curried' function pointer.
-   * @tparam F Function type.
-   */
-  template <typename F> void mapIndexInPlace(const msl::Fct2<int, T, T, F> &f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor. Also note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapIndexInPlace(T (*f)(int, T));
-
-  // SKELETONS / COMPUTATION / MAP
-  /**
-   * \brief Non-inplace variant of the map skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename F> msl::DM<R> map(const msl::Fct1<T, R, F> &f);
-
-  /**
-   * \brief Non-inplace variant of the map skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map function.
-   * @tparam R Return type.
-   */
-  template <typename R> msl::DM<R> map(R (*f)(T));
-
-  // SKELETONS / COMPUTATION / MAP / INDEX
-  /**
-   * \brief Non-inplace variant of the mapIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename F>
-  DM<R> mapIndex(const msl::Fct2<int, T, R, F> &f);
-
-  /**
-   * \brief Non-inplace variant of the mapIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename R> DM<R> mapIndex(R (*f)(int, T));
-
-#endif
 
   // SKELETONS / COMPUTATION / ZIP
 
@@ -460,8 +376,10 @@ public:
    * @return the result of combining all elements of the arra by the binary,
    * associative and commutativ operation f
    */
+/*
   template <typename FoldFunctor>
   T fold(FoldFunctor &f, bool final_fold_on_cpu);
+*/
 
   //
   // SKELETONS / COMMUNICATION
@@ -800,7 +718,6 @@ private:
   // points to the right data?
   std::vector<T*> all_data;
   T* padding_stencil;
-  cudaEvent_t start, stop;
   float t0 = 0, t1 = 0, t2= 0, t3= 0, t4= 0, t5= 0, t6= 0, t7= 0, t8= 0, t9=0, t10=0;
 
   //

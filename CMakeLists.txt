@@ -1,13 +1,15 @@
 cmake_minimum_required (VERSION 3.10.2)
 project(Muesli VERSION 4.01)
-enable_language(CUDA CXX)
+enable_language(CXX CUDA)
 message("Muesli Version " ${PROJECT_VERSION})
 
 # required macros
 include(CheckCXXCompilerFlag)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-
+find_package(MPI REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # config status messages
 message(STATUS "Host System: " ${CMAKE_HOST_SYSTEM})
 
@@ -25,18 +27,6 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 message("Build type is: " ${CMAKE_BUILD_TYPE})
 
-if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}" CACHE PATH "Set the runtime output directory (default: ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})." FORCE)
-endif(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
-
-if(NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Set the library output directory (default: ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})." FORCE)
-endif(NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
-
-if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Set the archive output directory (default: ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})." FORCE)
-endif(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
-
 
 message("Muesli installation path: " ${CMAKE_INSTALL_PREFIX})
 message("Example build output directory: " ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
@@ -45,30 +35,6 @@ message("Example build output directory: " ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL
 ####################################################################################################
 # find libs: MPI, OpenMP, and CUDA
 
-## MPI
-### workaround for MS-MPI on Windows
-if (WIN32) # taken from http://public.kitware.com/pipermail/cmake/2015-February/059979.html
-  #This is for finding MS-MPI.
-  #set(_MPI_PREFIX_PATH)
-  #list(APPEND _MPI_PREFIX_PATH "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\MPI;Path]/..")
-  set(MPIEXEC "C:/Program Files/Microsoft MPI/Bin/mpiexec.exe")
-  # For building MPI programs the selected Visual Studio compiler is used, namely cl.exe.
-  # So there is no need to set a specific MPI compiler.
-  #set(MPI_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
-  set(MPI_CXX_INCLUDE_PATH "C:/Program Files (x86)/Microsoft SDKs/MPI/Include")
-  # Make sure the correct libraries (64-bit or 32-bit) are selected.
-  # Decide between 32-bit and 64-bit libraries for Microsoft's MPI
-  if ("${CMAKE_SIZEOF_VOID_P}" EQUAL 8)
-    set(MS_MPI_ARCH_DIR x64)
-  else ("${CMAKE_SIZEOF_VOID_P}" EQUAL 8)
-    set(MS_MPI_ARCH_DIR x86)
-  endif ("${CMAKE_SIZEOF_VOID_P}" EQUAL 8)
-  set(MPI_CXX_LIBRARIES "C:/Program Files (x86)/Microsoft SDKs/MPI/Lib/${MS_MPI_ARCH_DIR}/msmpi.lib")
-  set(MPI_C_INCLUDE_PATH "${MPI_CXX_INCLUDE_PATH}")
-  set(MPI_C_LIBRARIES "{${MPI_CXX_LIBRARIES}")
-else (WIN32)
-  find_package(MPI REQUIRED)
-endif (WIN32)
 
 ### this is a cmake bug: MPI link flags are preceeded by two whitespaces, which leads to one leading whitespace, which is now an error according to policy CMP0004.
 string(STRIP "${MPI_CXX_LINK_FLAGS}" MPI_CXX_LINK_FLAGS)
@@ -86,9 +52,6 @@ if (OPENMP_FOUND)
   message(STATUS "OpenMP CXX compiler flags: " ${OpenMP_CXX_FLAGS})
 endif (OPENMP_FOUND)
 
-## CUDA
-find_package(CUDA)
-
 ####################################################################################################
 # check supported compiler flags
 
@@ -100,13 +63,8 @@ check_cxx_compiler_flag(-fno-strict-aliasing compiler_flag_fno_strict_aliasing)
 check_cxx_compiler_flag(-DMPICH_IGNORE_CXX_SEEK compiler_flag_dmpich_ignore_cxx_seek)
 
 ### SEQ
-check_cxx_compiler_flag(-Wno-unknown-pragmas compiler_flag_wno_unknown_pragmas)
+ ## check_cxx_compiler_flag(-Wno-unknown-pragmas compiler_flag_wno_unknown_pragmas)
 
-### PHI
-check_cxx_compiler_flag(-Wno-reorder compiler_flag_wno_reorder)
-check_cxx_compiler_flag(-mmic compiler_flag_mmic)
-check_cxx_compiler_flag(-vec-report1 compiler_flag_vec_report1)
-check_cxx_compiler_flag(-DMPICH_SKIP_MPICXX compiler_flag_dmpich_skip_mpicxx)
 
 ####################################################################################################
 # determine which variants are built
@@ -122,7 +80,7 @@ if (OPENMP_FOUND)
 else (OPENMP_FOUND)
   message(WARNING "Do not build CPU variant. OpenMP not found.")
 endif (OPENMP_FOUND)
-
+find_package(CUDA)
 ## GPU
 if (CUDA_FOUND)
   set(BUILD_GPU true)
@@ -130,7 +88,6 @@ if (CUDA_FOUND)
 else (CUDA_FOUND)
   message(WARNING "Do not build GPU variant. CUDA not found.")
 endif (CUDA_FOUND)
-
 ####################################################################################################
 # add the supported flags to variables
 
@@ -154,11 +111,10 @@ if (compiler_flag_dmpich_ignore_cxx_seek)
   set(GPU_COMPILER_OPTIONS_HOST "${GPU_COMPILER_OPTIONS_HOST},\"-DMPICH_IGNORE_CXX_SEEK\"")
 endif (compiler_flag_dmpich_ignore_cxx_seek)
 
-## SEQ
+## SEQ -Wno-unknown-pragmas
 if (compiler_flag_wno_unknown_pragmas)
   set(SEQ_COMPILER_OPTIONS ${SEQ_COMPILER_OPTIONS} -Wno-unknown-pragmas)
 endif (compiler_flag_wno_unknown_pragmas)
-
 
 ## GPU
 if (BUILD_GPU)
@@ -168,7 +124,7 @@ if (BUILD_GPU)
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
 
-  set(GPU_COMPILER_OPTIONS "-arch=sm_30;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
+  set(GPU_COMPILER_OPTIONS "-arch=sm_50;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
   set(GPU_COMPILER_OPTIONS_DEBUG "-g;-G;-O0")
   set(GPU_COMPILER_OPTIONS_RELEASE "-O3")
   set(GPU_COMPILER_OPTIONS_MINSIZEREL "-O2")
@@ -242,7 +198,7 @@ target_include_directories(muesli INTERFACE
         )
 target_compile_options(muesli INTERFACE ${MPI_CXX_COMPILE_FLAGS} ${COMMON_COMPILER_OPTIONS})
 target_link_libraries(muesli INTERFACE ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES})
-target_compile_features(muesli INTERFACE cxx_auto_type cxx_lambdas cxx_nullptr cxx_uniform_initialization)
+target_compile_features(muesli INTERFACE cxx_lambdas cxx_nullptr cxx_uniform_initialization)
 
 if (BUILD_SEQ)
   add_library(muesli_seq INTERFACE)
@@ -299,7 +255,6 @@ if (BUILD_SEQ)
           INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
           )
 endif (BUILD_SEQ)
-
 if (BUILD_CPU)
   install(TARGETS muesli_cpu EXPORT muesli_targets
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -308,7 +263,6 @@ if (BUILD_CPU)
           INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
           )
 endif (BUILD_CPU)
-
 install(EXPORT muesli_targets DESTINATION ${MUESLI_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR} NAMESPACE msl:: FILE muesli-lib-config.cmake)
 
 ####################################################################################################
@@ -325,7 +279,6 @@ endif (BUILD_CPU)
 if (BUILD_GPU)
   add_custom_target(gpu)
 endif (BUILD_GPU)
-
 ####################################################################################################
 # here starts the definition of the executables
 
@@ -333,7 +286,7 @@ endif (BUILD_GPU)
 ## use of glob is discouraged, so add each file separately
 ## names must be unique, folders are not considered
 set(EXAMPLE_SRCS
-    ${PROJECT_SOURCE_DIR}/examples/dm_test.cu
+        ${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
 )
 
 foreach (example_src ${EXAMPLE_SRCS})
@@ -353,8 +306,6 @@ foreach (example_src ${EXAMPLE_SRCS})
     add_dependencies(${example_name} ${example_name}_seq)
     add_dependencies(seq ${example_name}_seq)
   endif (BUILD_SEQ)
-
-  ### CPU executable
   if (BUILD_CPU)
     add_executable(${example_name}_cpu ${example_src})
     target_link_libraries(${example_name}_cpu PRIVATE muesli_cpu)
@@ -363,9 +314,6 @@ foreach (example_src ${EXAMPLE_SRCS})
     add_dependencies(${example_name} ${example_name}_cpu)
     add_dependencies(cpu ${example_name}_cpu)
   endif (BUILD_CPU)
-
-
-  ### GPU executable (only possible if CUDA is installed)
   if (BUILD_GPU)
     ### TODO: this is not too nice. The source file is a cpp. Therefore, it is build with default c++ compiler; however, we need nvcc. With CUDA_SOURCE_PROPERTY_FORMAT it is possible to compile cpp files with nvcc. However, this breaks the seq, cpu, and phi targets. Therefore, the next lines copy the file to a tmp folder in the build tree, which is used for the gpu target.
     ### possible "solution": should be possible to move this in another CMakeLists.txt file in another folder, then the properties are not valid for the other executables. However, not the whole build in one file anymore.

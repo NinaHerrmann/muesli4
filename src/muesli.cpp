@@ -223,7 +223,7 @@ void msl::startTiming() {
 }
 
 void msl::splitTime(int run) {
-  double result = timer->splitTime();
+  timer->splitTime();
   if (isRootProcess()) {
     //std::cout << "Run " << run << ": " << result << "s" << std::endl;
   }
