@@ -118,6 +118,7 @@ namespace msl {
                   printf("Fill \t\t\t \xE2\x9C\x93\n");
               }
             }
+            a.fill(2);
 
             DM<int> b(10, 10, 5);
             for (int i = 0; i < 10*10; i++){

@@ -376,10 +376,10 @@ public:
    * @return the result of combining all elements of the arra by the binary,
    * associative and commutativ operation f
    */
-/*
+
   template <typename FoldFunctor>
   T fold(FoldFunctor &f, bool final_fold_on_cpu);
-*/
+
 
   //
   // SKELETONS / COMMUNICATION

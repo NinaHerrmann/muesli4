@@ -94,18 +94,20 @@ template<typename T>
 msl::DM<T>::DM(int row, int col, const T &v)
         : ncol(col), nrow(row), n(col * row) {
     init();
-#ifdef __CUDACC__
     localPartition = new T[nLocal];
+
+#ifdef __CUDACC__
     // TODO die CPU Elemente brauchen wir nicht unbedingt.
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
-#else
 #endif
-    #pragma omp parallel for
-    for (int i = 0; i<nrow*ncol; i++){
+#pragma omp parallel for
+    for (int i = 0; i < nrow*ncol; i++){
         localPartition[i] = v;
     }
+#ifdef __CUDACC__
     initGPUs();
+#endif
     upload();
 }
 
@@ -281,11 +283,18 @@ void msl::DM<T>::init() {
 
     // TODO (endizhupani@uni-muenster.de): This could result in rows being split
     // between GPUs. Can be problematic for stencil ops.
+#ifdef __CUDAACC__
     nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
     nCPU = nLocal - nGPU * ng; // [0, nCPU-1] elements will be handled by the CPU.
+    indexGPU = nCPU;
+#else
+    // If GPU not used all Elements to CPU.
+    nGPU = 0;
+    nCPU = nLocal;
+    indexGPU = nLocal;
+#endif
     firstIndex = id * nLocal;
     firstRow = firstIndex / ncol;
-    indexGPU = nCPU;
 }
 
 // auxiliary method initGPUs
@@ -1133,7 +1142,7 @@ void msl::DM<T>::zipInPlace3(DM <T2> &b, DM <T3> &c, ZipFunctor &f) {
 // }
 
 // *********** fold *********************************************
-/*
+#ifdef __CUDAACC__
 template<typename T>
 template<typename FoldFunctor>
 T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
@@ -1305,7 +1314,32 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
     return final_result;
 }
-*/
+#else
+template<typename T>
+template<typename FoldFunctor>
+T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
+    if (!cpuMemoryInSync) {
+        download();
+    }
+    T result;
+    for (int j = 0; j < nLocal; j++) {
+        result += f(localPartition[j], localPartition[j+1]);
+    }
+
+    // step 2: global folding
+    msl::allgather(localResults, globalResults, 1);
+
+    for (int i = 1; i < np; i++) {
+        result = f(result, globalResults[i]);
+    }
+
+    delete[] localResults;
+    delete[] globalResults;
+
+    return result;
+}
+#endif
+
 
 // // *********** fill *********************************************
 
