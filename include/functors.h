@@ -39,7 +39,7 @@
 
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
-#include "plmatrix.h"
+/*#include "plmatrix.h"*/
 #include <utility>
 
 #ifdef __CUDACC__
@@ -196,7 +196,7 @@ public:
 };
 
 template <typename T> class DM;
-template <typename T> class PLMatrix;
+/*template <typename T> class PLMatrix;*/
 
 namespace NVF {
     class NeutralValueFunctor2 : public Functor2<int, int, int> {
@@ -242,9 +242,9 @@ public:
    * @param input Input for the map stencil function.
    * @return Output of the map stencil function.
    */
-  MSL_USERFUNC
+/*  MSL_USERFUNC
   virtual R operator()(int rowIndex, int colIndex,
-                       const PLMatrix<T> &input) const = 0;
+                       const PLMatrix<T> &input) const = 0;*/
 
   /**
    * \brief Returns the stencil size.
@@ -344,8 +344,10 @@ protected:
          * @param input Input for the map stencil function.
          * @return Output of the map stencil function.
          */
+/*
         MSL_USERFUNC
         virtual R operator()(int rowIndex, int colIndex, PLMatrix<T> *input, int* s) const = 0;
+*/
 
         /**
          * \brief Returns the stencil size.

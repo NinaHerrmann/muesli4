@@ -33,8 +33,8 @@
 #pragma once
 
 #include "exec_plan.h"
-#include "plmatrix.h"
-#include "dm.h"
+// #include "plmatrix.h"
+#include "dc.h"
 // #include "plarray.h"
 
 namespace msl {
@@ -56,7 +56,10 @@ __global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
-
+template <typename T, typename R, typename F>
+__global__ void mapIndexInPlaceKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
+                               bool localIndices);
+/*
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
                                  PLMatrix<T> *input,
@@ -74,7 +77,7 @@ template <typename T> __global__ void printFromGPU(T *A, int size, int breaker);
 template <typename T> __global__ void printStructFromGPU(T *A, int size, int breaker);
 template <typename T> __global__ void printsingleGPUElement(T *A, int index);
 template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss);
-template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);
+template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);*/
 __global__ void teststh(int Size, int t);
 
 

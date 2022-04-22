@@ -1,16 +1,14 @@
 /*
- * dm.cpp
+ * dc.cpp
  *
  *      Author: Herbert Kuchen <kuchen@uni-muenster.de>,
- *              Steffen Ernsting <s.ernsting@uni-muenster.de>,
  *              Nina Herrmann <nina.herrmann@uni-muenster.de>
  *
  * ---------------------------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2014-2020 Steffen Ernsting <s.ernsting@uni-muenster.de>,
- *                     Herbert Kuchen <kuchen@uni-muenster.de,
+ * Copyright 2014-2020 Herbert Kuchen <kuchen@uni-muenster.de,
  *                     Nina Herrmann <nina.herrmann@uni-muenster.de>.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -35,22 +33,22 @@
 #include "muesli.h"
 #include <chrono>
 #include <iostream>
-#include <dm.h>
+#include <dc.h>
 
 
 template<typename T>
-msl::DM<T>::DM()
+msl::DC<T>::DC()
         :       // distributed array (resides on GPUs until deleted!)
         n(0), // number of elements of distributed array
-        ncol(0), nrow(0), nLocal(0), // number of local elements on a node
+        ncol(0), nrow(0), depth(0), nLocal(0), // number of local elements on a node
         np(0),             // number of (MPI-) nodes (= Muesli::num_local_procs)
         id(0),             // id of local node among all nodes (= Muesli::proc_id)
-        localPartition(0), // local partition of the DM
+        localPartition(0), // local partition of the DC
         cpuMemoryInSync(false), // is GPU memory in sync with CPU?
-        firstIndex(0), // first global index of the DM on the local partition
-        firstRow(0),   // first golbal row index of the DM on the local partition
+        firstIndex(0), // first global index of the DC on the local partition
+        firstRow(0),   // first golbal row index of the DC on the local partition
         plans(0),      // GPU execution plans
-        dist(Distribution::DIST), // distribution of DM: DIST (distributed) or
+        dist(Distribution::DIST), // distribution of DC: DIST (distributed) or
         // COPY (for now: always DIST)
         gpuCopyDistributed(0),     // is GPU copy distributed? (for now: always "false")
         // new: for combined usage of CPU and GPUs on every MPI-node
@@ -60,9 +58,9 @@ msl::DM<T>::DM()
         indexGPU(0) // number of elements on CPU = nLocal - ng*nGPU
 {}
 
-// constructor creates a non-initialized DM
+// constructor creates a non-initialized DC
 template<typename T>
-msl::DM<T>::DM(int row, int col) : n(col * row), ncol(col), nrow(row) {
+msl::DC<T>::DC(int row, int col, int depth) : n(col * row), ncol(col), nrow(row), depth(depth) {
     init();
 #ifdef __CUDACC__
 
@@ -75,8 +73,8 @@ msl::DM<T>::DM(int row, int col) : n(col * row), ncol(col), nrow(row) {
 }
 
 template<typename T>
-msl::DM<T>::DM(int row, int col, bool rowComplete)
-    : n(col * row), ncol(col), nrow(row), rowComplete(rowComplete) {
+msl::DC<T>::DC(int row, int col, int depth, bool rowComplete)
+: ncol(col), nrow(row), depth(depth), n(col * row * depth), rowComplete(rowComplete) {
     init();
 
 #ifdef __CUDACC__
@@ -88,10 +86,10 @@ msl::DM<T>::DM(int row, int col, bool rowComplete)
     cpuMemoryInSync = false;
 }
 
-// constructor creates a DM, initialized with v
+// constructor creates a DC, initialized with v
 template<typename T>
-msl::DM<T>::DM(int row, int col, const T &v)
-    : n(col * row), ncol(col), nrow(row) {
+msl::DC<T>::DC(int row, int col, int depth, const T &v)
+: ncol(col), nrow(row), depth(depth), n(col * row * depth) {
     init();
     localPartition = new T[nLocal];
 
@@ -101,7 +99,7 @@ msl::DM<T>::DM(int row, int col, const T &v)
     initGPUs();
 #endif
 #pragma omp parallel for
-    for (int i = 0; i < nrow*ncol; i++){
+    for (int i = 0; i < nrow*ncol*depth; i++){
         localPartition[i] = v;
     }
 #ifdef __CUDACC__
@@ -111,8 +109,8 @@ msl::DM<T>::DM(int row, int col, const T &v)
 }
 
 template<typename T>
-msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
-    : n(col * row), ncol(col), nrow(row), rowComplete(rowComplete) {
+msl::DC<T>::DC(int row, int col, int depth, const T &v, bool rowComplete)
+        : ncol(col), nrow(row), n(col * row * depth), rowComplete(rowComplete) {
     init();
 
 #ifdef __CUDACC__
@@ -130,12 +128,14 @@ msl::DM<T>::DM(int row, int col, const T &v, bool rowComplete)
 }
 
 template<typename T>
-msl::DM<T>::DM(const DM <T> &other)
-: id(other.id), n(other.n), ncol(other.ncol), nrow(other.nrow), nLocal(other.nLocal),
-nlocalRows(other.nlocalRows), firstIndex(other.firstIndex), firstRow(other.firstRow),
-np(other.np), cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
-                *(other.plans)}}, gpuCopyDistributed(other.gpuCopyDistributed),
-                ng(other.ng), nGPU(other.nGPU), nCPU(other.nCPU), indexGPU(other.indexGPU),
+msl::DC<T>::DC(const DC <T> &other)
+        : id(other.id), n(other.n), nLocal(other.nLocal),
+          nlocalRows(other.nlocalRows), ncol(other.ncol), nrow(other.nrow), depth(other.depth),
+          firstIndex(other.firstIndex), firstRow(other.firstRow), np(other.np),
+          cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
+                *(other.plans)}},
+          gpuCopyDistributed(other.gpuCopyDistributed), ng(other.ng),
+          nGPU(other.nGPU), nCPU(other.nCPU), indexGPU(other.indexGPU),
           rowComplete(other.rowComplete) {
     copyLocalPartition(other);
 
@@ -144,9 +144,10 @@ np(other.np), cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan
 }
 
 template<typename T>
-msl::DM<T>::DM(DM <T> &&other)
-: id(other.id), n(other.n), ncol(other.ncol), nrow(other.nrow), nLocal(other.nLocal),
-nlocalRows(other.nlocalRows), firstIndex(other.firstIndex), firstRow(other.firstRow), np(other.np),
+msl::DC<T>::DC(DC <T> &&other)
+        : id(other.id), n(other.n), nLocal(other.nLocal), depth(other.depth),
+          nlocalRows(other.nlocalRows), ncol(other.ncol), nrow(other.nrow),
+          firstIndex(other.firstIndex), firstRow(other.firstRow), np(other.np),
           cpuMemoryInSync(other.cpuMemoryInSync), plans{other.plans},
           gpuCopyDistributed(other.gpuCopyDistributed), ng(other.ng),
           nGPU(other.nGPU), nCPU(other.nCPU), indexGPU(other.indexGPU),
@@ -157,7 +158,7 @@ nlocalRows(other.nlocalRows), firstIndex(other.firstIndex), firstRow(other.first
 }
 
 template<typename T>
-msl::DM<T> &msl::DM<T>::operator=(DM <T> &&other) {
+msl::DC<T> &msl::DC<T>::operator=(DC <T> &&other) {
     if (&other == this) {
         return *this;
     }
@@ -176,6 +177,7 @@ msl::DM<T> &msl::DM<T>::operator=(DM <T> &&other) {
     nlocalRows = other.nlocalRows;
     ncol = other.ncol;
     nrow = other.nrow;
+    depth = other.depth;
     firstIndex = other.firstIndex;
     firstRow = other.firstRow;
     np = other.np;
@@ -189,7 +191,7 @@ msl::DM<T> &msl::DM<T>::operator=(DM <T> &&other) {
 }
 
 template<typename T>
-msl::DM<T> &msl::DM<T>::operator=(const DM <T> &other) {
+msl::DC<T> &msl::DC<T>::operator=(const DC <T> &other) {
     if (&other == this) {
         return *this;
     }
@@ -205,6 +207,7 @@ msl::DM<T> &msl::DM<T>::operator=(const DM <T> &other) {
     nlocalRows = other.nlocalRows;
     ncol = other.ncol;
     nrow = other.nrow;
+    depth = other.depth;
     firstIndex = other.firstIndex;
     firstRow = other.firstRow;
     np = other.np;
@@ -218,7 +221,7 @@ msl::DM<T> &msl::DM<T>::operator=(const DM <T> &other) {
 }
 
 template<typename T>
-void msl::DM<T>::copyLocalPartition(const DM <T> &other) {
+void msl::DC<T>::copyLocalPartition(const DC <T> &other) {
 #ifdef __CUDACC__
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
 
@@ -230,7 +233,7 @@ void msl::DM<T>::copyLocalPartition(const DM <T> &other) {
 }
 
 template<typename T>
-void msl::DM<T>::freeLocalPartition() {
+void msl::DC<T>::freeLocalPartition() {
 #ifdef __CUDACC__
     (cudaFreeHost(localPartition));
 #else
@@ -240,7 +243,7 @@ void msl::DM<T>::freeLocalPartition() {
 }
 
 template<typename T>
-void msl::DM<T>::freePlans() {
+void msl::DC<T>::freePlans() {
 #ifdef __CUDACC__
     if (plans) {
         for (int i = 0; i < ng; i++) {
@@ -253,21 +256,22 @@ void msl::DM<T>::freePlans() {
     }
 #endif
 }
-// template <typename T> void msl::DM<T>::swap(DM<T> &first, DM<T> &second) {}
+// template <typename T> void msl::DC<T>::swap(DC<T> &first, DC<T> &second) {}
 
 // auxiliary method init()
 template<typename T>
-void msl::DM<T>::init() {
+void msl::DC<T>::init() {
     if (Muesli::proc_entrance == UNDEFINED) {
         throws(detail::MissingInitializationException());
     }
     id = Muesli::proc_id;
     np = Muesli::num_total_procs;
     ng = Muesli::num_gpus;
-    n = ncol * nrow;
+    n = ncol * nrow * depth;
     if (!rowComplete) {
         nLocal = n / np;
     } else {
+        // TODO not tested.
         auto nLocalRows = nrow / np;
         if (id == np - 1 && nrow % np != 0) {
             nLocalRows = nrow - (nLocalRows * np);
@@ -276,9 +280,8 @@ void msl::DM<T>::init() {
     }
 
     nlocalRows = nLocal % ncol == 0 ? nLocal / ncol : nLocal / ncol + 1;
+    //printf("Inside Init DC %d nLocal %d ncol %d nrow %d depth\n\n", nLocal, ncol, nrow, depth);
 
-    // TODO (endizhupani@uni-muenster.de): This could result in rows being split
-    // between GPUs. Can be problematic for stencil ops.
 #ifdef __CUDACC__
     nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
     nCPU = nLocal - nGPU * ng; // [0, nCPU-1] elements will be handled by the CPU.
@@ -295,7 +298,7 @@ void msl::DM<T>::init() {
 
 // auxiliary method initGPUs
 template<typename T>
-void msl::DM<T>::initGPUs() {
+void msl::DC<T>::initGPUs() {
 #ifdef __CUDACC__
     plans = new GPUExecutionPlan<T>[ng];
     int gpuBase = indexGPU;
@@ -328,9 +331,9 @@ void msl::DM<T>::initGPUs() {
 #endif
 }
 
-// destructor removes a DM
+// destructor removes a DC
 template<typename T>
-msl::DM<T>::~DM() {
+msl::DC<T>::~DC() {
 // printf("TODO: Destroy Datastructure\n");
 #ifdef __CUDACC__
     (cudaFreeHost(localPartition));
@@ -351,23 +354,23 @@ msl::DM<T>::~DM() {
 // ***************************** auxiliary methods
 // ******************************
 template<typename T>
-T *msl::DM<T>::getLocalPartition() {
+T *msl::DC<T>::getLocalPartition() {
     if (!cpuMemoryInSync)
         download();
     return localPartition;
 }
 
 template<typename T>
-void msl::DM<T>::setLocalPartition(T *elements) {
+void msl::DC<T>::setLocalPartition(T *elements) {
     localPartition = elements;
     initGPUs();
     upload();
     return;
 }
 template<typename T>
-void msl::DM<T>::fill(const T &element) {
+void msl::DC<T>::fill(const T &element) {
     #pragma omp parallel for
-    for (int i = 0; i<nrow*ncol; i++){
+    for (int i = 0; i<nrow*ncol*depth; i++){
         localPartition[i] = element;
     }
     initGPUs();
@@ -375,7 +378,7 @@ void msl::DM<T>::fill(const T &element) {
     return;
 }
 template<typename T>
-T msl::DM<T>::get(int index) const {
+T msl::DC<T>::get(int index) const {
     int idSource;
     T message;
     // TODO: adjust to new structure
@@ -415,8 +418,8 @@ T msl::DM<T>::get(int index) const {
 }
 
 template<typename T>
-T msl::DM<T>::get2D(int row, int col, int gpu) const {
-    int index = (row) * ncol + col;
+T msl::DC<T>::get3D(int row, int col, int depth, int gpu) const {
+    int index = (row) * ncol + col + (nrow*ncol) * depth;
     T message;
 #ifdef __CUDA_ARCH__
     // TODO calculate from row col? --> SM?
@@ -429,7 +432,7 @@ T msl::DM<T>::get2D(int row, int col, int gpu) const {
     return message;
 }
 template<typename T>
-T msl::DM<T>::get_shared(int row, int column) const {
+T msl::DC<T>::get_shared(int row, int column) const {
     int index = row * column;
     // TODO load from shared mem
     int idSource;
@@ -466,28 +469,28 @@ T msl::DM<T>::get_shared(int row, int column) const {
     return message;
 }
 template<typename T>
-int msl::DM<T>::getSize() const { return n; }
+int msl::DC<T>::getSize() const { return n; }
 
 template<typename T>
-int msl::DM<T>::getLocalSize() const { return nLocal; }
+int msl::DC<T>::getLocalSize() const { return nLocal; }
 
 template<typename T>
-int msl::DM<T>::getFirstIndex() const {
+int msl::DC<T>::getFirstIndex() const {
     return firstIndex;
 }
 
 template<typename T>
-void msl::DM<T>::setCpuMemoryInSync(bool b) {
+void msl::DC<T>::setCpuMemoryInSync(bool b) {
     cpuMemoryInSync = b;
 }
 
 template<typename T>
-bool msl::DM<T>::isLocal(int index) const {
+bool msl::DC<T>::isLocal(int index) const {
     return (index >= firstIndex) && (index < firstIndex + nLocal);
 }
 
 template<typename T>
-T msl::DM<T>::getLocal(int localIndex) {
+T msl::DC<T>::getLocal(int localIndex) {
     if (localIndex >= nLocal)
         throws(detail::NonLocalAccessException());
     if ((!cpuMemoryInSync) && (localIndex >= nCPU)) {
@@ -496,12 +499,12 @@ T msl::DM<T>::getLocal(int localIndex) {
 }
 
 template<typename T>
-T& msl::DM<T>::operator[](int index) {
+T& msl::DC<T>::operator[](int index) {
     return localPartition[index];
 }
 // TODO:adjust to new structure
 template<typename T>
-void msl::DM<T>::setLocal(int localIndex, const T &v) {
+void msl::DC<T>::setLocal(int localIndex, const T &v) {
 
 
     if (localIndex < nCPU) {
@@ -529,34 +532,20 @@ void msl::DM<T>::setLocal(int localIndex, const T &v) {
 }
 
 template<typename T>
-void msl::DM<T>::set(int globalIndex, const T &v) {
+void msl::DC<T>::set(int globalIndex, const T &v) {
     if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
         setLocal(globalIndex - firstIndex, v);
     }
 }
 
 template<typename T>
-GPUExecutionPlan<T> *msl::DM<T>::getExecPlans() {
+GPUExecutionPlan<T> *msl::DC<T>::getExecPlans() {
     // std::vector<GPUExecutionPlan<T> > ret(plans, plans + Muesli::num_gpus);
     return plans;
 }
-#ifdef __CUDACC__
-#define gpuErrchk(ans)                                                         \
-  { gpuAssert((ans), __FILE__, __LINE__); }
 
-
-inline void gpuAssert(cudaError_t code, const char *file, int line,
-                      bool abort = true) {
-    if (code != cudaSuccess) {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
-                line);
-        if (abort)
-            exit(code);
-    }
-}
-#endif
 template<typename T>
-void msl::DM<T>::upload() {
+void msl::DC<T>::upload() {
     std::vector<T *> dev_pointers;
 #ifdef __CUDACC__
     //if (cpuMemoryInSync) {
@@ -578,7 +567,7 @@ void msl::DM<T>::upload() {
 }
 
 template<typename T>
-void msl::DM<T>::download() {
+void msl::DC<T>::download() {
 #ifdef __CUDACC__
     cpuMemoryInSync = false;
     if (!cpuMemoryInSync) {
@@ -606,18 +595,18 @@ void msl::DM<T>::download() {
 }
 
 template<typename T>
-int msl::DM<T>::getGpuId(int index) const {
+int msl::DC<T>::getGpuId(int index) const {
     return (index - firstIndex - nCPU) / nGPU;
 }
 
 template<typename T>
-int msl::DM<T>::getFirstGpuRow() const {
+int msl::DC<T>::getFirstGpuRow() const {
     return indexGPU / ncol;
 }
 
 // method (only) useful for debbuging
 template<typename T>
-void msl::DM<T>::showLocal(const std::string &descr) {
+void msl::DC<T>::showLocal(const std::string &descr) {
     if (!cpuMemoryInSync) {
         download();
     }
@@ -635,7 +624,7 @@ void msl::DM<T>::showLocal(const std::string &descr) {
 }
 
 template<typename T>
-void msl::DM<T>::show(const std::string &descr) {
+void msl::DC<T>::show(const std::string &descr) {
     #ifdef __CUDACC__
     cudaDeviceSynchronize();
     #endif
@@ -668,29 +657,16 @@ void msl::DM<T>::show(const std::string &descr) {
         s << std::endl;
     }
 
-    delete b;
+    delete[] b;
 
     if (msl::isRootProcess())
         printf("%s", s.str().c_str());
 }
 
 // SKELETONS / COMMUNICATION / BROADCAST PARTITION
-
-template<typename T>
-void msl::DM<T>::broadcastPartition(int partitionIndex) {
-    if (partitionIndex < 0 || partitionIndex >= np) {
-        throws(detail::IllegalPartitionException());
-    }
-    if (!cpuMemoryInSync)
-        download();
-    msl::MSL_Broadcast(partitionIndex, localPartition, nLocal);
-    cpuMemoryInSync = false;
-    upload();
-}
-
 // SKELETONS / COMMUNICATION / GATHER
 template<typename T>
-T* msl::DM<T>::gather() {
+T* msl::DC<T>::gather() {
     T *b = new T[n];
     std::cout.precision(2);
     std::ostringstream s;
@@ -705,7 +681,7 @@ T* msl::DM<T>::gather() {
     return b;
 }
 template<typename T>
-void msl::DM<T>::gather(msl::DM<T> &da) {
+void msl::DC<T>::gather(msl::DC<T> &da) {
     printf("gather\n");
 
     size_t rec_bytes = nLocal * sizeof(T); // --> received per process
@@ -720,7 +696,7 @@ void msl::DM<T>::gather(msl::DM<T> &da) {
 
 /*template<typename T>
 template<typename Functor>
-inline void msl::DM<T>::permutePartition(Functor& f) {
+inline void msl::DC<T>::permutePartition(Functor& f) {
   int i, receiver;
   receiver = f(id);
 
@@ -767,12 +743,12 @@ inline void msl::DM<T>::permutePartition(Functor& f) {
 }
 */
 // template<typename T>
-// inline void msl::DM<T>::permutePartition(int (*f)(int)) {
+// inline void msl::DC<T>::permutePartition(int (*f)(int)) {
 //  permutePartition(curry(f));
 //}
 
 template<typename T>
-void msl::DM<T>::freeDevice() {
+void msl::DC<T>::freeDevice() {
 #ifdef __CUDACC__
     if (!cpuMemoryInSync) {
         for (int i = 0; i < ng; i++) {
@@ -787,7 +763,7 @@ void msl::DM<T>::freeDevice() {
 #endif
 }
 template<typename T>
-void msl::DM<T>::printTime() {//t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; - t10, t7, t8, t9,
+void msl::DC<T>::printTime() {//t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; - t10, t7, t8, t9,
     printf("\nt0 %.2f;t1 %.2f;t2 %.2f;t3 %.2f;t4 %.2f;t5 %.2f;t6 %.2f; t7%.2f; sum %.2f;",
            t0, t1, t2, t3, t4, t5, t6,t7, t0+t4+t1+t2+t3+t5+t6+t7+t8+t9);
 }
@@ -796,7 +772,7 @@ void msl::DM<T>::printTime() {//t10 %.2f;t7 %.2f;t8 %.2f;t9 %.2f; - t10, t7, t8,
 
 template<typename T>
 template<typename MapFunctor>
-void msl::DM<T>::mapInPlace(MapFunctor &f) {
+void msl::DC<T>::mapInPlace(MapFunctor &f) {
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
@@ -818,7 +794,7 @@ void msl::DM<T>::mapInPlace(MapFunctor &f) {
 
 template<typename T>
 template<typename MapIndexFunctor>
-void msl::DM<T>::mapIndexInPlace(MapIndexFunctor &f) {
+void msl::DC<T>::mapIndexInPlace(MapIndexFunctor &f) {
 #ifdef __CUDACC__
 
     //  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;  // is not used, HK
@@ -846,9 +822,9 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor &f) {
 
 template<typename T>
 template<typename F>
-msl::DM<T> msl::DM<T>::map(
+msl::DC<T> msl::DC<T>::map(
         F &f) {        // preliminary simplification in order to avoid type error
-    DM <T> result(nrow, ncol); // should be: DM<R>
+    DC <T> result(nrow, ncol, depth); // should be: DC<R>
 #ifdef __CUDACC__
 
     // map
@@ -877,8 +853,9 @@ msl::DM<T> msl::DM<T>::map(
 
 template<typename T>
 template<typename MapIndexFunctor>
-msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
-    DM <T> result(nrow, ncol);
+msl::DC<T> msl::DC<T>::mapIndex(MapIndexFunctor &f) {
+    DC <T> result(nrow, ncol, depth);
+    // TODO : CUDA Kernel
 #ifdef __CUDACC__
 
     // map on GPUs
@@ -893,9 +870,10 @@ msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
 #endif
 #pragma omp parallel for
     for (int k = 0; k < nCPU; k++) {
-        int j = (k + firstIndex) / ncol;
+        int l = (k + firstIndex) / (ncol*nrow);
+        int j = ((k + firstIndex) - l*(ncol*nrow)) / ncol;
         int i = (k + firstIndex) % ncol;
-        result.setLocal(k, f(i, j, localPartition[k]));
+        result.setLocal(k, f(i, j, l, localPartition[k]));
     }
 
     // check for errors during gpu computation
@@ -909,7 +887,7 @@ msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
 // ***************************************
 template<typename T>
 template<typename T2, typename ZipFunctor>
-void msl::DM<T>::zipInPlace(DM <T2> &b, ZipFunctor &f) {
+void msl::DC<T>::zipInPlace(DC <T2> &b, ZipFunctor &f) {
     // zip on GPU
 #ifdef __CUDACC__
 
@@ -935,10 +913,10 @@ void msl::DM<T>::zipInPlace(DM <T2> &b, ZipFunctor &f) {
 
 template<typename T>
 template<typename T2, typename ZipFunctor>
-msl::DM<T>
-msl::DM<T>::zip(DM <T2> &b,
+msl::DC<T>
+msl::DC<T>::zip(DC <T2> &b,
                 ZipFunctor &f) { // should have result type DA<R>; debug
-    DM <T> result(nrow, ncol);
+    DC <T> result(nrow, ncol);
     // zip on GPUs
 #ifdef __CUDACC__
 
@@ -965,7 +943,7 @@ msl::DM<T>::zip(DM <T2> &b,
 
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
+void msl::DC<T>::zipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
     // zip on GPUs
 #ifdef __CUDACC__
     for (int i = 0; i < ng; i++) {
@@ -992,7 +970,7 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
 }
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-void msl::DM<T>::crossZipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
+void msl::DC<T>::crossZipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
     // zip on GPUs
 #ifdef __CUDACC__
     for (int i = 0; i < ng; i++) {
@@ -1011,7 +989,7 @@ void msl::DM<T>::crossZipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         for (int k = 0; k < nCPU; k++) {
             int i = (k + firstIndex) / ncol;
             int j = (k + firstIndex) % ncol;
-            //localPartition[k] = f(i, j, localPartition, bPartition);
+            localPartition[k] = f(i, j, localPartition, bPartition);
         }
     }
     // check for errors during gpu computation
@@ -1019,8 +997,8 @@ void msl::DM<T>::crossZipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
 }
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {
-    DM <T> result(nrow, ncol);
+msl::DC<T> msl::DC<T>::zipIndex(DC <T2> &b, ZipIndexFunctor &f) {
+    DC <T> result(nrow, ncol);
     // zip on GPUs
 #ifdef __CUDACC__
 
@@ -1050,7 +1028,7 @@ msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {
 
 template<typename T>
 template<typename T2, typename T3, typename ZipFunctor>
-void msl::DM<T>::zipInPlace3(DM <T2> &b, DM <T3> &c, ZipFunctor &f) {
+void msl::DC<T>::zipInPlace3(DC <T2> &b, DC <T3> &c, ZipFunctor &f) {
     // zip on GPU
 #ifdef __CUDACC__
 
@@ -1079,7 +1057,7 @@ void msl::DM<T>::zipInPlace3(DM <T2> &b, DM <T3> &c, ZipFunctor &f) {
 
 // template <typename T>
 // template <typename T2, typename T3, typename T4, typename ZipFunctor>
-// void msl::DM<T>::zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor
+// void msl::DC<T>::zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DC<T4> &d, ZipFunctor
 // &f) {
 //   // zip on GPU
 //   for (int i = 0; i < ng; i++) {
@@ -1119,7 +1097,7 @@ void msl::DM<T>::zipInPlace3(DM <T2> &b, DM <T3> &c, ZipFunctor &f) {
 #ifdef __CUDACC__
 template<typename T>
 template<typename FoldFunctor>
-T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
+T msl::DC<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     if (!cpuMemoryInSync) {
         download();
     }
@@ -1144,7 +1122,7 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
         threads[i] = (plans[i].size < maxThreads)
-                ? static_cast<int>(detail::nextPow2((plans[i].size + 1) / 2))
+                     ? detail::nextPow2((plans[i].size + 1) / 2)
                      : maxThreads;
         blocks[i] = plans[i].size / threads[i];
         if (blocks[i] > maxBlocks) {
@@ -1173,7 +1151,7 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     for (int i = 0; i < Muesli::num_gpus; i++) {
         if (blocks[i] > 1) {
             cudaSetDevice(i);
-            int threads = (static_cast<int>(detail::nextPow2(blocks[i])) == blocks[i])
+            int threads = (detail::nextPow2(blocks[i]) == blocks[i])
                           ? blocks[i]
                           : detail::nextPow2(blocks[i]) / 2;
             detail::reduce<T, FoldFunctor>(blocks[i], d_odata[i], d_odata[i], threads,
@@ -1286,7 +1264,7 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
 template<typename T>
 template<typename FoldFunctor>
-T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
+T msl::DC<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     if (!cpuMemoryInSync) {
         download();
     }
@@ -1302,374 +1280,3 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     return localresult;
 }
 #endif
-
-
-// // *********** fill *********************************************
-
-// template <typename T> template <typename F> void msl::DM<T>::fill(const F &f)
-// {
-
-//    int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;
-//   for (int i = 0; i < ng; i++) {
-//     cudaSetDevice(i);
-//     dim3 dimBlock(Muesli::threads_per_block);
-//     dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-//     detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-//         plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f,
-//         ncol);
-//   }
-
-// // all necessary calculations are performed otherwise some are skipped.
-// #pragma omp parallel for
-//   for (int k = 0; k < nCPU; k++) {
-//     int i = (k + firstIndex) / ncol;
-//     int j = (k + firstIndex) % ncol;
-//     localPartition[k] = f(i, j, localPartition[k]);
-//   }
-//   // check for errors during gpu computation
-//   msl::syncStreams();
-
-//   cpuMemoryInSync = false;
-// }
-#ifdef __CUDACC__
-template<typename T>
-void msl::DM<T>::downloadupperpart(int paddingsize) {
-    cudaSetDevice(0);
-
-    // download data from device
-    (cudaMemcpyAsync(plans[0].h_Data, plans[0].d_Data,
-                                      paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
-                                      Muesli::streams[0]));
-
-    // wait until download is finished
-
-}
-#endif
-#ifdef __CUDACC__
-template<typename T>
-void msl::DM<T>::downloadlowerpart(int paddingsize) {
-    int gpu = Muesli::num_gpus - 1;
-    cudaSetDevice(gpu);
-
-    // download data from device
-    (cudaMemcpyAsync(plans[gpu].h_Data + (plans[gpu].nLocal - paddingsize), plans[gpu].d_Data + (plans[gpu].nLocal-paddingsize),
-                     paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
-                     Muesli::streams[gpu]));
-
-    // wait until download is finished
-}
-#endif
-
-/*template<typename T>
-void msl::DM<T>::matchloadall(int paddingsize) {
-#ifdef __CUDACC__
-    int gpu = Muesli::num_gpus - 1;
-    cudaSetDevice(gpu);
-
-    // download data from device
-    (cudaMemcpyAsync(plans[gpu].h_Data + (plans[gpu].nLocal - paddingsize), plans[gpu].d_Data + (plans[gpu].nLocal-paddingsize),
-                     paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
-                     Muesli::streams[gpu]));
-
-    // wait until download is finished
-#endif
-}
-template<typename T>
-void msl::DM<T>::updatecenter(T * destination, T* source) {
-#ifdef __CUDACC__
-    int gpu = Muesli::num_gpus - 1;
-    cudaSetDevice(gpu);
-
-    // TODO
-
-    // wait until download is finished
-#endif
-}*/
-/*
-#ifdef __CUDACC__
-
-template<typename T>
-template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
-void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
-                                   NeutralValueFunctor &neutral_value_functor) {
-    double t = MPI_Wtime();
-
-    if (!rowComplete) {
-        std::cout << "The matrix must be distributed between nodes in full rows to "
-                     "use the map stencil skeleton\n";
-        fail_exit();
-    }
-    if (Muesli::debug) {
-        if(f.getSharedMemory()){
-            //printf("Shared Memory is set to %s\n\n", f.getSharedMemory() ? "true" : "false");
-        }
-        if(!f.getSharedMemory()){
-            //printf("Using GM");
-        }
-    }
-    // Obtain stencil size.
-    int stencil_size = f.getStencilSize();
-
-    int padding_size = (stencil_size * ncol) + (2 * stencil_size);
-    int col_size = (stencil_size * ncol);
-    int kw = 2 * stencil_size;
-    if (!plinitMM) {
-        // TODO bigger stencils than 1
-        padding_stencil = new T[(padding_size) * 4];
-        d_dm = std::vector<T *>(Muesli::num_gpus);
-        all_data = std::vector<T *>(Muesli::num_gpus);
-        vplm = std::vector<PLMatrix < T> * > (Muesli::num_gpus);
-        for (int i = 0; i < Muesli::num_gpus; i++) {
-            cudaSetDevice(i);
-            (cudaMalloc(&d_dm[i], padding_size * 4 * sizeof(T)));
-            (cudaMalloc(&all_data[i], ((plans[i].gpuRows+kw) * (plans[i].gpuCols+kw)) * sizeof(T)));
-            //printf("\nSize: %d\n\n", ((padding_size * 4) + (plans[0].gpuRows * plans[0].gpuCols)));
-        }
-    }
-    int rowoffset = plans[0].gpuCols + (2*stencil_size);
-    int coloffset = plans[0].gpuRows + (2*stencil_size);
-    // Fill first and last GPU in total with NVF
-    if (!plinitMM) {
-        for (int j = 0; j < Muesli::num_gpus; j++) {
-
-            // In case it is the last GPU and the last process take the nvf
-            if (j == (Muesli::num_gpus - 1) && Muesli::proc_id == (Muesli::num_local_procs - 1)) {
-#pragma omp parallel for
-                for (int i = padding_size; i < padding_size * 2; i++) {
-                    int offset = (nlocalRows + stencil_size) * ncol + ((padding_size * 2) - i);
-                    padding_stencil[i] =
-                            neutral_value_functor(offset / ncol + firstRow - stencil_size, offset % ncol);
-                }
-                cudaMemcpyAsync(d_dm[j] + padding_size, padding_stencil + padding_size,
-                                padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[j]);
-            }
-            // In case it is the first GPU and the first process take the nvf
-            if (j == 0 && Muesli::proc_id == 0) {
-#pragma omp parallel for
-                for (int i = 0; i < padding_size; i++) {
-                    padding_stencil[i] =
-                            neutral_value_functor(i / ncol - stencil_size, i % ncol);
-                }
-                cudaMemcpyAsync(d_dm[j], padding_stencil,
-                                padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[j]);
-                dim3 fillthreads(Muesli::threads_per_block);
-                dim3 fillblocks((coloffset) / fillthreads.x);
-                // int paddingoffset, int gpuRows, int ss
-                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(all_data[j], rowoffset, plans[j].gpuCols, stencil_size);
-            }
-        }
-    }
-
-
-    MPI_Status stat;
-    MPI_Request req;
-
-    if (msl::Muesli::num_total_procs > 1) {
-        // Download the data from the GPU which needs to be send to other process
-        downloadupperpart(col_size);
-        downloadlowerpart(col_size);
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            T *buffer = localPartition + (nlocalRows - stencil_size) * ncol;
-            MSL_ISend(Muesli::proc_id + 1, buffer, req, col_size, msl::MYTAG);
-        }
-
-        // Blocking receive.
-        // If it is not the first process receive the bottom of the previous process and copy it to the top.
-        if (Muesli::proc_id > 0) {
-            MSL_Recv(Muesli::proc_id - 1, padding_stencil + (stencil_size), stat, col_size,
-                     msl::MYTAG);
-        }
-        // Wait for completion.
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            MPI_Wait(&req, &stat);
-        }
-        // Bottom up (send first stencil_rows to predecessor):
-        // Non-blocking send.
-        // If it is not the first process send top.
-        if (Muesli::proc_id > 0) {
-            MSL_ISend(Muesli::proc_id - 1, localPartition, req, col_size,
-                      msl::MYTAG);
-        }
-        // Blocking receive.
-        // If it is not the last process receive the top of the following process and copy it to the bottom.
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            T *buffer = padding_stencil + padding_size + (stencil_size);
-            MSL_Recv(Muesli::proc_id + 1, buffer, stat, col_size, msl::MYTAG);
-        }
-        // Wait for completion.
-        if (Muesli::proc_id > 0) {
-            MPI_Wait(&req, &stat);
-        }
-    }
-    if (!plinitMM) {
-        for (int i = 0; i < stencil_size; i++) {
-            // If it was not initialized we need to fill all corners --> start of top
-            padding_stencil[0 + i] =
-                    neutral_value_functor(-stencil_size, (-stencil_size) + i);
-            // If it was not initialized we need to fill all corners -->  end of top
-            padding_stencil[stencil_size + col_size + i] =
-                    neutral_value_functor(-stencil_size, stencil_size + col_size + i);
-            // If it was not initialized we need to fill corners --> start of bottom
-            padding_stencil[padding_size + i] =
-                    neutral_value_functor((-nrow - stencil_size) + i, (-stencil_size) + i);
-            // If it was not initialized we need to fill all corners --> end of bottom
-            padding_stencil[padding_size + stencil_size + col_size + i] =
-                    neutral_value_functor((-nrow - stencil_size) + i, stencil_size + col_size + i);
-        }
-    }
-    // overall rows and column, gpu rows and columns
-    msl::PLMatrix<T> plm(nrow, ncol, plans[0].gpuRows, plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
-
-    // TODO copy first GPU row to localPartition
-    int tile_width = f.getTileWidth();
-
-    float milliseconds = 0.0;
-    // NVF Values only need to be copied once
-
-    for (int i = 0; i < Muesli::num_gpus; i++) {
-        cudaSetDevice(i);
-
-        // TODO adjust to process (copy gotten stencil)
-        // If it is the first GPU copy first part from received paddingstencil
-        if (i == 0) {
-            cudaMemcpy(d_dm[i], padding_stencil,
-                       padding_size * sizeof(T), cudaMemcpyHostToDevice);
-        } else {
-            // If it is not the first GPU the top is always copied from the previous GPU.
-            cudaMemcpy(d_dm[i] + stencil_size, plans[i - 1].d_Data + (plans[i].nLocal - (stencil_size * ncol)),
-                       stencil_size * ncol * sizeof(T), cudaMemcpyDeviceToDevice);
-        }
-        // If it is the last GPU copy data from received padding_stencil.
-        if (i == (Muesli::num_gpus - 1)) {
-            cudaMemcpy(d_dm[i] + padding_size, padding_stencil + padding_size,
-                       padding_size * sizeof(T), cudaMemcpyHostToDevice);
-
-        } else {
-            // If it is not the last GPU the bottom is always copied from the following GPU
-            cudaMemcpy(d_dm[i] + padding_size + stencil_size, plans[i + 1].d_Data,
-                       padding_size * sizeof(T), cudaMemcpyDeviceToDevice);
-        }
-        for (int k = 0; k < padding_size; k++) {
-            padding_stencil[k + 2 * padding_size] =
-                    neutral_value_functor(k, -1);
-        }
-        for (int k = 0; k < padding_size; k++) {
-            padding_stencil[k + 3 * padding_size] =
-                    neutral_value_functor(k, nrow + 1);
-        }
-
-        cudaMemcpyAsync(d_dm[i] + (2 * padding_size), padding_stencil + (2 * padding_size),
-                        2 * padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-        cudaMemcpyAsync(all_data[i], padding_stencil,
-                        padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-        cudaMemcpyAsync(all_data[i]+((plans[i].gpuRows+stencil_size)*(plans[i].gpuCols+kw)), padding_stencil + padding_size,
-                        padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-       dim3 fillthreads(tile_width, tile_width);
-       dim3 fillblocks((plans[i].gpuRows + fillthreads.x - 1) / fillthreads.x, (plans[i].gpuCols + fillthreads.y - 1) / fillthreads.y);
-       // int paddingoffset, int gpuRows, int ss
-       if (Muesli::debug) {
-           gpuErrchk(cudaPeekAtLastError());
-           gpuErrchk(cudaDeviceSynchronize());
-       }
-       detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(all_data[i], plans[i].d_Data, stencil_size * (plans[i].gpuCols + (2*stencil_size)), plans[i].gpuCols, stencil_size);
-        if (Muesli::debug) {
-            gpuErrchk(cudaPeekAtLastError());
-            gpuErrchk(cudaDeviceSynchronize());
-        }
-        plm.addDevicePtr(all_data[i]);
-    }
-    cudaDeviceSynchronize();
-
-    for (int i = 0; i < msl::Muesli::num_gpus; i++) {
-        cudaSetDevice(i);
-        plm.setFirstRowGPU(plans[i].firstRow);
-        cudaMalloc((void **) &vplm[i], sizeof(PLMatrix < T > ));
-        (cudaMemcpyAsync(vplm[i], &plm, sizeof(PLMatrix < T > ),
-                                cudaMemcpyHostToDevice, Muesli::streams[i]));
-        plm.update();
-    }
-    cudaDeviceSynchronize();
-
-    // Map stencil
-    */
-/*int smem_size = (tile_width + 2 * stencil_size) *
-                    (tile_width + 2 * stencil_size) * sizeof(T) * 2;*//*
-
-    int smem_size = (tile_width + 2 * stencil_size) *
-                    (tile_width + 2 * stencil_size) * sizeof(T) * 2;
-
-    for (int i = 0; i < Muesli::num_gpus; i++) {
-        f.init(plans[i].gpuRows, plans[i].gpuCols, plans[i].firstRow,
-               plans[i].firstCol);
-        f.notify();
-
-        cudaSetDevice(i);
-        int divisor = 1;
-        if (f.getSharedMemory()) {
-            dim3 dimBlock(tile_width, tile_width);
-            int kw = stencil_size * 2;
-            if (plans[i].gpuRows % tile_width != 0){
-                //printf("\nRight now number of rows must be dividable by tile width\n");
-            }
-            if (plans[i].gpuCols % tile_width != 0) {
-                //printf("\nRight now number of columns must be dividable by tile width\n");
-            }
-            // cudaDeviceProp prop;
-            // cudaGetDeviceProperties(&prop, i);
-            // 68 for Palma. -> each SM can start one block TODO for opt.
-            // int sms = prop.multiProcessorCount;
-            // float smpp = prop.sharedMemPerBlock;
-            // We assume that this is an even number
-            //printf("  Shared memory per block (Kbytes) %.1f\n",(float)(prop.sharedMemPerBlock)/1024.0);
-            if (Muesli::debug) {
-                gpuErrchk(cudaPeekAtLastError());
-                gpuErrchk(cudaDeviceSynchronize());
-            }
-            divisor = Muesli::reps;
-            // printf("\ncurrent size %d Previous size %d %d\n", ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T), (tile_width + 2 * stencil_size) *
-            // (tile_width + 2 * stencil_size) * sizeof(T) * 2, stencil_size);
-            dim3 dimGrid(((plans[i].gpuRows))/divisor/dimBlock.x,
-                         (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
-            smem_size = ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T);
-            //printf("\n %d %d; %d %d \n\n", dimBlock.x, dimBlock.y, dimGrid.x, dimGrid.y);
-            //printf("Rows %d Cols %d %d %d %d %d \n", plans[i].gpuRows, plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
-            detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i].gpuRows, plans[i].gpuCols, plans[i].firstCol, plans[i].firstRow, vplm[i],all_data[i], f, tile_width, divisor, kw);
-            if (Muesli::debug) {
-                gpuErrchk(cudaPeekAtLastError());
-                gpuErrchk(cudaDeviceSynchronize());
-            }
-        }
-        if (!f.getSharedMemory()){
-            //dim3 dimBlock(Muesli::threads_per_block);
-            //dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-            dim3 dimBlock(tile_width, tile_width);
-
-            divisor = Muesli::reps;
-
-            dim3 dimGrid(((plans[i].gpuRows))/divisor,
-                         (plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
-            detail::mapStencilGlobalMem_rep<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
-                    result.getExecPlans()[i].d_Data, plans[i], vplm[i], f, i, divisor, tile_width);
-            if (Muesli::debug) {
-                gpuErrchk(cudaPeekAtLastError());
-                gpuErrchk(cudaDeviceSynchronize());
-            }
-        }
-        cudaDeviceSynchronize();
-    }
-
-    f.notify();
-    if (nCPU != 0) {
-        if (Muesli::debug)
-            printf("Calculating %d Elements on the CPU ... \n", nCPU);
-        #pragma omp parallel for
-        for (int i = 0; i < nCPU; i++) {
-            // TODO CPU PLM Matrix
-            //result.setLocal(i, f(i / ncol + firstRow, i % ncol, localPartition, nrow, ncol));
-        }
-    }
-
-    plinitMM = true;
-}
-#endif*/

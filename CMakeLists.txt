@@ -286,7 +286,9 @@ endif (BUILD_GPU)
 ## use of glob is discouraged, so add each file separately
 ## names must be unique, folders are not considered
 set(EXAMPLE_SRCS
-        ${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
+	##        ${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
+	${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
+	##	${PROJECT_SOURCE_DIR}/examples/da_test.cpp
 )
 
 foreach (example_src ${EXAMPLE_SRCS})

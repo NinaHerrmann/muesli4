@@ -1,14 +1,14 @@
 /*
- * dm.h
+ * dc.h
  *
- *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *      Author: Nina Herrmann <nina.herrmann@uni-muenster.de>
  *              Herbert Kuchen <kuchen@uni-muenster.de>
  *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2014-2020 	Steffen Ernsting <s.ernsting@uni-muenster.de>,
+ * Copyright 2021-... 	Nina Herrmann <nina.herrmann@uni-muenster.de>,
  *                	Herbert Kuchen <kuchen@uni-muenster.de.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,7 +41,6 @@
 
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
-#include "plmatrix.h"
 #include <utility>
 
 #ifdef __CUDACC__
@@ -55,18 +54,18 @@
 #endif
 
 namespace msl {
-/**
- * \brief Class DM represents a distributed array.
- *
- * A distributed array represents a one-dimensional parallel container and is
- * distributed among all MPI processes the application was started with. It
- * includes data parallel skeletons such as map, mapStencil, zip, and fold as
- * well as variants of these skeletons.
- *
- * \tparam T Element type. Restricted to classes without pointer data members.
- */
+    /**
+     * \brief Class DC represents a distributed Cuboid.
+     *
+     * A distributed Cuboid represents a one-dimensional parallel container and is
+     * distributed among all MPI processes the application was started with. It
+     * includes data parallel skeletons such as map, mapStencil, zip, and fold as
+     * well as variants of these skeletons.
+     *
+     * \tparam T Element type. Restricted to classes without pointer data members.
+     */
 template <typename T>
-class DM{
+class DC{
 public:
   //
   // CONSTRUCTORS / DESTRUCTOR
@@ -75,7 +74,7 @@ public:
   /**
    * \brief Default constructor.
    */
-  DM();
+  DC();
 
   /**
    * \brief Creates an empty distributed matrix.
@@ -83,9 +82,9 @@ public:
    * @param size Size of the distributed array.
    * @param d Distribution of the distributed array.
    */
-  DM(int row, int col);
+  DC(int row, int col, int depth);
 
-  DM(int row, int col, bool rowComplete);
+  DC(int row, int col, int depth, bool rowComplete);
 
   /**
    * \brief Creates a distributed matrix with \em size elements equal to
@@ -94,7 +93,7 @@ public:
    * @param size Size of the distributed array.
    * @param initial_value Initial value for all elements.
    */
-  DM(int row, int col, const T &initial_value);
+  DC(int row, int col, int depth, const T &initial_value);
 
   /**
    * @brief Creates a distributed matrix with \em size elements equal to
@@ -105,7 +104,7 @@ public:
    * @param rowComplete if true, the matrix will be distributed between nodes in
    * full rows. If mapStencil will be used, this option needs to be set to true.
    */
-  DM(int row, int col, const T &initial_value, bool rowComplete);
+  DC(int row, int col, int depth, const T &initial_value, bool rowComplete);
 
 //#pragma region Rule of five
   /**
@@ -118,7 +117,7 @@ public:
    * @brief Copy constructor. Fully copies the object and it's data.
    *
    */
-  DM(const DM<T> &other);
+  DC(const DC<T> &other);
 
   /**
    * @brief Move constructor. Transfers ownership of resources allocated by \em
@@ -126,29 +125,29 @@ public:
    *
    * @param other
    */
-  DM(DM<T> &&other);
+  DC(DC<T> &&other);
 
   /**
    * @brief Copy assignment operator. Works the same as the copy constructor.
    *
    * @param other
-   * @return DM<T>&
+   * @return DC<T>&
    */
-  DM<T> &operator=(const DM<T> &other);
+  DC<T> &operator=(const DC<T> &other);
 
   /**
    * @brief Move assignment operator. This assigs the object defined in \em
    * other to the left hand side of the operation without creating copies
    *
    * @param other
-   * @return DM<T>&
+   * @return DC<T>&
    */
-  DM<T> &operator=(DM<T> &&other);
+  DC<T> &operator=(DC<T> &&other);
 
   /**
    * \brief Destructor.
    */
-  ~DM();
+  ~DC();
 
 //#pragma endregion
 
@@ -232,7 +231,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename F>
-  msl::DM<T>
+  msl::DC<T>
   map(F &f); // preliminary simplification, in order to avoid type error
   // should be: msl::DA<R> map(F& f);
 
@@ -247,36 +246,24 @@ public:
    * @return The newly created distributed array.
    */
   template <typename MapIndexFunctor>
-  DM<T> mapIndex(MapIndexFunctor &f); // should be return type DA<R>; debug
-
-  /**
+  DC<T> mapIndex(MapIndexFunctor &f); // should be return type DA<R>; debug
+/*
+    TODO Stencil Functor
+  */
+/**
    * \brief Replaces each element a[i] of the distributed array with f(i, a).
    *        Note that the index i and the local partition is passed to the
    *        functor.
    *
    * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
    * @tparam MapStencilFunctor Functor type.
-   */
+   *//*
+
   template <typename MapStencilFunctor, typename NeutralValueFunctor>
   void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
   template <typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
-  void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
-
-
-  /**
-   * @brief Non-inplace variant of the mapStencil skeleton.
-   *
-   * @tparam R type of the resulting matrix
-   * @tparam MapStencilFunctor
-   * @tparam NeutralValueFunctor
-   * @param f
-   * @param neutral_value_functor
-   * @return DM<R>
-   */
-  template <typename MapStencilFunctor, typename NeutralValueFunctor>
-  DM<T> mapStencil(MapStencilFunctor &f,
-                   NeutralValueFunctor &neutral_value_functor);
-
+  void mapStencilMM(DC<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+*/
 
   // SKELETONS / COMPUTATION / ZIP
 
@@ -289,7 +276,7 @@ public:
    * @tparam ZipFunctor Functor type.
    */
   template <typename T2, typename ZipFunctor>
-  void zipInPlace(DM<T2> &b, ZipFunctor &f);
+  void zipInPlace(DC<T2> &b, ZipFunctor &f);
 
   /**
    * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
@@ -301,7 +288,7 @@ public:
    * @tparam ZipIndexFunctor Functor type.
    */
   template <typename T2, typename ZipIndexFunctor>
-  void zipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
+  void zipIndexInPlace(DC<T2> &b, ZipIndexFunctor &f);
   /**
    * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
    * *b[]). Note that besides the elements themselves also the index is passed
@@ -312,7 +299,7 @@ public:
    * @tparam ZipIndexFunctor Functor type.
    */
   template <typename T2, typename ZipIndexFunctor>
-  void crossZipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
+  void crossZipIndexInPlace(DC<T2> &b, ZipIndexFunctor &f);
 
   /**
    * \brief Non-inplace variant of the zip skeleton.
@@ -324,7 +311,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipFunctor>
-  DM<T> zip(DM<T2> &b, ZipFunctor &f); // should have result type DA<R>; debug
+  DC<T> zip(DC<T2> &b, ZipFunctor &f); // should have result type DA<R>; debug
 
   /**
    * \brief Non-inplace variant of the zipIndex skeleton.
@@ -336,7 +323,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipIndexFunctor>
-  DM<T> zipIndex(DM<T2> &b, ZipIndexFunctor &f);
+  DC<T> zipIndex(DC<T2> &b, ZipIndexFunctor &f);
 
   /**
    * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j],
@@ -349,23 +336,8 @@ public:
    * @tparam ZipFunctor Functor type.
    */
   template <typename T2, typename T3, typename ZipFunctor>
-  void zipInPlace3(DM<T2> &b, DM<T3> &c, ZipFunctor &f);
+  void zipInPlace3(DC<T2> &b, DC<T3> &c, ZipFunctor &f);
 
-  // /**
-  //  * \brief Replaces each element a[i,j] of the distributed matrix a by
-  //  * f(a[i,j], b[i], c[i], d[i,j]), with \em b and \em c being distributed
-  //  * arrays with a number of elements corresponding to the number of rows of
-  //  a
-  //  *        and d being another distributed matrix of the same size as a
-  //  *
-  //  * @param f The zip functor, must be of type \em AZipFunctor.
-  //  * @tparam T2 Element type of the 1st distributed array b
-  //  * @tparam T3 Element type of the 2nd distributed array c
-  //  * @tparam T4 Element type of the other distributed matrix d
-  //  * @tparam ZipFunctor Functor type.
-  //  */
-  // template <typename T2, typename T3, typename T4, typename ZipFunctor>
-  // void zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor &f);
 
   /**
    * \brief fold skeleton.
@@ -388,17 +360,6 @@ public:
   // SKELETONS / COMMUNICATION / BROADCAST PARTITION
 
   /**
-   * \brief Broadcasts the partition with index \em partitionIndex to all
-   * processes. Afterwards, each partition of the distributed array stores the
-   * same values. Note that 0 <= \em partitionIndex <= size/numProcesses.
-   *
-   * @param partitionIndex The index of the partition to broadcast.
-   */
-  void broadcastPartition(int partitionIndex);
-
-  // SKELETONS / COMMUNICATION / GATHER
-
-  /**
    * \brief Transforms a distributed array to an ordinary array by copying each
    *        element to the given array \em b. \em b must at least be of length
    *        \em size.
@@ -416,7 +377,7 @@ public:
    * @param da The (copy distributed) distributed array to stores the elements
    * of the distributed array.
    */
-  void gather(msl::DM<T> &dm);
+  void gather(msl::DC<T> &dc);
 
   // SKELETONS / COMMUNICATION / PERMUTE PARTITION
 
@@ -428,7 +389,7 @@ public:
    * @param f bijective functor
    * @tparam F Function type for \em f.
    */
-  template <typename Functor> inline void permutePartition(Functor &f);
+  //template <typename Functor> inline void permutePartition(Functor &f);
 
   /**
    * \brief Permutes the partitions of the distributed array according to the
@@ -472,7 +433,7 @@ public:
    * @return The element at the given global index.
    */
     MSL_USERFUNC
-    T get2D(int row, int col, int gpu) const;
+    T get3D(int row, int col, int depth, int gpu) const;
     /**
      * \brief Returns the element at the given row \em row and column \em column.
      *
@@ -597,11 +558,11 @@ public:
   /**
    * \brief Manually download the local partition from GPU memory.
    */
-  void downloadupperpart(int paddingsize);
+  //void downloadupperpart(int paddingsize);
   /**
    * \brief Manually download the local partition from GPU memory.
    */
-  void downloadlowerpart(int paddingsize);
+  //void downloadlowerpart(int paddingsize);
 
   /**
    * \brief Manually free device memory.
@@ -661,16 +622,22 @@ private:
 
   // number of elements
   int n;
-  // number of cols
-  int ncol;
-  // number of rows
-  int nrow;
+
   // number of local elements
   int nLocal;
+
   // Number of local rows. If the distribution is not row complete, a row will
   // be counted if one or more elements from that row are part of this
   // partition.
   int nlocalRows;
+
+  // number of cols
+  int ncol;
+  // number of rows
+  int nrow;
+  // depth
+  int depth;
+
   // first (global) index of local partition
   int firstIndex;
   // first (global) row in local partition
@@ -694,14 +661,12 @@ private:
   int nCPU;
   // firstIndex caclulated by GPU
   int indexGPU;
-  std::vector<PLMatrix<T>*> vplm;
 
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete;
   bool plinitMM = false; // pl matrix initialized?
 
-  std::vector<T*> d_dm;
   // points to the right data?
   std::vector<T*> all_data;
   T* padding_stencil;
@@ -722,7 +687,7 @@ private:
 
   int getFirstGpuRow() const;
 
-  void copyLocalPartition(const DM<T> &other);
+  void copyLocalPartition(const DC<T> &other);
   void freeLocalPartition();
 
   void freePlans();
@@ -730,4 +695,4 @@ private:
 
 } // namespace msl
 
-#include "../src/dm.cpp"
+#include "../src/dc.cpp"

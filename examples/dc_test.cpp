@@ -1,5 +1,5 @@
 /*
- * dm_test.cpp
+ * dc_test.cpp
  *
  *      Author: Nina Hermann,
  *  	        Herbert Kuchen <kuchen@uni-muenster.de>
@@ -35,7 +35,7 @@
 #include <cmath>
 
 #include "muesli.h"
-#include "dm.h"
+#include "dc.h"
 
 namespace msl {
     namespace test {
@@ -98,29 +98,29 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return y;}
         };
 
-        void dm_test(int dim) {
-            printf("Starting dm_test...\n");
+        void dc_test(int dim) {
+            printf("Starting dc_test...\n");
 
             // ************* Init *********************** //
 
-            DM<int> a(10, 10);
+            DC<int> a(5, 5, 5);
             a.fill(2);
-            for (int i = 0; i < 10*10; i++){
+            for (int i = 0; i < 5*5*5; i++){
                 if (a.get(i) != 2){
                     printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i, a.get(i));
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (5*5*5)-1) {
                     printf("Fill \t\t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> b(10, 10, 5);
-            for (int i = 0; i < 10*10; i++){
-                if (b.get(i) != 5){
+            DC<int> b(5, 5, 5, 2);
+            for (int i = 0; i < 5*5*5; i++){
+                if (b.get(i) != 2){
                     printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i, b.get(i));
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (5*5*5)-1) {
                     printf("Initialize+fill \t \xE2\x9C\x93\n");
                 }
             }
@@ -130,31 +130,31 @@ namespace msl {
             Sum sum;
             Sum3 sum3;
             Sum4 sum4;
-
-            DM<int> map(10, 10, 3);
-            DM<int> map_dest = map.map(mult);
-            for (int i = 0; i < 10*10; i++) {
+            int elements = 5 * 5 * 5;
+            DC<int> map(5, 5, 5,3);
+            DC<int> map_dest = map.map(mult);
+            for (int i = 0; i < elements; i++) {
                 if (map_dest.get(i) != 9){
                     printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, map_dest.get(i), 9);
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (elements)-1) {
                     printf("map \t\t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> mapInPlace(10, 10, 2);
+            DC<int> mapInPlace(5, 5, 5, 2);
             mapInPlace.mapInPlace(mult);
-            for (int i = 0; i < 10*10; i++) {
+            for (int i = 0; i < elements; i++) {
                 if (mapInPlace.get(i) != 6){
                     printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapInPlace.get(i), 6);
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (elements)-1) {
                     printf("mapInPlace \t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> mapIndex(10, 10, 6);
-            DM<int> mapIndex_dest = mapIndex.mapIndex(sum3);
+            DC<int> mapIndex(5, 5, 5, 6);
+            DC<int> mapIndex_dest = mapIndex.mapIndex(sum4);
             int *mapIndex_comp = new int[10*10];
             for (int j = 0; j < 10 * 10; j++) {
                 mapIndex_comp[j] = int(j/10) + (j%10) + 6;
@@ -167,8 +167,8 @@ namespace msl {
                 if (i == (10*10)-1) {
                     printf("mapIndex \t\t \xE2\x9C\x93\n");
                 }
-            }
-            DM<int> amap(10, 10, 2);
+            }/*
+            DC<int> amap(10, 10, 2);
             int *amap_comp = new int[10*10];
             for (int j = 0; j < 10 * 10; j++) {
                 amap_comp[j] = 2 * int(j/10) * (j%10);
@@ -184,8 +184,8 @@ namespace msl {
                 }
             }
             // ************* Fold *********************** //
-            DM<int> fold(8, 8, 2);
-            DM<int> fold2(16, 16, 2);
+            DC<int> fold(8, 8, 2);
+            DC<int> fold2(16, 16, 2);
             fold.mapIndexInPlace(pr);
             fold2.mapIndexInPlace(pr);
             int result = fold.fold(sum, true);
@@ -218,11 +218,11 @@ namespace msl {
             }
             // ************* Zip *********************** //
 
-            DM<int> zip(10, 10);
-            DM<int> zip_param(10, 10);
+            DC<int> zip(10, 10);
+            DC<int> zip_param(10, 10);
             zip.fill(10);
             zip_param.fill(20);
-            DM<int> zip_dest = zip.zip(zip_param,sum);
+            DC<int> zip_dest = zip.zip(zip_param,sum);
             for (int i = 0; i < 10*10; i++){
                 if (zip_dest.get(i) != 30){
                     printf("Zip \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zip_dest.get(i), 30);
@@ -232,9 +232,9 @@ namespace msl {
                     printf("Zip \t\t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> zipIndex(10, 10, 7);
-            DM<int> zipIndex_param(10, 10, 8);
-            DM<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
+            DC<int> zipIndex(10, 10, 7);
+            DC<int> zipIndex_param(10, 10, 8);
+            DC<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
             int *zipIndex_comp = new int[10*10];
             for (int j = 0; j < 10 * 10; j++) {
                 zipIndex_comp[j] = int(j/10) + (j%10) + 7 + 8;
@@ -248,8 +248,8 @@ namespace msl {
                     printf("ZipIndex \t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> zipInPlace(10, 10);
-            DM<int> zipInPlace_dest(10, 10);
+            DC<int> zipInPlace(10, 10);
+            DC<int> zipInPlace_dest(10, 10);
             zipInPlace.fill(10);
             zipInPlace_dest.fill(10);
             zipInPlace_dest.zipInPlace(zipInPlace, sum);
@@ -262,8 +262,8 @@ namespace msl {
                     printf("ZipInPlace \t\t \xE2\x9C\x93\n");
                 }
             }
-            DM<int> zipIndexInPlace(10, 10, 4);
-            DM<int> zipIndexInPlace_param(10, 10, 2);
+            DC<int> zipIndexInPlace(10, 10, 4);
+            DC<int> zipIndexInPlace_param(10, 10, 2);
             int *zipIndexInPlace_comp = new int[10*10];
             for (int j = 0; j < 10 * 10; j++) {
                 zipIndexInPlace_comp[j] = 4 * int(j/10) * (j%10) * 3 * 2;
@@ -277,7 +277,7 @@ namespace msl {
                 if (i == (10*10)-1) {
                     printf("ZipIndexInPlace \t \xE2\x9C\x93\n");
                 }
-            }
+            }*/
 
           return;
         }
@@ -292,7 +292,7 @@ int main(int argc, char** argv){
 
   printf("Starting Program %s with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
   msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
-  msl::test::dm_test(16);
+  msl::test::dc_test(16);
   msl::terminateSkeletons();
   return EXIT_SUCCESS;
 }

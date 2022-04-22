@@ -84,7 +84,7 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
     }
   }
 }
-
+/*
 template <typename T, typename R, typename F>
 __global__ void
 msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm, F func, int i) {
@@ -205,7 +205,7 @@ __global__ void msl::detail::fillcore(T *destination, T *source, int paddingoffs
     // x is the row (ungaro4k smaller one)
     destination[paddingoffset + ss + (x * (gpuCols+(2*ss)) + y)] = source[(x * gpuCols) + y];
 
-}
+}*/
 __global__ void msl::detail::teststh(int Size, int t) {
     if(threadIdx.x + blockIdx.x * blockDim.x >= Size-1-t) return;
     printf(" write to %d t: %d Size: %d\n", Size*(blockDim.x*blockIdx.x+threadIdx.x+t+1)+t, t, Size);
