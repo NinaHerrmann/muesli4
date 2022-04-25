@@ -119,6 +119,14 @@ zipIndexKernel(T1* in1,
 		       FCT4 func,
 			   bool localIndices);
 
+template<typename T1, typename T2, typename R, typename FCT4>
+__global__ void
+zipIndexKernel(T1* in1,
+               T2* in2,
+               R* out,
+               GPUExecutionPlan<T1> plan,
+               FCT4 func,
+               bool localIndices, int nrow, int ncol, bool dim3);
 }
 }
 

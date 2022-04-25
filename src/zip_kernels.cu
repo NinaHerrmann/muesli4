@@ -97,7 +97,8 @@ __global__ void msl::detail::zipIndexKernel(T1* in1, T2* in2, R* out, size_t n,
 }
 
 template <typename T1, typename T2, typename R, typename FCT4>
-__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,GPUExecutionPlan<T1> plan,FCT4 func,bool localIndices){
+__global__ void msl::detail::zipIndexKernel(T1* in1, T2* in2, R* out, GPUExecutionPlan<T1> plan,
+                                            FCT4 func,bool localIndices){
   size_t y = blockIdx.y * blockDim.y + threadIdx.y;
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -110,6 +111,31 @@ __global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,GPUExecutionP
     		     	 	 	 	 	  x + colOffset,
     		     	 	 	 	 	  in1[y * plan.mLocal + x],
     		     	 	 	 	 	  in2[y * plan.mLocal + x]);
+    }
+  }
+}
+template <typename T1, typename T2, typename R, typename FCT4>
+__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,GPUExecutionPlan<T1> plan,FCT4 func,
+                                            bool localIndices, int nrow, int ncol, bool dim3){
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+
+    int rowOffset = localIndices ? 0 : plan.firstRow;
+    int colOffset = localIndices ? 0 : plan.firstCol;
+    int depthOffset = localIndices ? 0 : plan.firstDepth;
+
+    //int overall = ((z+depthOffset) * (nrow*ncol)) + (y * ncol) + x;
+    int localoverall = (z * (nrow*ncol)) + (y * ncol) + x;
+    if (z < plan.gpuDepth) {
+        if (y < plan.gpuRows) {
+            if (x < plan.gpuCols) {
+                out[localoverall] = func(y + rowOffset,
+                                         x + colOffset,
+                                         z + depthOffset,
+                                                in1[localoverall],
+                                                in2[localoverall]);
+            }
     }
   }
 }

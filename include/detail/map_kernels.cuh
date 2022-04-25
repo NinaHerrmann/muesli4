@@ -56,6 +56,10 @@ __global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
+
+template <typename T, typename R, typename F>
+__global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
+                               bool localIndices, int nrow, int ncol, bool dim3);
 template <typename T, typename R, typename F>
 __global__ void mapIndexInPlaceKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);

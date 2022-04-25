@@ -65,6 +65,14 @@ namespace msl {
 
             MSL_USERFUNC int operator() (int i, int j, int Ai, int Bi) const {return (i * j * Ai * Bi * y);}
         };
+        class Mult5 : public Functor5<int, int, int, int, int, int> {
+        private: int y;
+        public:
+            Mult5(int factor):
+            y(factor){}
+
+            MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const {return (i * j * l * Ai * Bi * y);}
+        };
 
         class Sum : public Functor2<int, int, int>{
         public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
@@ -77,6 +85,10 @@ namespace msl {
 
         class Sum4 : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
+        };
+
+        class Sum5 : public Functor5<int, int, int, int, int, int>{
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {return i+j+x+y+l;}
         };
 
         class CopyCond : public Functor4<int, int, int, int, int>{
@@ -126,10 +138,12 @@ namespace msl {
             }
             Produkt pr;
             Mult4 mul4(3);
+            Mult5 mul5(3);
             Mult mult(3);
             Sum sum;
             Sum3 sum3;
             Sum4 sum4;
+            Sum5 sum5;
             int elements = 5 * 5 * 5;
             DC<int> map(5, 5, 5,3);
             DC<int> map_dest = map.map(mult);
@@ -155,47 +169,52 @@ namespace msl {
             }
             DC<int> mapIndex(5, 5, 5, 6);
             DC<int> mapIndex_dest = mapIndex.mapIndex(sum4);
-            int *mapIndex_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                mapIndex_comp[j] = int(j/10) + (j%10) + 6;
+            int *mapIndex_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                int depth = int(j/(5*5));
+                mapIndex_comp[j] = depth + int(j-(depth * 5*5))/5 + (j%5) + 6;
             }
-            for (int i = 0; i < 10*10; i++) {
+            for (int i = 0; i < elements; i++) {
                 if (mapIndex_dest.get(i) != mapIndex_comp[i]){
                     printf("mapIndex \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapIndex_dest.get(i), mapIndex_comp[i]);
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (elements)-1) {
                     printf("mapIndex \t\t \xE2\x9C\x93\n");
                 }
-            }/*
-            DC<int> amap(10, 10, 2);
-            int *amap_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                amap_comp[j] = 2 * int(j/10) * (j%10);
             }
-            amap.mapIndexInPlace(pr);
-            for (int i = 0; i < 10*10; i++){
-                if (amap.get(i) != amap_comp[i]){
-                    printf("MapIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, amap.get(i), amap_comp[i]);
+
+            DC<int> mapIndexInPlace(5, 5, 5, 3);
+            int *mapIndexInPlace_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                int depth = int(j/(5*5));
+                mapIndexInPlace_comp[j] = depth + int(j-(depth * 5*5))/5 + (j%5) + 3;
+            }
+            mapIndexInPlace.mapIndexInPlace(sum4);
+            for (int i = 0; i < elements; i++){
+                if (mapIndexInPlace.get(i) != mapIndexInPlace_comp[i]){
+                    printf("MapIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapIndexInPlace.get(i), mapIndexInPlace_comp[i]);
                     break;
                 }
-                if (i == (10*10)-1) {
+                if (i == (elements)-1) {
                     printf("MapIndexInPlace \t \xE2\x9C\x93\n");
                 }
             }
             // ************* Fold *********************** //
-            DC<int> fold(8, 8, 2);
-            DC<int> fold2(16, 16, 2);
-            fold.mapIndexInPlace(pr);
-            fold2.mapIndexInPlace(pr);
+            DC<int> fold(5, 5, 5, 3);
+            DC<int> fold2(10, 10, 10, 5);
+            fold.mapIndexInPlace(sum4);
+            fold2.mapIndexInPlace(sum4);
             int result = fold.fold(sum, true);
+            //int result2 = 0;
             int result2 = fold2.fold(sum, true);
             int compresult2 = 0;
-            int *fold_comp2 = new int[16*16];
-            for (int j = 0; j < 16*16; j++) {
-                fold_comp2[j] = 2 * int(j/16) * (j%16);
+            int *fold_comp2 = new int[10*10*10];
+            for (int j = 0; j < 10*10*10; j++) {
+                int depth = int(j/(10*10));
+                fold_comp2[j] = depth + int(j-(depth * 10*10))/10 + (j%10) + 5;
             }
-            for (int j = 0; j < 16*16; j++) {
+            for (int j = 0; j < 10*10*10; j++) {
                 compresult2 += fold_comp2[j];
             }
             if (compresult2 == result2) {
@@ -204,11 +223,12 @@ namespace msl {
                 printf("Fold2 \t\t\t\t \xE2\x9C\x97  \t\t parallel = %d seq = %d! \n", result2, compresult2);
             }
             int compresult = 0;
-            int *fold_comp = new int[8*8];
-            for (int j = 0; j < 8*8; j++) {
-                fold_comp[j] = 2 * int(j/8) * (j%8);
+            int *fold_comp = new int[5*5*5];
+            for (int j = 0; j < elements; j++) {
+                int depth = int(j/(5*5));
+                fold_comp[j] = depth + int(j-(depth * 5*5))/5 + (j%5) + 3;
             }
-            for (int j = 0; j < 8*8; j++) {
+            for (int j = 0; j < elements; j++) {
                 compresult += fold_comp[j];
             }
             if (compresult == result) {
@@ -218,12 +238,12 @@ namespace msl {
             }
             // ************* Zip *********************** //
 
-            DC<int> zip(10, 10);
-            DC<int> zip_param(10, 10);
+            DC<int> zip(5, 5, 5, 3);
+            DC<int> zip_param(5, 5, 5, 3);
             zip.fill(10);
             zip_param.fill(20);
             DC<int> zip_dest = zip.zip(zip_param,sum);
-            for (int i = 0; i < 10*10; i++){
+            for (int i = 0; i < elements; i++){
                 if (zip_dest.get(i) != 30){
                     printf("Zip \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zip_dest.get(i), 30);
                     break;
@@ -232,28 +252,12 @@ namespace msl {
                     printf("Zip \t\t\t \xE2\x9C\x93\n");
                 }
             }
-            DC<int> zipIndex(10, 10, 7);
-            DC<int> zipIndex_param(10, 10, 8);
-            DC<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
-            int *zipIndex_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                zipIndex_comp[j] = int(j/10) + (j%10) + 7 + 8;
-            }
-            for (int i = 0; i < 10*10; i++){
-                if (zipIndex_dest.get(i) != zipIndex_comp[i]){
-                    printf("ZipIndex \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndex_dest.get(i), zipIndex_comp[i]);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("ZipIndex \t\t \xE2\x9C\x93\n");
-                }
-            }
-            DC<int> zipInPlace(10, 10);
-            DC<int> zipInPlace_dest(10, 10);
+            DC<int> zipInPlace(5, 5, 5);
+            DC<int> zipInPlace_dest(5, 5, 5);
             zipInPlace.fill(10);
             zipInPlace_dest.fill(10);
             zipInPlace_dest.zipInPlace(zipInPlace, sum);
-            for (int i = 0; i < 10*10; i++){
+            for (int i = 0; i < elements; i++){
                 if (zipInPlace_dest.get(i) != 20){
                     printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipInPlace_dest.get(i), 20);
                     break;
@@ -262,14 +266,33 @@ namespace msl {
                     printf("ZipInPlace \t\t \xE2\x9C\x93\n");
                 }
             }
-            DC<int> zipIndexInPlace(10, 10, 4);
-            DC<int> zipIndexInPlace_param(10, 10, 2);
-            int *zipIndexInPlace_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                zipIndexInPlace_comp[j] = 4 * int(j/10) * (j%10) * 3 * 2;
+            DC<int> zipIndex(5, 5, 5, 7);
+            DC<int> zipIndex_param(5, 5, 5, 5);
+            DC<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum5);
+            int *zipIndex_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                int depth = int(j/(5*5));
+                zipIndex_comp[j] = depth + int(j-(depth * 5*5))/5 + (j%5) + 7 + 5;
             }
-            zipIndexInPlace.zipIndexInPlace(zipIndexInPlace_param, mul4);
-            for (int i = 0; i < 10*10; i++){
+            for (int i = 0; i < elements; i++){
+                if (zipIndex_dest.get(i) != zipIndex_comp[i]){
+                    printf("ZipIndex \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndex_dest.get(i), zipIndex_comp[i]);
+                    break;
+                }
+                if (i == (elements)-1) {
+                    printf("ZipIndex \t\t \xE2\x9C\x93\n");
+                }
+            }
+
+            DC<int> zipIndexInPlace(5, 5, 5, 3);
+            DC<int> zipIndexInPlace_param(5, 5, 5, 2);
+            int *zipIndexInPlace_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                int depth = int(j/(5*5));
+                zipIndexInPlace_comp[j] = 3 * depth * (int(j-(depth * 5*5))/5) * (j%5) * 3 * 2;
+            }
+            zipIndexInPlace.zipIndexInPlace(zipIndexInPlace_param, mul5);
+            for (int i = 0; i < elements; i++){
                 if (zipIndexInPlace.get(i) != zipIndexInPlace_comp[i]){
                     printf("ZipIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndexInPlace.get(i), zipIndexInPlace_comp[i]);
                     break;
@@ -277,7 +300,7 @@ namespace msl {
                 if (i == (10*10)-1) {
                     printf("ZipIndexInPlace \t \xE2\x9C\x93\n");
                 }
-            }*/
+            }
 
           return;
         }
@@ -286,7 +309,7 @@ namespace msl {
 int main(int argc, char** argv){
   //printf("Starting Main...\n");
   msl::setNumRuns(1);
-  msl::setNumGpus(2);
+  msl::setNumGpus(1);
   msl::initSkeletons(argc, argv);
   msl::Muesli::cpu_fraction = 0.2;
 

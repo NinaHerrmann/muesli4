@@ -53,6 +53,9 @@ template <typename T> struct GPUExecutionPlan {
   // Number of columns on the GPU (relevant on the new data structures only)
   int gpuCols;
 
+  // Opt: for 3D Number of Depth on the GPU (relevant on the new data structures only)
+  int gpuDepth;
+
   // Index of the first element processed in the GPU. If data structure is a
   // matrix, then this is the row major index.
   int first;
@@ -63,11 +66,17 @@ template <typename T> struct GPUExecutionPlan {
   // First column where the GPU processing starts (global)
   int firstCol;
 
+  // First depth where the GPU processing starts (global)
+  int firstDepth;
+
   // Last row where the GPU processing ends (global)
   int lastRow;
 
   // Last column where the GPU processing ends. (global)
   int lastCol;
+
+  // Last Depth where the GPU processing ends. (global)
+  int lastDepth;
 
   // Host copy of the data stored in the GPU
   T *h_Data;
