@@ -99,7 +99,7 @@ msl::DC<T>::DC(int row, int col, int depth, const T &v)
     initGPUs();
 #endif
 #pragma omp parallel for
-    for (int i = 0; i < nrow*ncol*depth; i++){
+    for (int i = 0; i < nLocal; i++){
         localPartition[i] = v;
     }
 #ifdef __CUDACC__
@@ -312,12 +312,12 @@ void msl::DC<T>::initGPUs() {
         plans[i].firstDepth = plans[i].first / (ncol * nrow);
         plans[i].firstRow = (plans[i].first - plans[i].firstDepth * (ncol*nrow)) / ncol;
         plans[i].firstCol = plans[i].first % ncol;
-        //printf("______________%d %d %d_________________\n", plans[i].firstDepth, plans[i].firstRow, plans[i].firstCol);
         plans[i].lastCol = (plans[i].first + plans[i].nLocal - 1) % ncol;
         plans[i].lastDepth = (plans[i].first + plans[i].nLocal - 1) / (ncol * nrow);
         plans[i].lastRow = ((plans[i].first + plans[i].nLocal - 1) - plans[i].lastDepth * (ncol*nrow)) / ncol;
         plans[i].gpuRows = plans[i].lastRow - plans[i].firstRow + 1;
         plans[i].gpuDepth = plans[i].lastDepth - plans[i].firstDepth + 1;
+        // Error prone when not row complete.
         if (plans[i].gpuRows > 2) {
             plans[i].gpuCols = ncol;
         } else if (plans[i].gpuRows == 2) {
@@ -375,7 +375,7 @@ void msl::DC<T>::setLocalPartition(T *elements) {
 template<typename T>
 void msl::DC<T>::fill(const T &element) {
     #pragma omp parallel for
-    for (int i = 0; i<nrow*ncol*depth; i++){
+    for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
     initGPUs();
@@ -388,6 +388,7 @@ T msl::DC<T>::get(int index) const {
     T message;
     // TODO: adjust to new structure
     // element with global index is locally stored
+    printf("-----------%d , %d ------------\n\n", index, indexGPU);
     if (index < indexGPU) {
         return localPartition[index];
     }
@@ -417,7 +418,7 @@ T msl::DC<T>::get(int index) const {
         // Calculate id of the process that stores the element locally
         idSource = (int) (index / nLocal);
     }
-
+    printf("%d id source --------------", idSource);
     msl::MSL_Broadcast(idSource, &message, 1);
     return message;
 }
@@ -678,11 +679,11 @@ T* msl::DC<T>::gather() {
     std::cout.precision(2);
     std::ostringstream s;
 
-    if (!cpuMemoryInSync) {
-        download();
-    } else {
-        //std::cout << "CPU in sync" << std::endl;
-    }
+#ifdef __CUDACC__
+if (!cpuMemoryInSync) {
+    download();
+}
+#endif
     msl::allgather(localPartition, b, nLocal);
 
     return b;
@@ -1296,8 +1297,19 @@ T msl::DC<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         localresult = f(localresult, localPartition[i]);
     }
 
-    // TODO MPI global result
+    T *local_results = new T[np];
+    T tmp = localresult;
+    // gather all local results
+    msl::allgather(&tmp, local_results, 1);
+
+    // calculate global result from local results
+    T global_result = local_results[0];
+#pragma omp parallel for shared(local_results) reduction(+: global_result)
+    for (int i = 1; i < np; i++) {
+        global_result = f(global_result, local_results[i]);
+    }
+
     // T* globalResults = new T[np];
-    return localresult;
+    return global_result;
 }
 #endif
