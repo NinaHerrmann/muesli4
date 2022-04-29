@@ -1,4 +1,4 @@
-for size in 100 200; do
+for size in 100 200 300 400 500 600 700 800 900; do
 	bin/dc_test_seq $size 0 
 	for np in 1 2; do
 		for split in 0.1 0.2 0.3 0.4 0.5; do

@@ -34,6 +34,7 @@
 
 #include "exec_plan.h"
 // #include "plmatrix.h"
+// #include "da.h"
 #include "dc.h"
 // #include "plarray.h"
 
@@ -56,6 +57,7 @@ __global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
                                bool localIndices);
+
 
 template <typename T, typename R, typename F>
 __global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,

@@ -413,7 +413,7 @@ int main(int argc, char** argv){
   std::string nextfile;
   if (msl::isRootProcess()) {
       std::stringstream ss;
-      ss << "dc";
+      ss << "dc" + std::to_string(msl::Muesli::num_gpus) + '_' + std::to_string(msl::Muesli::cpu_fraction);
       nextfile = ss.str();
       std::ofstream outputFile;
       outputFile.open(nextfile, std::ios_base::app);

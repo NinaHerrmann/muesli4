@@ -63,7 +63,6 @@ template<typename T>
 msl::DC<T>::DC(int row, int col, int depth) : n(col * row * depth), ncol(col), nrow(row), depth(depth) {
     init();
 #ifdef __CUDACC__
-
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
 #else
@@ -865,7 +864,6 @@ template<typename T>
 template<typename MapIndexFunctor>
 msl::DC<T> msl::DC<T>::mapIndex(MapIndexFunctor &f) {
     DC<T> result(nrow, ncol, depth);
-    // TODO : CUDA Kernel
 
 #ifdef __CUDACC__
 

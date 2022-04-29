@@ -36,7 +36,7 @@ __global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func) {
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
   if (x < size) {
     out[x] = func(in[x]);
-    //    printf("debug GPU: x: %i, in[x]: %i, out[x]: %i\n",x,in[x],out[x]);
+    //printf("debug GPU: x: %i, in[x]: %i, out[x]: %i\n",x,in[x],out[x]);
   }
 }
 
@@ -53,7 +53,7 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
   }
 }
 
-/*
+
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
                                             size_t first, F func,
@@ -65,7 +65,7 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out, size_t size,
   if (x < size) {
     out[x] = func(x + indexOffset, in[x]);
   }
-}*/
+}
 
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernel(T *in, R *out,

@@ -285,16 +285,9 @@ public:
    * @param f The map functor, must be a 'curried' function pointer.
    * @tparam F Function type.
    */
-  template <typename F>
-  void mapInPlace(const msl::Fct1<T, T, F>& f);
+  //template <typename MapFunctor>
+  //void mapInPlace(MapFunctor &f);
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapInPlace(T(*f)(T));
 
   // SKELETONS / COMPUTATION / MAP / INDEXINPLACE
   /**
@@ -305,8 +298,8 @@ public:
    * @param f The mapIndex functor, must be a 'curried' function pointer.
    * @tparam F Function type.
    */
-  template <typename F>
-  void mapIndexInPlace(const msl::Fct2<int, T, T, F>& f);
+  //template <typename F>
+  //void mapIndexInPlace(const msl::Fct2<int, T, T, F>& f);
 
   // SKELETONS / COMPUTATION / MAP
   /**
@@ -318,8 +311,8 @@ public:
    * @tparam F Function type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename F>
-  msl::DA<R> map(const msl::Fct1<T, R, F>& f);
+  //template <typename R, typename F>
+  //msl::DA<R> map(const msl::Fct1<T, R, F>& f);
 
 
   // SKELETONS / COMPUTATION / MAP / INDEX
@@ -332,8 +325,8 @@ public:
    * @tparam F Function type.
    * @return The newly created distributed array.
    */
-  template <typename R, typename F>
-  msl::DA<R> mapIndex(const msl::Fct2<int, T, R, F>& f);
+ // template <typename R, typename F>
+ // msl::DA<R> mapIndex(const msl::Fct2<int, T, R, F>& f);
 
   /**
    * \brief Non-inplace variant of the mapIndex skeleton.
@@ -343,8 +336,8 @@ public:
    * @tparam R Return type.
    * @return The newly created distributed array.
    */
-  template <typename R>
-  msl::DA<R> mapIndex(R(*f)(int, T));
+ // template <typename R>
+ // msl::DA<R> mapIndex(R(*f)(int, T));
 
 #endif
 
