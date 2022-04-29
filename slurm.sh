@@ -17,7 +17,7 @@
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-cd /home/n/n_herr03/stenciltestgaussian/
+cd /home/n/n_herr03/mueslidc/
 
 ./build.sh
 export OMP_NUM_THREADS=4
@@ -40,14 +40,14 @@ export I_MPI_FABRICS=shm:tcp
 
 # parameters: #DMCols #DMRows #nGPU #nRuns #CpuPercentage
 
-#echo  "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n" >> "/scratch/tmp/n_herr03/timesplit_stenciltestgaussian.csv"
+#echo  "n;Gpus;cpu_fraction;runs1;time;runs;runtime\n" >> "/scratch/tmp/n_herr03/timesplit_mueslidc.csv"
 #for m_size in 1024 4096 8192 16384; do
 #    for gpu_n in 1 2; do
 #        for tile_width in 16; do
 #                for iterations in 1000 2000 3000 4000 5000 10000; do
 #                        for run in 1 2 3 4 5 6 7 8 9 10; do
 #				for np in 1 2;
-#                 	       mpirun -np $np /home/n/n_herr03/stenciltestgaussian/build/gameoflife $m_size $m_size $gpu_n 1 0.00 $tile_width $iterations "/scratch/tmp/n_herr03/timesplit_stenciltestgaussian.csv"
+#                 	       mpirun -np $np /home/n/n_herr03/mueslidc/build/gameoflife $m_size $m_size $gpu_n 1 0.00 $tile_width $iterations "/scratch/tmp/n_herr03/timesplit_mueslidc.csv"
 #                        done
 #                done
 #        done
@@ -60,9 +60,9 @@ for np in 1; do
             for iterations in 1 5 10 20; do
 		for kw in 2 10 20; do
                     for tile_width in 8 16 32; do
-                    	mpirun -np $np /home/n/n_herr03/stenciltestgaussian/build/gaussianblur $gpu_n 20 $cpu_p $tile_width $iterations 1 $kw "/scratch/tmp/n_herr03/gaussian/muesli/SM/SM_${tile_width}_BIG.csv"
+                    	mpirun -np $np /home/n/n_herr03/mueslidc/build/gaussianblur $gpu_n 20 $cpu_p $tile_width $iterations 1 $kw "/scratch/tmp/n_herr03/gaussian/muesli/SM/SM_${tile_width}_BIG.csv"
                     done
-                    mpirun -np $np /home/n/n_herr03/stenciltestgaussian/build/gaussianblur $gpu_n 20 $cpu_p 12 $iterations 0 $kw "/scratch/tmp/n_herr03/gaussian/muesli/GM/GM_BIG.csv"
+                    mpirun -np $np /home/n/n_herr03/mueslidc/build/gaussianblur $gpu_n 20 $cpu_p 12 $iterations 0 $kw "/scratch/tmp/n_herr03/gaussian/muesli/GM/GM_BIG.csv"
                 done
             done
         done
