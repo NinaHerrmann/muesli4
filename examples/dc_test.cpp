@@ -165,9 +165,10 @@ namespace msl {
             Sum4 sum4;
             Sum5 sum5;
             int * mapResults = new int [dim*dim*dim];
-            for (int i = 0; i<reps; i++) {
+            DC<int> map_dest(dim,dim,dim, 5);
+	    for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
-                DC<int> map_dest = b.map(mult);
+                map_dest = b.map(mult);
                 int * mapResults = map_dest.gather();
                 if(CHECK){
                     if (msl::isRootProcess()) {
@@ -189,7 +190,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 b.mapInPlace(mult);
-                mapResults = b.gather();
+             //   mapResults = b.gather();
                 map1_time += MPI_Wtime() - t;
             }
             if(CHECK){
@@ -210,7 +211,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 b = mapIndex.mapIndex(sum4);
-                mapResults = b.gather();
+             //   mapResults = b.gather();
                 map2_time += MPI_Wtime() - t;
             }
             if(CHECK){
@@ -237,7 +238,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 b.mapIndexInPlace(sum4);
-                mapResults = b.gather();
+             //   mapResults = b.gather();
                 map3_time += MPI_Wtime() - t;
             }
 
@@ -297,7 +298,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 d = b.zip(c,sum);
-                zipResults = d.gather();
+                //zipResults = d.gather();
                 zip0_time += MPI_Wtime() - t;
             }
 
@@ -319,7 +320,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 b.zipInPlace(c, sum);
-                zipResults = b.gather();
+                //zipResults = b.gather();
                 zip1_time += MPI_Wtime() - t;
             }
 
@@ -341,7 +342,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 d = b.zipIndex(c, sum5);
-                zipResults = d.gather();
+                //zipResults = d.gather();
                 zip2_time += MPI_Wtime() - t;
             }
 
@@ -369,7 +370,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
                 b.zipIndexInPlace(c, mul5);
-                zipResults = b.gather();
+                //zipResults = b.gather();
                 zip3_time += MPI_Wtime() - t;
             }
 
@@ -437,7 +438,7 @@ int main(int argc, char** argv){
   std::string nextfile;
   if (msl::isRootProcess()) {
       std::stringstream ss;
-      ss << "dc" << std::to_string(msl::Muesli::num_gpus) <<  '_' <<  std::to_string(msl::Muesli::cpu_fraction)<< std::to_string(reps);
+      ss << "without_gather_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
       nextfile = ss.str();
       std::ofstream outputFile;
       outputFile.open(nextfile, std::ios_base::app);
