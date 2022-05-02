@@ -34,9 +34,24 @@
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func) {
   size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+
   if (x < size) {
     out[x] = func(in[x]);
-    //printf("debug GPU: x: %i, in[x]: %i, out[x]: %i\n",x,in[x],out[x]);
+  }
+}
+template <typename T, typename R, typename F>
+__global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func, GPUExecutionPlan<T> plan, int nrow, int ncol) {
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int z = blockIdx.z * blockDim.z + threadIdx.z;
+  int localoverall = (z * (nrow*ncol)) + (y * ncol) + x;
+  if (z < plan.gpuDepth) {
+      if (y < plan.gpuRows) {
+          if (x < plan.gpuCols) {
+
+              out[localoverall] = func(in[localoverall]);
+          }
+      }
   }
 }
 
@@ -106,6 +121,25 @@ __global__ void msl::detail::mapIndexKernel(T *in, R *out,
           }
       }
   }
+
+}
+template <typename T, typename R, typename F>
+__global__ void msl::detail::mapPlaceKernel(T *in, R *out,
+                                            GPUExecutionPlan<T> plan, F func,
+                                            bool localIndices, int nrow, int ncol, bool dim3, bool inpl) {
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+
+    //int overall = ((z+depthOffset) * (nrow*ncol)) + (y * ncol) + x;
+    int localoverall = (z * (nrow*ncol)) + (y * ncol) + x;
+    if (z < plan.gpuDepth) {
+        if (y < plan.gpuRows) {
+            if (x < plan.gpuCols) {
+                out[localoverall] = func(in[localoverall]);
+            }
+        }
+    }
 
 }
 /*

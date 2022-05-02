@@ -140,6 +140,23 @@ __global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,GPUExecutionP
   }
 }
 
+template <typename T1, typename T2, typename R, typename FCT4>
+__global__ void msl::detail::zip3DKernel(T1* in1,T2* in2,R* out,GPUExecutionPlan<T1> plan,FCT4 func,int nrow, int ncol){
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+
+    int localoverall = (z * (nrow*ncol)) + (y * ncol) + x;
+    if (z < plan.gpuDepth) {
+        if (y < plan.gpuRows) {
+            if (x < plan.gpuCols) {
+                out[localoverall] = func(in1[localoverall],
+                                         in2[localoverall]);
+            }
+        }
+    }
+}
+
 
 
 

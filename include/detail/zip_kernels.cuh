@@ -46,6 +46,14 @@ zipKernel(T1* in1,
           R* out,
           size_t n,   
           FCT2 func);
+
+template<typename T1, typename T2, typename R, typename FCT2>
+__global__ void
+zip3DKernel(T1* in1,
+          T2* in2,
+          R* out,
+          GPUExecutionPlan<T1> plan,
+          FCT2 func, int nrow, int ncol);
 		  
 template<typename T1, typename T2, typename T3, typename R, typename FCT3>
 __global__ void
