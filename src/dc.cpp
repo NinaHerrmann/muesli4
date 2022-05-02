@@ -981,7 +981,7 @@ void msl::DC<T>::zipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
             localPartition[k] = f(i, j, l, localPartition[k], bPartition[k]);
         }
     }
-     msl::syncStreams()    msl::syncStreams();;   
+     msl::syncStreams();
 	// check for errors during gpu computation
     cpuMemoryInSync = false;
 }

@@ -166,33 +166,34 @@ namespace msl {
             Sum5 sum5;
             int * mapResults = new int [dim*dim*dim];
             DC<int> map_dest(dim,dim,dim, 5);
-	    for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
+            t = MPI_Wtime();
+	        for (int i = 0; i<reps; i++) {
                 map_dest = b.map(mult);
-                int * mapResults = map_dest.gather();
-                if(CHECK){
-                    if (msl::isRootProcess()) {
-                        for (int i = 0; i < elements; i++) {
-                            if (mapResults[i] != 9){
-                                printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 9);
-                                break;
-                            }
-                            if (i == (elements)-1) {
-                                printf("map \t\t\t \xE2\x9C\x93\n");
-                            }
-                        }
-                    }
-                }
-                map0_time += MPI_Wtime() - t;
+
             }
+	        mapResults = map_dest.gather();
+	        map0_time += MPI_Wtime() - t;
+	        if(CHECK){
+	            if (msl::isRootProcess()) {
+	                for (int i = 0; i < elements; i++) {
+	                    if (mapResults[i] != 9){
+	                        printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 9);
+	                        break;
+	                    }
+	                    if (i == (elements)-1) {
+	                        printf("map \t\t\t \xE2\x9C\x93\n");
+	                    }
+	                }
+	            }
+	        }
 
             b.fill(2);
+	        t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.mapInPlace(mult);
-             //   mapResults = b.gather();
-                map1_time += MPI_Wtime() - t;
             }
+            mapResults = b.gather();
+            map1_time += MPI_Wtime() - t;
             if(CHECK){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++) {
@@ -208,12 +209,14 @@ namespace msl {
             }
 
             DC<int> mapIndex(dim, dim, dim, 6);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b = mapIndex.mapIndex(sum4);
              //   mapResults = b.gather();
-                map2_time += MPI_Wtime() - t;
             }
+            mapResults = b.gather();
+            map2_time += MPI_Wtime() - t;
+
             if(CHECK){
                 int *mapIndex_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
@@ -235,12 +238,13 @@ namespace msl {
 
 
             b.fill(3);
+            t = MPI_Wtime();
+
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.mapIndexInPlace(sum4);
-             //   mapResults = b.gather();
-                map3_time += MPI_Wtime() - t;
             }
+            mapResults = b.gather();
+            map3_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *mapIndexInPlace_comp = new int[elements];
@@ -266,11 +270,12 @@ namespace msl {
             b.fill(3);
             b.mapIndexInPlace(sum4);
             int result = 0;
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 result = b.fold(sum, true);
-                fold0_time += MPI_Wtime() - t;
             }
+            fold0_time += MPI_Wtime() - t;
+
             if(CHECK){
                 int compresult = 0;
                 int *fold_comp = new int[elements];
@@ -295,12 +300,14 @@ namespace msl {
             c.fill(20);
             int * zipResults = new int [dim*dim*dim];
             DC<int> d (dim,dim,dim);
+            t = MPI_Wtime();
+
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 d = b.zip(c,sum);
-                //zipResults = d.gather();
-                zip0_time += MPI_Wtime() - t;
+                //
             }
+            zipResults = d.gather();
+            zip0_time += MPI_Wtime() - t;
 
             if(CHECK){
                 if (msl::isRootProcess()) {
@@ -317,12 +324,14 @@ namespace msl {
             }
             b.fill(10);
             c.fill(10);
+            t = MPI_Wtime();
+
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.zipInPlace(c, sum);
-                //zipResults = b.gather();
-                zip1_time += MPI_Wtime() - t;
+                //
             }
+            zipResults = b.gather();
+            zip1_time += MPI_Wtime() - t;
 
             if(CHECK){
                 if (msl::isRootProcess()) {
@@ -339,12 +348,13 @@ namespace msl {
             }
             b.fill(7);
             c.fill(5);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 d = b.zipIndex(c, sum5);
-                //zipResults = d.gather();
-                zip2_time += MPI_Wtime() - t;
+                //
             }
+            zipResults = d.gather();
+            zip2_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *zipIndex_comp = new int[elements];
@@ -367,12 +377,14 @@ namespace msl {
 
             b.fill(3);
             c.fill(2);
+            t = MPI_Wtime();
+
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.zipIndexInPlace(c, mul5);
-                //zipResults = b.gather();
-                zip3_time += MPI_Wtime() - t;
+                //
             }
+            zipResults = b.gather();
+            zip3_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *zipIndexInPlace_comp = new int[elements];
@@ -438,7 +450,7 @@ int main(int argc, char** argv){
   std::string nextfile;
   if (msl::isRootProcess()) {
       std::stringstream ss;
-      ss << "without_gather_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
+      ss << "gather_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
       nextfile = ss.str();
       std::ofstream outputFile;
       outputFile.open(nextfile, std::ios_base::app);
