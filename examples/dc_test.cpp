@@ -41,9 +41,6 @@ int CHECK = 0;
 namespace msl {
     namespace test {
 
-        class Square : public Functor<int, int> {
-          public: MSL_USERFUNC int operator() (int y) const {return y*y;}
-        };
 
         class Mult : public Functor<int, int> {
         private: int y;
@@ -51,65 +48,60 @@ namespace msl {
             Mult(int factor):
                 y(factor){}
 
-            MSL_USERFUNC int operator() (int x) const {return x*y;}
+            MSL_USERFUNC int operator() (int x) const {
+                int summe = 0;
+                for (int n = 0; n < 100; n++){
+                    summe = summe + n;
+                }
+                return summe + x;
+            }
         };
 
-        struct Produkt : public Functor3<int, int, int, int>{
-            MSL_USERFUNC int operator()(int i, int j, int Ai) const {return (i * j * Ai);}
-        };
-
-        class Mult4 : public Functor4<int, int, int, int, int> {
-        private: int y;
-        public:
-            Mult4(int factor):
-            y(factor){}
-
-            MSL_USERFUNC int operator() (int i, int j, int Ai, int Bi) const {return (i * j * Ai * Bi * y);}
-        };
         class Mult5 : public Functor5<int, int, int, int, int, int> {
         private: int y;
         public:
             Mult5(int factor):
             y(factor){}
 
-            MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const {return (i * j * l * Ai * Bi * y);}
+            MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const {
+                int summe = 0;
+                for (int n = 0; n < 100; n++){
+                    summe = summe + n;
+                }
+                return (summe - j - l - Ai - Bi - y);
+            }
         };
 
         class Sum : public Functor2<int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
-        };
-
-        class Sum3 : public Functor3<int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int i, int j, int x) const {return i+j+x;}
+        public: MSL_USERFUNC int operator() (int x, int y) const {
+            int summe = 0;
+            for (int n = 0; n < 100; n++){
+                summe = summe + n;
+            }
+            return summe + y + x;
+        }
         };
 
 
         class Sum4 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {
+            int summe = 0;
+            for (int n = 0; n < 100; n++){
+                summe = summe + n;
+            }
+            return i+summe-j-x;}
         };
 
         class Sum5 : public Functor5<int, int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {return i+j+x+y+l;}
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {
+            int summe = 0;
+            for (int n = 0; n < 100; n++){
+                summe = summe + n;
+            }
+
+            return summe -(i+j+x+y+l);}
         };
 
-        class CopyCond : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const
-                   {if ((v1 * v2) % 2 == 0) return x; else return y;}
-        };
-
-
-        class Proj1 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return x;}
-        };
-
-
-        class Proj2 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return v1;}
-        };
-
-        class Proj4 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return y;}
-        };
 
         void dc_test(int dim, std::string nextfile, int reps) {
             if (msl::isRootProcess()) {
@@ -155,13 +147,9 @@ namespace msl {
                 }
             }
             const_time += MPI_Wtime() - t;
-
-            Produkt pr;
-            Mult4 mul4(3);
             Mult5 mul5(3);
             Mult mult(3);
             Sum sum;
-            Sum3 sum3;
             Sum4 sum4;
             Sum5 sum5;
             int * mapResults = new int [dim*dim*dim];
@@ -457,8 +445,8 @@ int main(int argc, char** argv){
       outputFile << "" + std::to_string(msl::Muesli::num_total_procs) + ";" + std::to_string(msl::Muesli::num_gpus) + ";"
       + std::to_string(dim) + ";" + std::to_string(msl::Muesli::cpu_fraction) + ";";
       outputFile.close();
-      printf("%d; %d; %d;", msl::Muesli::num_total_procs,
-        msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
+      printf("%d; %d; %d; %.2f", msl::Muesli::num_total_procs,
+             msl::Muesli::num_local_procs, msl::Muesli::num_gpus, msl::Muesli::cpu_fraction);
   }
   msl::test::dc_test(dim, nextfile, reps);
   msl::terminateSkeletons();
