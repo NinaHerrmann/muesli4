@@ -1680,3 +1680,148 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     plinitMM = true;
 }
 #endif*/
+
+
+// **************************************************************************************************
+// ************************************ "Communication" *********************************************
+// **************************************************************************************************
+/* rotateRows
+* 1 1 1 1          2 2 2 2           4 4 4 4
+* 2 2 2 2    -1    3 3 3 3      2    1 1 1 1
+* 3 3 3 3  ------> 4 4 4 4   ------> 2 2 2 2
+* 4 4 4 4          1 1 1 1           3 3 3 3
+ */
+template<typename T>
+void msl::DM<T>::rotateRows(int a) {
+#ifdef __CUDACC__
+#endif
+    bool negative = a < 0;
+    int howmuch = a;
+    if (negative) {
+        howmuch = -1 * a;
+    }
+    if (howmuch == nrow || a == 0) {
+        // if the number to rotate is equal to rows data stays the same.
+        return;
+    }
+    if (howmuch > nlocalRows) {
+        printf("not yet implemented\n");
+        return;
+    }
+    // easy approach put all to cpu.
+    T * switchPartition = new T[howmuch * ncol];
+    download();
+    /* Depending on negative we need to write the "lower" or "upper" elements into the buffer
+     * and write rows up or downwards.
+    */
+    T * doublePartition = new T[nLocal];
+
+    for (int i = 0; i < nLocal; i++) {
+        doublePartition[i] = localPartition[i];
+    }
+    if (negative) {
+        for (int i = 0; i < howmuch * ncol; i++) {
+            switchPartition[i] = localPartition[i];
+        }
+    } else {
+        for (int i = 0; i < howmuch * ncol; i++) {
+            switchPartition[i] = localPartition[nLocal - (howmuch * ncol) + i];
+        }
+    }
+    // TODO switch between the MPI Processes
+    T * buffer = new T[howmuch * ncol];
+
+    if (msl::Muesli::num_total_procs > 1) {
+        MPI_Status stat;
+        MPI_Request req;
+        int send_size = howmuch * ncol;
+        int send_procid = 0;
+        int rec_procid = 0;
+        if (negative) {
+            if (Muesli::proc_id == 0){
+                send_procid = msl::Muesli::num_total_procs - 1;
+            } else {
+                send_procid = Muesli::proc_id - 1;
+            }
+            MSL_ISend(send_procid, switchPartition, req, send_size, msl::MYTAG);
+        } else {
+            if (Muesli::proc_id == msl::Muesli::num_total_procs - 1){
+                send_procid = 0;
+            } else {
+                send_procid = Muesli::proc_id + 1;
+            }
+            MSL_ISend(send_procid, switchPartition, req, send_size, msl::MYTAG);
+        }
+
+        // Blocking receive.
+        if (negative) {
+            if (Muesli::proc_id == msl::Muesli::num_total_procs - 1){
+                rec_procid = 0;
+            } else {
+                rec_procid = Muesli::proc_id + 1;
+            }
+            MSL_Recv(rec_procid, buffer, stat, send_size, msl::MYTAG);
+        } else {
+            if (Muesli::proc_id == 0){
+                rec_procid = msl::Muesli::num_total_procs - 1;
+            } else {
+                rec_procid = Muesli::proc_id - 1;
+            }
+
+            MSL_Recv(rec_procid, buffer, stat, send_size, msl::MYTAG);
+        }
+
+        // Wait for completion.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            MPI_Wait(&req, &stat);
+        }
+        for (int j = 0; j < howmuch * ncol; j++) {
+            switchPartition[j] = buffer[j];
+        }
+    } else {
+        if (negative) {
+            for (int j = 0; j < howmuch; j++) {
+                for (int i = 0; i < ncol; i++) {
+                    switchPartition[i + (j * ncol)] = doublePartition[i + (j * ncol)];
+                }
+            }
+        } else {
+            for (int j = 0; j < howmuch; j++) {
+                for (int i = 0; i < ncol; i++) {
+                    switchPartition[i + (j * ncol)] = doublePartition[i + (((nlocalRows - howmuch)+j) * ncol)];
+                }
+            }
+        }
+    }
+    // TODO Depending on negative we need to write the "lower" or upper elements into the free space written to the buffer.
+    for (int k = 0; k < nlocalRows; k ++) {
+        if (negative) {
+            if (k >= nlocalRows - howmuch) {
+                for (int i = 0; i < ncol; i++) {
+                    localPartition[i + (k * ncol)] = switchPartition[i + ((k-(nlocalRows-howmuch)) * ncol)];
+                }
+            } else {
+                for (int i = 0; i < ncol; i++) {
+                    localPartition[i + (k * ncol)] = doublePartition[i + ((k+howmuch) * ncol)];
+                }
+                //take row from local partition
+            }
+        } else {
+            if (k < howmuch) {
+                for (int i = 0; i < ncol; i++) {
+                    //printf("%d;", switchPartition[i + (k * ncol)]);
+                    localPartition[i + (k * ncol)] = switchPartition[i + (k * ncol)];
+                }
+                // take the row from switch
+            } else {
+                for (int i = 0; i < ncol; i++) {
+                    localPartition[i + (k * ncol)] = doublePartition[i + ((k-howmuch) * ncol)];
+                }
+            }
+        }
+    }
+    // Switch
+
+    upload();
+    // put to gpu
+}

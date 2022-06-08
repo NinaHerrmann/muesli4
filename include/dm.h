@@ -419,25 +419,31 @@ public:
   void gather(msl::DM<T> &dm);
 
   // SKELETONS / COMMUNICATION / PERMUTE PARTITION
+  /**
+     * \brief Rotates the partitions of the distributed matrix cyclically in vertical
+     *        direction.
+     *
+     * Rotates the partitions of the distributed matrix cyclically in vertical direction.
+     * The number of steps depends on the given Integer a. Negative numbers correspond to
+     * cyclic rotations upwards, positive numbers correspond to cyclic rotations downwards.
+     *
+     * @param a Integer - Positive rotate down negative rotate up.
+     */
+  void rotateRows(int a);
 
   /**
-   * \brief Permutes the partitions of the distributed array according to the
-   *        given function \em f. \em f must be bijective and return the ID
-   *        of the new process p_i to store the partition, with 0 <= i < np.
+   * \brief Rotates the partitions of the distributed matrix cyclically in horizontal
+   *        direction.
    *
-   * @param f bijective functor
-   * @tparam F Function type for \em f.
+   * Rotates the partitions of the distributed matrix cyclically in horizontal direction.
+   * The number of steps depends on the given Integer a. Negative numbers correspond to
+   * cyclic rotations to the left, positive numbers correspond to cyclic rotations to the
+   * right.
+   *
+   * @param a Integer - Positive rotate down negative rotate up.
    */
-  template <typename Functor> inline void permutePartition(Functor &f);
+  void rotateCols(int a);
 
-  /**
-   * \brief Permutes the partitions of the distributed array according to the
-   *        given function \em f. \em f must be bijective and return the the
-   *        ID of the new process p_i to store the partition, with 0 <= i < np.
-   *
-   * @param f The bijective function.
-   */
-  // inline void permutePartition(int (*f)(int));
 
   //
   // GETTERS AND SETTERS
