@@ -92,25 +92,6 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {return i+j+x+y+l;}
         };
 
-        class CopyCond : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const
-                   {if ((v1 * v2) % 2 == 0) return x; else return y;}
-        };
-
-
-        class Proj1 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return x;}
-        };
-
-
-        class Proj2 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return v1;}
-        };
-
-        class Proj4 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return y;}
-        };
-
         void da_test(int dim, std::string nextfile, int reps) {
             if (msl::isRootProcess()) {
                 //printf("Starting DA_test...\n");
@@ -191,16 +172,24 @@ namespace msl {
             }
 
             b.fill(2);
-            for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
+            t = MPI_Wtime();
+            for (int i = 0; i < reps; i++) {
                 b.mapInPlace(mult);
-                b.gather(mapResults);
-                map1_time += MPI_Wtime() - t;
             }
+            b.gather(mapResults);
+            map1_time += MPI_Wtime() - t;
             if(CHECK){
+                for (int j = 0; j < elements; j++){
+                    mapResults[j] = 2;
+                }
+                for (int i = 0; i < reps; i++) {
+                    for (int j = 0; j < elements; j++){
+                        mapResults[j] = mapResults[j] * 3;
+                    }
+                }
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++) {
-                        if (mapResults[i] != 6){
+                        if (mapResults[i] != mapResults[i]){
                             printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 6);
                             break;
                         }
@@ -213,13 +202,16 @@ namespace msl {
 
             DA<int> mapIndex(dim, 6);
             int * mapResults2 = new int[dim];
-            DA<int> bb(dim);
+            DA<int> bb(dim, 6);
+            //DA<int> check(dim, 6);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
-                bb = mapIndex.mapIndex(sum);
-                bb.gather(mapResults2);
-                map2_time += MPI_Wtime() - t;
+                DA<int> check = mapIndex.mapIndex(sum);
+                check.gather(mapResults2);
+
             }
+
+            map2_time += MPI_Wtime() - t;
             if(CHECK){
                 int *mapIndex_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
@@ -241,17 +233,23 @@ namespace msl {
 
 
             b.fill(3);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.mapIndexInPlace(sum);
-                b.gather(mapResults);
-                map3_time += MPI_Wtime() - t;
             }
+            b.gather(mapResults);
+            map3_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *mapIndexInPlace_comp = new int[elements];
+
                 for (int j = 0; j < elements; j++) {
-                    mapIndexInPlace_comp[j] = j + 3;
+                    mapIndexInPlace_comp[j] = 3;
+                }
+                for (int i = 0; i<reps; i++) {
+                    for (int j = 0; j < elements; j++) {
+                        mapIndexInPlace_comp[j] = mapIndexInPlace_comp[j] + j;
+                    }
                 }
 
 
@@ -322,17 +320,25 @@ namespace msl {
 
             b.fill(10);
             c.fill(10);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 b.zipInPlace(c, sum);
-                b.gather(zipResults);
-                zip1_time += MPI_Wtime() - t;
             }
+            b.gather(zipResults);
+            zip1_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if (CHECK) {
+                for (int j = 0; j<elements; j++) {
+                    zipResults[j] = 10;
+                }
+                for (int i = 0; i<reps; i++) {
+                    for (int j = 0; j<elements; j++) {
+                        zipResults[j] = 10 + zipResults[j];
+                    }
+                }
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
-                        if (zipResults[i] != 20){
+                        if (zipResults[i] != zipResults[i]){
                             printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipResults[i], 20);
                             break;
                         }
@@ -344,18 +350,23 @@ namespace msl {
             }
             bb.fill(7);
             c.fill(5);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 DA<int> dd = bb.zipIndex(c, sum3);
                 dd.gather(zipResults);
-                zip2_time += MPI_Wtime() - t;
             }
+            zip2_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *zipIndex_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
-                    zipIndex_comp[j] = j + 7 + 5;
+                    zipIndex_comp[j] = 5;
                 }
+                // independent from reps.
+                for (int j = 0; j < elements; j++) {
+                    zipIndex_comp[j] = j + 7 + zipIndex_comp[j];
+                }
+
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
                         if (zipResults[i] != zipIndex_comp[i]){
@@ -371,18 +382,24 @@ namespace msl {
 
             bb.fill(3);
             c.fill(2);
+            t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                t = MPI_Wtime();
                 bb.zipIndexInPlace(c, pr);
-                bb.gather(zipResults);
-                zip3_time += MPI_Wtime() - t;
             }
+            bb.gather(zipResults);
+            zip3_time += MPI_Wtime() - t;
 
             if(CHECK){
                 int *zipIndexInPlace_comp = new int[elements];
-                for (int j = 0; j < elements; j++) {
-                    zipIndexInPlace_comp[j] = j * 3 * 2;
+                for (int j = 0; j<elements; j++) {
+                    zipIndexInPlace_comp[j] = 3;
                 }
+                for (int i = 0; i<reps; i++) {
+                    for (int j = 0; j<elements; j++) {
+                        zipIndexInPlace_comp[j] = j * zipIndexInPlace_comp[j] * 2;
+                    }
+                }
+
 
 
                 if (msl::isRootProcess()) {
@@ -448,7 +465,7 @@ int main(int argc, char** argv){
       outputFile << "" + std::to_string(msl::Muesli::num_total_procs) + ";" + std::to_string(msl::Muesli::num_gpus) + ";"
       + std::to_string(dim) + ";" + std::to_string(msl::Muesli::cpu_fraction) + ";";
       outputFile.close();
-      printf("%d; %d; %d;", msl::Muesli::num_total_procs,
+      printf("%d; %d; %d;\n", msl::Muesli::num_total_procs,
         msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
   }
   msl::test::da_test(dim, nextfile, reps);

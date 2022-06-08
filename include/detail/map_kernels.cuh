@@ -34,8 +34,7 @@
 
 #include "exec_plan.h"
 // #include "plmatrix.h"
-// #include "da.h"
-#include "dc.h"
+
 // #include "plarray.h"
 
 namespace msl {

@@ -38,6 +38,7 @@
 #include "dc.h"
 
 int CHECK = 0;
+int OUTPUT = 0;
 namespace msl {
     namespace test {
 
@@ -49,11 +50,7 @@ namespace msl {
                 y(factor){}
 
             MSL_USERFUNC int operator() (int x) const {
-                int summe = 0;
-                for (int n = 0; n < 100; n++){
-                    summe = summe + n;
-                }
-                return summe + x;
+                return y * x;
             }
         };
 
@@ -64,42 +61,25 @@ namespace msl {
             y(factor){}
 
             MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const {
-                int summe = 0;
-                for (int n = 0; n < 100; n++){
-                    summe = summe + n;
-                }
-                return (summe - j - l - Ai - Bi - y);
+                return i * j * l * Ai * Bi * y;
             }
         };
 
         class Sum : public Functor2<int, int, int>{
         public: MSL_USERFUNC int operator() (int x, int y) const {
-            int summe = 0;
-            for (int n = 0; n < 100; n++){
-                summe = summe + n;
-            }
-            return summe + y + x;
+            return y + x;
         }
         };
 
 
         class Sum4 : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {
-            int summe = 0;
-            for (int n = 0; n < 100; n++){
-                summe = summe + n;
-            }
-            return i+summe-j-x;}
+            return i+j+x+y;}
         };
 
         class Sum5 : public Functor5<int, int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {
-            int summe = 0;
-            for (int n = 0; n < 100; n++){
-                summe = summe + n;
-            }
-
-            return summe -(i+j+x+y+l);}
+            return i+j+x+y+l;}
         };
 
 
@@ -115,8 +95,9 @@ namespace msl {
             a.fill(2);
             // TODO does not work for all sizes.
             int elements = dim * dim * dim;
-            if(CHECK){
-                int * fillResult = a.gather();
+            int * fillResult = a.gather();
+
+            if(CHECK && msl::isRootProcess()){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
                         if (fillResult[i] != 2){
@@ -132,8 +113,9 @@ namespace msl {
             fill_time += MPI_Wtime() - t;
             t = MPI_Wtime();
             DC<int> b(dim, dim, dim, 3);
-            if(CHECK){
-                int * constructorResult = b.gather();
+            int * constructorResult = b.gather();
+
+            if(CHECK && msl::isRootProcess()){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
                         if (constructorResult[i] != 3){
@@ -153,15 +135,15 @@ namespace msl {
             Sum4 sum4;
             Sum5 sum5;
             int * mapResults = new int [dim*dim*dim];
-            DC<int> map_dest(dim,dim,dim, 5);
+            int * manmapResults = new int [dim*dim*dim];
+            DC<int> map_dest(dim, dim, dim, 5);
             t = MPI_Wtime();
 	        for (int i = 0; i<reps; i++) {
                 map_dest = b.map(mult);
-
             }
 	        mapResults = map_dest.gather();
 	        map0_time += MPI_Wtime() - t;
-	        if(CHECK){
+	        if(CHECK && msl::isRootProcess()){
 	            if (msl::isRootProcess()) {
 	                for (int i = 0; i < elements; i++) {
 	                    if (mapResults[i] != 9){
@@ -180,12 +162,20 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 b.mapInPlace(mult);
             }
+            for (int j = 0; j < elements; j++) {
+                manmapResults[j] = 2;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j < elements; j++) {
+                    manmapResults[j] = manmapResults[j] * 3;
+                }
+            }
             mapResults = b.gather();
             map1_time += MPI_Wtime() - t;
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++) {
-                        if (mapResults[i] != 6){
+                        if (mapResults[i] != manmapResults[i]){
                             printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 6);
                             break;
                         }
@@ -205,7 +195,7 @@ namespace msl {
             mapResults = b.gather();
             map2_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 int *mapIndex_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
                     int depth = int(j/(dim*dim));
@@ -234,11 +224,16 @@ namespace msl {
             mapResults = b.gather();
             map3_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 int *mapIndexInPlace_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
-                    int depth = int(j/(dim * dim));
-                    mapIndexInPlace_comp[j] = depth + int(j-(depth * dim * dim))/dim + (j%dim) + 3;
+                    mapIndexInPlace_comp[j] = 3;
+                }
+                for (int i = 0; i<reps; i++) {
+                    for (int j = 0; j < elements; j++) {
+                        int depth = int(j/(dim * dim));
+                        mapIndexInPlace_comp[j] = depth + int(j-(depth * dim * dim))/dim + (j%dim) + mapIndexInPlace_comp[j];
+                    }
                 }
 
 
@@ -256,7 +251,6 @@ namespace msl {
             }
             // ************* Fold *********************** //
             b.fill(3);
-            b.mapIndexInPlace(sum4);
             int result = 0;
             t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
@@ -264,12 +258,12 @@ namespace msl {
             }
             fold0_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 int compresult = 0;
                 int *fold_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
                     int depth = int(j/(dim*dim));
-                    fold_comp[j] = depth + int(j-(depth * dim*dim))/dim + (j%dim) + 3;
+                    fold_comp[j] = 3;//depth + int(j-(depth * dim * dim))/dim + (j%dim) + 3;
                 }
                 for (int j = 0; j < elements; j++) {
                     compresult += fold_comp[j];
@@ -287,17 +281,17 @@ namespace msl {
             DC<int> c(dim, dim, dim, 3);
             c.fill(20);
             int * zipResults = new int [dim*dim*dim];
+            int * manzipResults = new int [dim*dim*dim];
             DC<int> d (dim,dim,dim);
             t = MPI_Wtime();
 
             for (int i = 0; i<reps; i++) {
                 d = b.zip(c,sum);
-                //
             }
             zipResults = d.gather();
             zip0_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
                         if (zipResults[i] != 30){
@@ -316,15 +310,21 @@ namespace msl {
 
             for (int i = 0; i<reps; i++) {
                 b.zipInPlace(c, sum);
-                //
             }
             zipResults = b.gather();
             zip1_time += MPI_Wtime() - t;
-
-            if(CHECK){
+            for (int j = 0; j < elements; j++){
+                manzipResults[j] = 10;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j < elements; j++){
+                    manzipResults[j] = 10 + manzipResults[j];
+                }
+            }
+            if(CHECK && msl::isRootProcess()){
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
-                        if (zipResults[i] != 20){
+                        if (zipResults[i] != manzipResults[i]){
                             printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipResults[i], 20);
                             break;
                         }
@@ -339,12 +339,11 @@ namespace msl {
             t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
                 d = b.zipIndex(c, sum5);
-                //
             }
             zipResults = d.gather();
             zip2_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 int *zipIndex_comp = new int[elements];
                 for (int j = 0; j < elements; j++) {
                     int depth = int(j/(dim*dim));
@@ -369,18 +368,21 @@ namespace msl {
 
             for (int i = 0; i<reps; i++) {
                 b.zipIndexInPlace(c, mul5);
-                //
             }
             zipResults = b.gather();
             zip3_time += MPI_Wtime() - t;
 
-            if(CHECK){
+            if(CHECK && msl::isRootProcess()){
                 int *zipIndexInPlace_comp = new int[elements];
-                for (int j = 0; j < elements; j++) {
-                    int depth = int(j/(dim*dim));
-                    zipIndexInPlace_comp[j] = 3 * depth * (int(j-(depth * dim*dim))/dim) * (j%dim) * 3 * 2;
+                for (int i = 0; i<elements; i++) {
+                    zipIndexInPlace_comp[i] = 3;
                 }
-
+                for (int i = 0; i<reps; i++) {
+                    for (int j = 0; j < elements; j++) {
+                        int depth = int(j/(dim*dim));
+                        zipIndexInPlace_comp[j] = zipIndexInPlace_comp[j] * depth * (int(j-(depth * dim*dim))/dim) * (j%dim) * 3 * 2;
+                    }
+                }
 
                 if (msl::isRootProcess()) {
                     for (int i = 0; i < elements; i++){
@@ -395,13 +397,15 @@ namespace msl {
                 }
             }
             if (msl::isRootProcess()) {
-                std::ofstream outputFile;
-                outputFile.open(nextfile, std::ios_base::app);
-                outputFile << "" + std::to_string(fill_time) + ";" + std::to_string(const_time) +";" + std::to_string(map0_time) + ";" +
-                "" + std::to_string(map1_time) + ";" + std::to_string(map2_time) +";" + std::to_string(map3_time) + ";" +
-                "" + std::to_string(fold0_time) + ";" + std::to_string(zip0_time) +";" + std::to_string(zip1_time) + ";" +
-                std::to_string(zip2_time) + ";" + std::to_string(zip3_time)+ ";\n";
-                outputFile.close();
+                if (OUTPUT) {
+                    std::ofstream outputFile;
+                    outputFile.open(nextfile, std::ios_base::app);
+                    outputFile << "" + std::to_string(fill_time) + ";" + std::to_string(const_time) +";" + std::to_string(map0_time) + ";" +
+                    "" + std::to_string(map1_time) + ";" + std::to_string(map2_time) +";" + std::to_string(map3_time) + ";" +
+                    "" + std::to_string(fold0_time) + ";" + std::to_string(zip0_time) +";" + std::to_string(zip1_time) + ";" +
+                    std::to_string(zip2_time) + ";" + std::to_string(zip3_time)+ ";\n";
+                    outputFile.close();
+                }
                // printf("Filltime ; consttime ; Map ; Mapinplace ; mapindex ; mapindexinplace, fold, zip, zipinplace, zipindex, zipindexinplace\n");
                printf("%f; %f; %f; %f; %f; %f; %f; %f; %f; %f; %f\n", fill_time, const_time,
                        map0_time, map1_time, map2_time, map3_time, fold0_time, zip0_time, zip1_time, zip2_time, zip3_time);}
@@ -438,14 +442,16 @@ int main(int argc, char** argv){
   std::string nextfile;
   if (msl::isRootProcess()) {
       std::stringstream ss;
-      ss << "gather_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
+      ss << "local_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
       nextfile = ss.str();
-      std::ofstream outputFile;
-      outputFile.open(nextfile, std::ios_base::app);
-      outputFile << "" + std::to_string(msl::Muesli::num_total_procs) + ";" + std::to_string(msl::Muesli::num_gpus) + ";"
-      + std::to_string(dim) + ";" + std::to_string(msl::Muesli::cpu_fraction) + ";";
-      outputFile.close();
-      printf("%d; %d; %d; %.2f", msl::Muesli::num_total_procs,
+      if (OUTPUT) {
+          std::ofstream outputFile;
+          outputFile.open(nextfile, std::ios_base::app);
+          outputFile << "" + std::to_string(msl::Muesli::num_total_procs) + ";" + std::to_string(msl::Muesli::num_gpus) + ";"
+          + std::to_string(dim) + ";" + std::to_string(msl::Muesli::cpu_fraction) + ";";
+          outputFile.close();
+      }
+      printf("%d; %d; %d; %.2f\n", msl::Muesli::num_total_procs,
              msl::Muesli::num_local_procs, msl::Muesli::num_gpus, msl::Muesli::cpu_fraction);
   }
   msl::test::dc_test(dim, nextfile, reps);

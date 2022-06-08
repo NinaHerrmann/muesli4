@@ -33,11 +33,10 @@
 
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func) {
-  size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (x < size) {
-    out[x] = func(in[x]);
-  }
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < size) {
+        out[x] = func(in[x]);
+    }
 }
 template <typename T, typename R, typename F>
 __global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func, GPUExecutionPlan<T> plan, int nrow, int ncol) {

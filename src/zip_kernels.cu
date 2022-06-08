@@ -51,12 +51,12 @@ __global__ void msl::detail::zipKernel(T1* in1, T2* in2, T3* in3, R* out, size_t
 
 // new kernel for DM, HK 06.11.2020 -- TODO better to start matrix of threads?
 template <typename T1, typename T2, typename R, typename FCT3>
-__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,size_t n,int first,FCT3 func,int ncols){
+__global__ void msl::detail::zipIndexKernel(T1* in1,T2* in2,R* out,size_t n, int first,FCT3 func,int ncols){
   size_t k = blockIdx.x * blockDim.x + threadIdx.x;
 
-  //if (k < n) {
-  out[k] = func((k + first) / ncols,(k + first) % ncols, in1[k], in2[k]);
- // }
+  if (k < n) {
+    out[k] = func((k + first) / ncols, (k + first) % ncols, in1[k], in2[k]);
+  }
 }
 
 // new kernel for DM, NH 06.11.2020

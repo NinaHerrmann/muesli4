@@ -48,7 +48,7 @@ double valB = 0.01;
 #define TW 16
 
 template <typename T>
-void checkResults(DMatrix<T>& dmC, int n)
+void checkResults(DM<T>& dmC, int n)
 {
   T** C = new T*[n];
   for (int i = 0; i < n; i++) {
@@ -99,7 +99,7 @@ struct dotproduct : public MMapIndexFunctor<T, T>
   int tw;
   LMatrix<T> A, B;
 
-  dotproduct(DMatrix<T>& _A, DMatrix<T>& _B, int tile_width)
+  dotproduct(DM<T>& _A, DM<T>& _B, int tile_width)
     : tw(tile_width), A(_A), B(_B, Distribution::COPY)
   {
     this->addArgument(&A);
@@ -174,7 +174,7 @@ struct dotproduct : public MMapIndexFunctor<T, T>
 };
 
 template <typename T>
-DMatrix<T>& matmult(DMatrix<T>& A, DMatrix<T>& B, DMatrix<T>* C, int tile_width)
+DM<T>& matmult(DM<T>& A, DM<T>& B, DM<T>* C, int tile_width)
 {
   // Initial shifting
   auto negate = [] (int a) {return -a;};
@@ -201,8 +201,8 @@ template <typename T>
 void testMatMult(int n, int tile_width, bool output, bool check)
 {
   int sqrtp = (int) (sqrt((double) Muesli::num_local_procs) + 0.1);
-  DMatrix<T> A(n, n, sqrtp, sqrtp, &initA<T>);
-  DMatrix<T> B(n, n, sqrtp, sqrtp, &initB<T>);
+  DM<T> A(n, n, sqrtp, sqrtp, &initA<T>);
+  DM<T> B(n, n, sqrtp, sqrtp, &initB<T>);
 
   // output matrices A and B
   if (output) {
@@ -211,7 +211,7 @@ void testMatMult(int n, int tile_width, bool output, bool check)
   }
 
   // matrix multiplication C=A*B
-  DMatrix<T> C(n, n, sqrtp, sqrtp, (T)0.0);
+  DM<T> C(n, n, sqrtp, sqrtp, (T)0.0);
   C = matmult(A, B, &C, tile_width);
 
   // output matrix C

@@ -101,7 +101,7 @@ msl::DM<T>::DM(int row, int col, const T &v)
     initGPUs();
 #endif
 #pragma omp parallel for
-    for (int i = 0; i < nrow*ncol; i++){
+    for (int i = 0; i < nLocal; i++){
         localPartition[i] = v;
     }
 #ifdef __CUDACC__
@@ -367,7 +367,7 @@ void msl::DM<T>::setLocalPartition(T *elements) {
 template<typename T>
 void msl::DM<T>::fill(const T &element) {
     #pragma omp parallel for
-    for (int i = 0; i<nrow*ncol; i++){
+    for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
     initGPUs();
@@ -519,8 +519,6 @@ void msl::DM<T>::setLocal(int localIndex, const T &v) {
         // TODO adjust to new!
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
-        //printf("gpuid %d idx %d \n", (localIndex - nCPU) / nGPU, localIndex - nCPU - gpuId * nGPU);
-        //printf("setLocal: localIndex: %i, gpuId: %i, idx: %i - %d - %d\n", localIndex, gpuId, idx, nCPU, nGPU); // debug
         cudaSetDevice(gpuId);
         (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T),
                                      cudaMemcpyHostToDevice));
@@ -706,8 +704,6 @@ T* msl::DM<T>::gather() {
 }
 template<typename T>
 void msl::DM<T>::gather(msl::DM<T> &da) {
-    printf("gather\n");
-
     size_t rec_bytes = nLocal * sizeof(T); // --> received per process
     if (msl::isRootProcess()) {
         MPI_Gather(localPartition, rec_bytes, MPI_BYTE, localPartition, rec_bytes, MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -972,7 +968,6 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-
         detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data,
                         plans[i].nLocal, plans[i].first, f, ncol);
@@ -989,6 +984,8 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
     }
     // check for errors during gpu computation
     cpuMemoryInSync = false;
+    msl::syncStreams();
+
 }
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
@@ -1162,9 +1159,13 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     }
     // fold local elements on CPU (overlap with GPU computations)
     // TODO: openmp has parallel reduce operators.
-    T cpu_result = localPartition[0];
-    for (int k = 1; k < nCPU; k++) {
-        cpu_result = f(cpu_result, localPartition[k]);
+    T cpu_result = 0;
+
+    if (nCPU > 0){
+        cpu_result = localPartition[0];
+        for (int k = 1; k < nCPU; k++) {
+            cpu_result = f(cpu_result, localPartition[k]);
+        }
     }
 
     msl::syncStreams();
@@ -1291,20 +1292,26 @@ T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         download();
     }
     T localresult = 0;
-
 #pragma omp parallel for shared(localPartition) reduction(+: localresult)
     for (int i = 0; i < nLocal; i++) {
         localresult = f(localresult, localPartition[i]);
     }
+    T *local_results = new T[np];
+    T tmp = localresult;
 
+    msl::allgather(&tmp, local_results, 1);
+    T global_result = local_results[0];
+#pragma omp parallel for shared(local_results) reduction(+: global_result)
+    for (int i = 1; i < np; i++) {
+        global_result = f(global_result, local_results[i]);
+    }
     // TODO MPI global result
-    // T* globalResults = new T[np];
-    return localresult;
+    return global_result;
 }
 #endif
 
 
-// // *********** fill *********************************************
+// *********** fill *********************************************
 
 // template <typename T> template <typename F> void msl::DM<T>::fill(const F &f)
 // {

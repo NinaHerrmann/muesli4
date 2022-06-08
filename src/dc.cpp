@@ -1180,9 +1180,14 @@ T msl::DC<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     }
     // fold local elements on CPU (overlap with GPU computations)
     // TODO: openmp has parallel reduce operators.
-    T cpu_result = localPartition[0];
-    for (int k = 1; k < nCPU; k++) {
-        cpu_result = f(cpu_result, localPartition[k]);
+    // TODO: when 0.0% cpu fraction this adds an extra element.
+    T cpu_result = 0;
+
+    if (nCPU > 0){
+        cpu_result = localPartition[0];
+        for (int k = 1; k < nCPU; k++) {
+            cpu_result = f(cpu_result, localPartition[k]);
+        }
     }
 
     msl::syncStreams();
@@ -1297,6 +1302,7 @@ T msl::DC<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     delete[] gpu_results;
     delete[] d_odata;
     delete[] local_results;
+    msl::syncStreams();
 
     return final_result;
 }

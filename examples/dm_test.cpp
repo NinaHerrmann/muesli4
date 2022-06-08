@@ -37,6 +37,8 @@
 #include "muesli.h"
 #include "dm.h"
 
+int CHECK = 0;
+int OUTPUT = 0;
 namespace msl {
     namespace test {
 
@@ -74,54 +76,55 @@ namespace msl {
         public: MSL_USERFUNC int operator() (int i, int j, int x) const {return i+j+x;}
         };
 
+        class Index : public Functor3<int, int, int, int>{
+        private: int y;
+        public:
+            Index(int cols):
+            y(cols){}
+        MSL_USERFUNC int operator() (int i, int j, int x) const {return (i*y)+j;}
+        };
+
 
         class Sum4 : public Functor4<int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {return i+j+x+y;}
         };
 
-        class CopyCond : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const
-                   {if ((v1 * v2) % 2 == 0) return x; else return y;}
-        };
-
-
-        class Proj1 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return x;}
-        };
-
-
-        class Proj2 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return v1;}
-        };
-
-        class Proj4 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int v1, int v2, int y) const {return y;}
-        };
-
-        void dm_test(int dim) {
-            printf("Starting dm_test...\n");
-
+        void dm_test(int dim, std::string nextfile, int reps) {
             // ************* Init *********************** //
+            double fill_time = 0.0, const_time = 0.0, map0_time =  0.0, map1_time =  0.0, map2_time =  0.0, map3_time =  0.0, zip0_time =  0.0, zip1_time =  0.0, zip2_time =  0.0, zip3_time =  0.0, fold0_time = 0.0, fold1_time = 0.0;
 
-            DM<int> a(10, 10);
+            DM<int> a(dim, dim);
+            double t = MPI_Wtime();
             a.fill(2);
-            for (int i = 0; i < 10*10; i++){
-                if (a.get(i) != 2){
-                    printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i, a.get(i));
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("Fill \t\t\t \xE2\x9C\x93\n");
+            int elements = dim * dim;
+            int * fillResult = a.gather();
+            fill_time += MPI_Wtime() - t;
+
+            if(CHECK && msl::isRootProcess()){
+                for (int i = 0; i < elements; i++){
+                    if (fillResult[i] != 2){
+                        printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i, fillResult[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("Fill \t\t\t \xE2\x9C\x93\n");
+                    }
                 }
             }
-            DM<int> b(10, 10, 5);
-            for (int i = 0; i < 10*10; i++){
-                if (b.get(i) != 5){
-                    printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i, b.get(i));
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("Initialize+fill \t \xE2\x9C\x93\n");
+            t = MPI_Wtime();
+            DM<int> b(dim, dim, 5);
+            const_time += MPI_Wtime() - t;
+            int * constResult = b.gather();
+
+            if(CHECK && msl::isRootProcess()){
+                for (int i = 0; i < elements; i++){
+                    if (constResult[i] != 5){
+                        printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i, constResult[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("Initialize+fill \t \xE2\x9C\x93\n");
+                    }
                 }
             }
             Produkt pr;
@@ -131,154 +134,243 @@ namespace msl {
             Sum3 sum3;
             Sum4 sum4;
 
-            DM<int> map(10, 10, 3);
-            DM<int> map_dest = map.map(mult);
-            for (int i = 0; i < 10*10; i++) {
-                if (map_dest.get(i) != 9){
-                    printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, map_dest.get(i), 9);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("map \t\t\t \xE2\x9C\x93\n");
+            /*DM<int> map(dim, dim, 3);
+            int * mapResults;
+            t = MPI_Wtime();
+            DM<int> map_dest(dim, dim);
+            for (int i = 0; i<reps; i++) {
+                map_dest = map.map(mult);
+            }
+            mapResults = map_dest.gather();
+            map0_time += MPI_Wtime() - t;
+            if(CHECK && msl::isRootProcess()){
+                for (int i = 0; i < elements; i++) {
+                    if (mapResults[i] != 9){
+                        printf("map \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 9);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("map \t\t\t \xE2\x9C\x93\n");
+                    }
                 }
             }
-            DM<int> mapInPlace(10, 10, 2);
-            mapInPlace.mapInPlace(mult);
-            for (int i = 0; i < 10*10; i++) {
-                if (mapInPlace.get(i) != 6){
-                    printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapInPlace.get(i), 6);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("mapInPlace \t\t \xE2\x9C\x93\n");
+            DM<int> mapInPlace(dim, dim, 2);
+            t = MPI_Wtime();
+
+            for (int i = 0; i<reps; i++) {
+                mapInPlace.mapInPlace(mult);
+            }
+            int * manmapResults = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                manmapResults[j] = 2;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j < elements; j++) {
+                    manmapResults[j] = manmapResults[j] * 3;
                 }
             }
-            DM<int> mapIndex(10, 10, 6);
-            DM<int> mapIndex_dest = mapIndex.mapIndex(sum3);
-            int *mapIndex_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                mapIndex_comp[j] = int(j/10) + (j%10) + 6;
-            }
-            for (int i = 0; i < 10*10; i++) {
-                if (mapIndex_dest.get(i) != mapIndex_comp[i]){
-                    printf("mapIndex \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapIndex_dest.get(i), mapIndex_comp[i]);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("mapIndex \t\t \xE2\x9C\x93\n");
+            mapResults = mapInPlace.gather();
+            map1_time += MPI_Wtime() - t;
+            if(CHECK && msl::isRootProcess()){
+                for (int i = 0; i < elements; i++) {
+                    if (mapResults[i] != manmapResults[i]){
+                        printf("mapInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], 6);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("mapInPlace \t\t \xE2\x9C\x93\n");
+                    }
                 }
             }
-            DM<int> amap(10, 10, 2);
-            int *amap_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                amap_comp[j] = 2 * int(j/10) * (j%10);
+            DM<int> mapIndex(dim, dim, 6);
+            for (int i = 0; i<reps; i++) {
+                DM<int> mapIndex_dest = mapIndex.mapIndex(sum3);
+                mapResults = mapIndex_dest.gather();
             }
-            amap.mapIndexInPlace(pr);
-            for (int i = 0; i < 10*10; i++){
-                if (amap.get(i) != amap_comp[i]){
-                    printf("MapIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, amap.get(i), amap_comp[i]);
-                    break;
+            int *mapIndex_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                mapIndex_comp[j] = 6;
+            }
+            for (int j = 0; j < elements; j++) {
+                mapIndex_comp[j] = int(j/dim) + (j%dim) + mapIndex_comp[j];
+            }
+
+            if (CHECK && msl::isRootProcess()){
+                for (int i = 0; i < elements; i++) {
+                    if (mapResults[i] != mapIndex_comp[i]){
+                        printf("mapIndex \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], mapIndex_comp[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("mapIndex \t\t \xE2\x9C\x93\n");
+                    }
                 }
-                if (i == (10*10)-1) {
-                    printf("MapIndexInPlace \t \xE2\x9C\x93\n");
+            }
+            DM<int> amap(dim, dim, 2);
+            int *amap_comp = new int[elements];
+
+            for (int i = 0; i<reps; i++) {
+                amap.mapIndexInPlace(pr);
+            }
+            mapResults = amap.gather();
+            for (int j = 0; j < elements; j++) {
+                amap_comp[j] = 2;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j < elements; j++) {
+                    amap_comp[j] = amap_comp[j] * int(j/dim) * (j%dim);
+                }
+            }
+            if(CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++){
+                    if (mapResults[i] != amap_comp[i]){
+                        printf("MapIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, mapResults[i], amap_comp[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("MapIndexInPlace \t \xE2\x9C\x93\n");
+                    }
                 }
             }
             // ************* Fold *********************** //
-            DM<int> fold(8, 8, 2);
-            DM<int> fold2(16, 16, 2);
+            DM<int> fold(dim, dim, 2);
             fold.mapIndexInPlace(pr);
-            fold2.mapIndexInPlace(pr);
-            int result = fold.fold(sum, true);
-            int result2 = fold2.fold(sum, true);
-            int compresult2 = 0;
-            int *fold_comp2 = new int[16*16];
-            for (int j = 0; j < 16*16; j++) {
-                fold_comp2[j] = 2 * int(j/16) * (j%16);
+            int foldresult;
+            for (int i = 0; i<reps; i++) {
+                foldresult = fold.fold(sum, true);
             }
-            for (int j = 0; j < 16*16; j++) {
-                compresult2 += fold_comp2[j];
+            int compfoldresult = 0;
+            int *fold_comp2 = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                fold_comp2[j] = 2 * int(j/dim) * (j%dim);
             }
-            if (compresult2 == result2) {
-                printf("Fold2  \t\t\t \xE2\x9C\x93\n");
-            } else {
-                printf("Fold2 \t\t\t\t \xE2\x9C\x97  \t\t parallel = %d seq = %d! \n", result2, compresult2);
+
+            for (int j = 0; j < elements; j++) {
+                compfoldresult += fold_comp2[j];
             }
-            int compresult = 0;
-            int *fold_comp = new int[8*8];
-            for (int j = 0; j < 8*8; j++) {
-                fold_comp[j] = 2 * int(j/8) * (j%8);
+            if(CHECK && msl::isRootProcess()) {
+                if (compfoldresult == foldresult) {
+                    printf("Fold2  \t\t\t \xE2\x9C\x93\n");
+                } else {
+                    printf("Fold2 \t\t\t\t \xE2\x9C\x97  \t\t parallel = %d seq = %d! \n", foldresult, compfoldresult);
+                }
             }
-            for (int j = 0; j < 8*8; j++) {
-                compresult += fold_comp[j];
-            }
-            if (compresult == result) {
-                printf("Fold  \t\t\t \xE2\x9C\x93\n");
-            } else {
-                printf("Fold \t\t\t\t \xE2\x9C\x97  \t\t parallel = %d seq = %d! \n", result, compresult);
-            }
+           
             // ************* Zip *********************** //
 
-            DM<int> zip(10, 10);
-            DM<int> zip_param(10, 10);
+            DM<int> zip(dim, dim);
+            DM<int> zip_param(dim, dim);
+            DM<int> zip_dest(dim, dim);
             zip.fill(10);
+            int * zipResults = new int[elements];
+            int * manzipResults = new int[elements];
+
             zip_param.fill(20);
-            DM<int> zip_dest = zip.zip(zip_param,sum);
-            for (int i = 0; i < 10*10; i++){
-                if (zip_dest.get(i) != 30){
-                    printf("Zip \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zip_dest.get(i), 30);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("Zip \t\t\t \xE2\x9C\x93\n");
-                }
+            for (int j = 0; j<elements; j++) {
+                manzipResults[j] = 20;
             }
-            DM<int> zipIndex(10, 10, 7);
-            DM<int> zipIndex_param(10, 10, 8);
-            DM<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
-            int *zipIndex_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                zipIndex_comp[j] = int(j/10) + (j%10) + 7 + 8;
-            }
-            for (int i = 0; i < 10*10; i++){
-                if (zipIndex_dest.get(i) != zipIndex_comp[i]){
-                    printf("ZipIndex \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndex_dest.get(i), zipIndex_comp[i]);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("ZipIndex \t\t \xE2\x9C\x93\n");
-                }
-            }
-            DM<int> zipInPlace(10, 10);
-            DM<int> zipInPlace_dest(10, 10);
-            zipInPlace.fill(10);
-            zipInPlace_dest.fill(10);
-            zipInPlace_dest.zipInPlace(zipInPlace, sum);
-            for (int i = 0; i < 10*10; i++){
-                if (zipInPlace_dest.get(i) != 20){
-                    printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipInPlace_dest.get(i), 20);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("ZipInPlace \t\t \xE2\x9C\x93\n");
-                }
-            }
-            DM<int> zipIndexInPlace(10, 10, 4);
-            DM<int> zipIndexInPlace_param(10, 10, 2);
-            int *zipIndexInPlace_comp = new int[10*10];
-            for (int j = 0; j < 10 * 10; j++) {
-                zipIndexInPlace_comp[j] = 4 * int(j/10) * (j%10) * 3 * 2;
-            }
-            zipIndexInPlace.zipIndexInPlace(zipIndexInPlace_param, mul4);
-            for (int i = 0; i < 10*10; i++){
-                if (zipIndexInPlace.get(i) != zipIndexInPlace_comp[i]){
-                    printf("ZipIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipIndexInPlace.get(i), zipIndexInPlace_comp[i]);
-                    break;
-                }
-                if (i == (10*10)-1) {
-                    printf("ZipIndexInPlace \t \xE2\x9C\x93\n");
-                }
+            for (int j = 0; j<elements; j++) {
+                manzipResults[j] = 10 + manzipResults[j];
             }
 
+
+            for (int i = 0; i<reps; i++) {
+                zip_dest = zip.zip(zip_param,sum);
+            }
+            zipResults = zip_dest.gather();
+            if(CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++){
+                    if (manzipResults[i] != zipResults[i]){
+                        printf("Zip \t\t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipResults[i], manzipResults[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("Zip \t\t\t \xE2\x9C\x93\n");
+                    }
+                }
+            }
+            DM<int> zipIndex(dim, dim, 7);
+            DM<int> zipIndex_param(dim, dim, 8);
+            for (int i = 0; i<reps; i++) {
+                DM<int> zipIndex_dest = zipIndex.zipIndex(zipIndex_param, sum4);
+                zipResults = zipIndex_dest.gather();
+            }
+            int *zipIndex_comp = new int[elements];
+            // Independent from reps?
+            for (int j = 0; j < elements; j++) {
+                zipIndex_comp[j] = int(j/dim) + (j%dim) + 7 + 8;
+            }
+
+            if(CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++){
+                    if (zipResults[i] != zipIndex_comp[i]){
+                        printf("ZipIndex \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipResults[i], zipIndex_comp[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("ZipIndex \t\t \xE2\x9C\x93\n");
+                    }
+                }
+            }
+            DM<int> zipInPlace(dim, dim);
+            DM<int> zipInPlace_dest(dim, dim);
+            zipInPlace.fill(10);
+            zipInPlace_dest.fill(20);
+            for (int i = 0; i<reps; i++) {
+                zipInPlace_dest.zipInPlace(zipInPlace, sum);
+            }
+            zipResults = zipInPlace_dest.gather();
+
+            for (int j = 0; j<elements; j++) {
+                manzipResults[j] = 20;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j<elements; j++) {
+                    manzipResults[j] = 10 + manzipResults[j];
+                }
+            }
+            if(CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++){
+                    if (zipResults[i] != manzipResults[i]){
+                        printf("ZipInPlace \t\t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipInPlace_dest.get(i), 20);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("ZipInPlace \t\t \xE2\x9C\x93\n");
+                    }
+                }
+            }
+            DM<int> zipIndexInPlace(dim, dim, 4);
+            DM<int> zipIndexInPlace_param(dim, dim, 2);
+            int *zipIndexInPlace_comp = new int[elements];
+            for (int j = 0; j < elements; j++) {
+                zipIndexInPlace_comp[j] = 4;
+            }
+            for (int i = 0; i<reps; i++) {
+                for (int j = 0; j < elements; j++) {
+                    zipIndexInPlace_comp[j] = zipIndexInPlace_comp[j] * int(j/dim) * int(j%dim) * 3 * 2;
+                }
+            }
+            for (int i = 0; i<reps; i++) {
+                zipIndexInPlace.zipIndexInPlace(zipIndexInPlace_param, mul4);
+            }
+            zipResults = zipIndexInPlace.gather();
+
+            if(CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++){
+                    if (zipResults[i] != zipIndexInPlace_comp[i]){
+                        printf("ZipIndexInPlace \t\t \xE2\x9C\x97 At Index %d: Valuep %d != Valueseq %d No further checking.\n", i, zipResults[i], zipIndexInPlace_comp[i]);
+                        break;
+                    }
+                    if (i == (elements)-1) {
+                        printf("ZipIndexInPlace \t \xE2\x9C\x93\n");
+                    }
+                }
+            }
+            if (msl::isRootProcess()) {
+                printf("%f; %f; %f; %f; %f; %f; %f; %f; %f; %f; %f\n", fill_time, const_time,
+                       map0_time, map1_time, map2_time, map3_time, fold0_time, zip0_time, zip1_time, zip2_time, zip3_time);
+            }*/
           return;
         }
     }} // close namespaces
@@ -289,10 +381,32 @@ int main(int argc, char** argv){
   msl::setNumGpus(2);
   msl::initSkeletons(argc, argv);
   msl::Muesli::cpu_fraction = 0.2;
-
-  printf("Starting Program %s with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
-  msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
-  msl::test::dm_test(16);
+  int dim = 4;
+  int nGPUs = 1;
+  int reps = 1;
+  if (argc >= 3) {
+      dim = atoi(argv[1]);
+      nGPUs = atoi(argv[2]);
+  }
+  if (argc >= 4) {
+      msl::Muesli::cpu_fraction = atof(argv[3]);
+      if (msl::Muesli::cpu_fraction > 1) {
+          msl::Muesli::cpu_fraction = 1;
+      }
+  }
+  if (argc >= 5) {
+      CHECK = atoi(argv[4]);
+  }
+  if (argc >= 6) {
+      reps = atoi(argv[5]);
+  }
+  msl::setNumGpus(nGPUs);
+  std::string nextfile;
+  if (msl::isRootProcess()) {
+      printf("Starting Program %s with %d nodes %d cpus and %d gpus\n", msl::Muesli::program_name, msl::Muesli::num_total_procs,
+             msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
+  }
+  msl::test::dm_test(dim, nextfile, reps);
   msl::terminateSkeletons();
   return EXIT_SUCCESS;
 }
