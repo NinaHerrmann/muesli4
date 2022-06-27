@@ -125,6 +125,40 @@ public:
 
 };
 
+class RotateRowCompleteNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating when datastructure is not row complete ist not implemented yet.";
+  }
+
+};
+class RotateColCompleteNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating when datastructure is not row complete ist not implemented yet.";
+  }
+
+};
+class RotateRowManyNotImplementedException: public Exception
+{
+
+public:
+
+  std::string tostring() const
+  {
+    return "Rotating more rows than allocated to one node ist not implemented yet.";
+  }
+
+};
+
 class IllegalGetException: public Exception
 {
 

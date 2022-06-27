@@ -63,6 +63,12 @@ msl::DM<T>::DM()
 // constructor creates a non-initialized DM
 template<typename T>
 msl::DM<T>::DM(int row, int col) : n(col * row), ncol(col), nrow(row) {
+    nLocal = n / Muesli::num_total_procs;
+    if (nLocal % ncol == 0) {
+        rowComplete = true;
+    } else {
+        rowComplete = false;
+    }
     init();
 #ifdef __CUDACC__
 
@@ -78,7 +84,6 @@ template<typename T>
 msl::DM<T>::DM(int row, int col, bool rowComplete)
     : n(col * row), ncol(col), nrow(row), rowComplete(rowComplete) {
     init();
-
 #ifdef __CUDACC__
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
     initGPUs();
@@ -92,6 +97,12 @@ msl::DM<T>::DM(int row, int col, bool rowComplete)
 template<typename T>
 msl::DM<T>::DM(int row, int col, const T &v)
     : n(col * row), ncol(col), nrow(row) {
+        nLocal = n / Muesli::num_total_procs;
+        if (nLocal % ncol == 0) {
+            rowComplete = true;
+        } else {
+            rowComplete = false;
+        }
     init();
     localPartition = new T[nLocal];
 
@@ -266,19 +277,41 @@ void msl::DM<T>::init() {
     ng = Muesli::num_gpus;
     n = ncol * nrow;
     if (!rowComplete) {
-        nLocal = n / np;
-    } else {
-        auto nLocalRows = nrow / np;
+        // TODO not working for uneven data structures e.g. 7*7 results in 2 * 24.
+        // *1.0f required to get float.
+        if (ceilf((n*1.0f)/np)-(n*1.0f/np) != 0){
+            // If we have an even number of processes just switch roundf and roundl.
+            if (np%2 == 0){
+                if (id%2 == 0){
+                    nLocal = roundf((n*1.0f)/np);
+                } else {
+                    nLocal = roundl((n*1.0f)/np);
+                }
+            } else {
+                // if they are not even e.g. 5 processes 49 element just put the leftovers to first process
+                // maybe not the most precise way but easy. However, not really relevant as many operation
+                // do not work with uneven data structures.
+                if (id == 0){
+                    nLocal = (n / np) + ((n / np)%np);
+                } else {
+                    nLocal = n / np;
+                }
+                printf("ID \t %d nLocal Rows \t %d \n", id, nLocal);
+            }
+        } else {
+            nLocal = n / np;
+        }
+        nlocalRows = nLocal % ncol == 0 ? nLocal / ncol : nLocal / ncol + 1;
+        } else {
+        nlocalRows = nrow / np;
+        /* TODO: Not sure why this was added (and from who).
         if (id == np - 1 && nrow % np != 0) {
             nLocalRows = nrow - (nLocalRows * np);
-        }
-        nLocal = nLocalRows * ncol;
+        } */
+        nLocal = nlocalRows * ncol;
     }
-
-    nlocalRows = nLocal % ncol == 0 ? nLocal / ncol : nLocal / ncol + 1;
-
-    // TODO (endizhupani@uni-muenster.de): This could result in rows being split
-    // between GPUs. Can be problematic for stencil ops.
+    // TODO: This could result in rows being split between GPUs.
+    //  Can be problematic for stencil ops.
 #ifdef __CUDACC__
     nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
     nCPU = nLocal - nGPU * ng; // [0, nCPU-1] elements will be handled by the CPU.
@@ -1704,8 +1737,17 @@ void msl::DM<T>::rotateRows(int a) {
         // if the number to rotate is equal to rows data stays the same.
         return;
     }
+    if (!rowComplete) {
+        if (msl::isRootProcess()) {
+            printf("rowcomplete %d \n", rowComplete);
+            throws(detail::RotateRowCompleteNotImplementedException());
+        }
+        return;
+    }
     if (howmuch > nlocalRows) {
-        printf("not yet implemented\n");
+        if (msl::isRootProcess()) {
+            throws(detail::RotateRowManyNotImplementedException());
+        }
         return;
     }
     // easy approach put all to cpu.
@@ -1824,4 +1866,55 @@ void msl::DM<T>::rotateRows(int a) {
 
     upload();
     // put to gpu
+}
+/* rotateCols
+ * A rowwise distribution is assumed. Otherwise not working.
+* 1 2 3 4    -1    2 3 4 1      2    4 1 2 3
+* 5 6 7 8  ------> 6 7 8 5   ------> 8 5 6 7
+ */
+template<typename T>
+void msl::DM<T>::rotateCols(int a) {
+    bool negative = a < 0;
+    int howmuch = a;
+    if (negative) {
+        howmuch = -1 * a;
+    }
+    if (howmuch >= ncol) {
+        howmuch = howmuch % ncol;
+        a = a % ncol;
+    }
+    printf("howmuch %d a %d\n", howmuch, a);
+    if (howmuch == ncol || a == 0) {
+        // if the number to rotate is equal to rows data stays the same.
+        return;
+    }
+    // easy approach put all to cpu.
+    T * doublePartition = new T[nLocal];
+    download();
+    for (int i = 0; i < nLocal; i++) {
+        doublePartition[i] = localPartition[i];
+    }
+    // easy case iterate where we are.
+    if (rowComplete) {
+        for (int i = 0; i < nrow; i++) {
+            for (int j = 0; j < ncol; j++) {
+                int colelement = (j+a);
+                if (colelement < 0){
+                    colelement = ncol + colelement;
+                }
+                if (colelement >= ncol) {
+                    int newcolelement = colelement - ncol;
+                    colelement = newcolelement;
+                }
+                localPartition[(i*ncol)+j] = doublePartition[(i*ncol)+(colelement)];
+            }
+        }
+    } else {
+        if (msl::isRootProcess()) {
+            throws(detail::RotateColCompleteNotImplementedException());
+        }
+        return;
+    }
+    upload();
+
 }

@@ -134,22 +134,27 @@ namespace msl {
             Sum3 sum3;
             Sum4 sum4;
             Index index(dim);
-            DM<int> rotate(dim, dim, 0);
+            DM<int> rotate(dim, dim, 3);
             rotate.mapIndexInPlace(index);
-            rotate.show();
-            printf("Rotate 1 \n");
+            if (CHECK) { rotate.show(); }
             rotate.rotateRows(1);
-            rotate.show();
-            printf("Rotate -1 \n");
+            if (CHECK) { printf("Rotate 1 \n"); rotate.show(); }
             rotate.rotateRows(-1);
-            rotate.show();
-            printf("Rotate 2 \n");
+            if (CHECK) { printf("Rotate -1 \n");rotate.show(); }
             rotate.rotateRows(2);
-            rotate.show();
-            printf("Rotate -2 \n");
+            if (CHECK) { printf("Rotate 2 \n");rotate.show(); }
             rotate.rotateRows(-2);
+            if (CHECK) { printf("Rotate -2 \n"); rotate.show(); }
+            //rotate.rotateRows(dim+1);
             rotate.show();
-            rotate.rotateRows(dim+1);
+            rotate.rotateCols(-2);
+            rotate.show();
+            rotate.rotateCols(2);
+            rotate.show();
+            rotate.rotateCols(5);
+            rotate.show();
+            rotate.rotateCols(-5);
+            rotate.show();
 
             /*DM<int> map(dim, dim, 3);
             int * mapResults;
