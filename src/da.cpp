@@ -77,6 +77,7 @@ msl::DA<T>::DA(int size, const T &v)
 #endif
 #pragma omp parallel for
     for (int i = 0; i < nLocal; i++) localPartition[i] = v;
+    cpuMemoryInSync = false;
     updateDevice();
 }
 
@@ -254,6 +255,7 @@ void msl::DA<T>::fill(const T &element) {
     for (int i = 0; i < nLocal; i++) {
         localPartition[i] = element;
     }
+    cpuMemoryInSync = false;
     updateDevice();
     return;
 }
@@ -469,7 +471,7 @@ void msl::DA<T>::mapInPlace(MapFunctor &f) {
 template<typename T>
 template<typename MapIndexFunctor>
 void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
-    updateDevice();
+   // updateDevice();
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
       cudaSetDevice(i);
