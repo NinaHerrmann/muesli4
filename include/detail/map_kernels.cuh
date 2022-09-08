@@ -39,39 +39,91 @@
 
 namespace msl {
 
-namespace detail {
+    namespace detail {
 
-template <typename T, typename R, typename F>
-__global__ void mapKernel(T *in, R *out, size_t size, F func);
+        /**
+        * \brief Map function for DA and DM.
+        *
+        * @param in Pointer to gpu memory of datastructure (DA or DM) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DA or DM) where the data is written to.
+        * @param size of the data.
+        * @param func functor to be called.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapKernel(T *in, R *out, size_t size, F func);
 
-template <typename T, typename R, typename F>
-__global__ void mapKernel(T *in, R *out, size_t size, F func, GPUExecutionPlan<T> plan, int nrow, int ncol);
+        /**
+        * \brief Map function for DC. \em Includes index calculations and checks to start 3D kernels.
+        *
+        * @param in Pointer to gpu memory of datastructure (DC) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DC) where the data is written to.
+        * @param size of the data.
+        * @param func functor to be called. (One Param)
+        * @param gpuRows Rows per GPU.
+        * @param gpuCols Cols per GPU.
+        * @param gpuDepth Depth per GPU.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapKernel3D(T *in, R *out, F func, int gpuRows, int gpuCols,
+                                    int gpuDepth);
 
+        /**
+        * \brief MapIndex function for DM. \em Includes index calculations but is startes 1D. TODO:better start 2D?
+        *
+        * @param in Pointer to gpu memory of datastructure (DM) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DM) where the data is written to.
+        * @param size of the data.
+        * @param first Offset for the first element.
+        * @param func functor to be called.
+        * @param ncols number of cols is used to calc the indices.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapIndexKernelDM(T *in, R *out, size_t size, size_t first, F func,
+                                         int ncols);
+        /**
+        * \brief MapIndex function for DA. \em Calls Functor which has two Arguments: the index and the value at the index.
+        *
+        * @param in Pointer to gpu memory of datastructure (DA) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DA) where the data is written to.
+        * @param size of the data.
+        * @param first functor to be called.
+        * @param func functor to be called.
+        * @param localIndices Evaluate - is this feature necessary? Can be used to calculate with local indices.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapIndexKernelDA(T *in, R *out, size_t size, size_t first, F func);
 
-template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
-                               bool localIndices);
+        /**
+        * \brief MapIndex function for DC. \em Calls Functor which has four Arguments: the three indeces and the value at the index.
+        *
+        * @param in Pointer to gpu memory of datastructure (DC) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DC) where the data is written to.
+        * @param gpuRows Rows per GPU.
+        * @param gpuCols Cols per GPU.
+        * @param gpuDepth Depth per GPU.
+        * @param func functor to be called.
+        * @param localIndices Evaluate - is this feature necessary? Can be used to calculate with local indices.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapIndexKernelDC(T *in, R *out, int gpuRows, int gpuCols,
+                                         int gpuDepth, F func);
 
-// new kernel for DM, HK 06.11.2020
-template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T *in, R *out, size_t size, size_t first, F func,
-                               int ncols);
+        /**
+        * \brief MapInPlace function for DC. \em Calls Functor which has one Arguments: the value at the index.
+        *
+        * @param in Pointer to gpu memory of datastructure (DC) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DC) where the data is written to.
+        * @param gpuRows Rows per GPU.
+        * @param gpuCols Cols per GPU.
+        * @param gpuDepth Depth per GPU.
+        * @param func functor to be called.
+        * @param localIndices Evaluate - is this feature necessary? Can be used to calculate with local indices.
+        * @param dim3 Additional param for 3 dim.
+        */
+        template<typename T, typename R, typename F>
+        __global__ void mapInPlaceKernelDC(T *in, R *out, int gpuRows, int gpuCols,
+                                           int gpuDepth, F func);
 
-template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
-                               bool localIndices);
-
-
-template <typename T, typename R, typename F>
-__global__ void mapIndexKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
-                               bool localIndices, int nrow, int ncol, bool dim3);
-
-template <typename T, typename R, typename F>
-__global__ void mapPlaceKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
-                               bool localIndices, int nrow, int ncol, bool dim3, bool inpl);
-template <typename T, typename R, typename F>
-__global__ void mapIndexInPlaceKernel(T *in, R *out, GPUExecutionPlan<T> plan, F func,
-                               bool localIndices);
 /*
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
@@ -86,15 +138,11 @@ __global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T
 template <typename T, typename R, typename F>
 __global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
                                         F func, int i, int rep, int tile_width);
-template <typename T> __global__ void printFromGPU(T *A, int size, int breaker);
-template <typename T> __global__ void printStructFromGPU(T *A, int size, int breaker);
-template <typename T> __global__ void printsingleGPUElement(T *A, int index);
+
 template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss);
 template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);*/
-__global__ void teststh(int Size, int t);
 
-
-} // namespace detail
+    } // namespace detail
 } // namespace msl
 
 #include "../../src/map_kernels.cu"
