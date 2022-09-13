@@ -476,7 +476,6 @@ T &msl::DM<T>::operator[](int index) {
     return get(index);
 }
 
-// TODO:adjust to new structure
 template<typename T>
 void msl::DM<T>::setLocal(int localIndex, const T &v) {
     if (localIndex < nCPU) {
@@ -499,6 +498,7 @@ void msl::DM<T>::set(int globalIndex, const T &v) {
     if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
         setLocal(globalIndex - firstIndex, v);
     }
+    // TODO: Set global
 }
 
 template<typename T>
@@ -506,30 +506,13 @@ GPUExecutionPlan<T> *msl::DM<T>::getExecPlans() {
     return plans;
 }
 
-// TODO Move to muesli.cpp
-#ifdef __CUDACC__
-#define gpuErrchk(ans)                                                         \
-  { gpuAssert((ans), __FILE__, __LINE__); }
-
-
-inline void gpuAssert(cudaError_t code, const char *file, int line,
-                      bool abort = true) {
-    if (code != cudaSuccess) {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
-                line);
-        if (abort)
-            exit(code);
-    }
-}
-#endif
-
 template<typename T>
 void msl::DM<T>::updateDevice() {
 #ifdef __CUDACC__
     if (cpuMemoryInSync) {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
-            // updateHost data
+            // upload data to host
             (cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data,
                                               plans[i].bytes, cudaMemcpyHostToDevice,
                                               Muesli::streams[i]));
@@ -569,7 +552,6 @@ int msl::DM<T>::getGpuId(int index) const {
 }
 
 
-// method (only) useful for debbuging
 template<typename T>
 void msl::DM<T>::showLocal(const std::string &descr) {
     if (!cpuMemoryInSync) {
@@ -613,7 +595,7 @@ void msl::DM<T>::show(const std::string &descr) {
         s << std::endl;
     }
 
-    delete b;
+    delete[] b;
 
     if (msl::isRootProcess())
         printf("%s", s.str().c_str());
@@ -639,12 +621,12 @@ T *msl::DM<T>::gather() {
     T *b = new T[n];
     std::cout.precision(2);
     std::ostringstream s;
-
+#ifdef __CUDACC__
     if (!cpuMemoryInSync) {
         updateHost();
     }
+#endif
     msl::allgather(localPartition, b, nLocal);
-
     return b;
 }
 
@@ -763,12 +745,11 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor &f) {
 
 #ifdef __CUDACC__
 
-    //  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;  // is not used, HK
     for (int i = 0; i < ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        detail::mapIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f,
                         ncol);
     }
@@ -800,8 +781,6 @@ msl::DM<T> msl::DM<T>::map(
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                //          plans[i].d_Data, plans[i].d_Data, plans[i].size, f); // in,
-                //          out, #bytes, function
                 plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].size, f);
     }
 #endif
@@ -828,7 +807,7 @@ msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        detail::mapIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
                         plans[i].first, f, ncol);
     }
@@ -915,7 +894,7 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        detail::zipIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data,
                         plans[i].nLocal, plans[i].first, f, ncol);
     }
@@ -948,7 +927,7 @@ msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        detail::zipIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, b.getExecPlans()[i].d_Data,
                         result.getExecPlans()[i].d_Data, plans[i].nLocal, plans[i].first, f,
                         ncol);
@@ -991,7 +970,7 @@ if (nCPU > 0) {
     for (int k = 0; k < nCPU; k++) {
         int i = (k + firstIndex) / ncol;
         int j = (k + firstIndex) % ncol;
-        //localPartition[k] = f(i, j, localPartition, bPartition);
+        localPartition[k] = f(i, j, localPartition[k], bPartition);
     }
 }
 // check for errors during gpu computation
@@ -1255,6 +1234,12 @@ void msl::DM<T>::downloadlowerpart(int paddingsize) {
 }
 #endif
 
+template<typename T>
+template<typename MapStencilFunctor, typename NeutralValueFunctor>
+void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor) {
+    printf("mapStencilInPlace\n");
+    throws(detail::NotYetImplementedException());
+}
 /*template<typename T>
 void msl::DM<T>::matchloadall(int paddingsize) {
 #ifdef __CUDACC__

@@ -208,9 +208,7 @@ namespace msl {
             for (int i = 0; i<reps; i++) {
                 DA<int> check = mapIndex.mapIndex(sum);
                 check.gather(mapResults2);
-
             }
-
             map2_time += MPI_Wtime() - t;
             if(CHECK){
                 int *mapIndex_comp = new int[elements];

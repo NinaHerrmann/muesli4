@@ -153,7 +153,21 @@ void msl::terminateSkeletons() {
   MPI_Finalize();
   Muesli::running_proc_no = 0;
 }
+#ifdef __CUDACC__
+#define gpuErrchk(ans)                                                         \
+{ gpuAssert((ans), __FILE__, __LINE__); }
 
+
+inline void gpuAssert(cudaError_t code, const char *file, int line,
+                      bool abort = true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
+                line);
+        if (abort)
+            exit(code);
+    }
+}
+#endif
 void msl::printv(const char *format, ...) {
   va_list argp;
   va_start(argp, format);

@@ -136,7 +136,7 @@ namespace msl {
             Index index(dim);
             DM<int> rotate(dim, dim, 3);
             rotate.mapIndexInPlace(index);
-            if (CHECK) { rotate.show(); }
+         /*   if (CHECK) { rotate.show(); }
             rotate.rotateRows(1);
             if (CHECK) { printf("Rotate 1 \n"); rotate.show(); }
             rotate.rotateRows(-1);
@@ -146,17 +146,12 @@ namespace msl {
             rotate.rotateRows(-2);
             if (CHECK) { printf("Rotate -2 \n"); rotate.show(); }
             //rotate.rotateRows(dim+1);
-            rotate.show();
             rotate.rotateCols(-2);
-            rotate.show();
             rotate.rotateCols(2);
-            rotate.show();
             rotate.rotateCols(5);
-            rotate.show();
-            rotate.rotateCols(-5);
-            rotate.show();
+            rotate.rotateCols(-5);*/
 
-            /*DM<int> map(dim, dim, 3);
+            DM<int> map(dim, dim, 3);
             int * mapResults;
             t = MPI_Wtime();
             DM<int> map_dest(dim, dim);
@@ -392,7 +387,7 @@ namespace msl {
             if (msl::isRootProcess()) {
                 printf("%f; %f; %f; %f; %f; %f; %f; %f; %f; %f; %f\n", fill_time, const_time,
                        map0_time, map1_time, map2_time, map3_time, fold0_time, zip0_time, zip1_time, zip2_time, zip3_time);
-            }*/
+            }
           return;
         }
     }} // close namespaces
@@ -422,6 +417,7 @@ int main(int argc, char** argv){
   if (argc >= 6) {
       reps = atoi(argv[5]);
   }
+  CHECK = 1;
   msl::setNumGpus(nGPUs);
   std::string nextfile;
   if (msl::isRootProcess()) {

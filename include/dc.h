@@ -42,6 +42,7 @@
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 #include <utility>
+#include "plmatrix.h"
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
@@ -352,6 +353,28 @@ public:
   template <typename FoldFunctor>
   T fold(FoldFunctor &f, bool final_fold_on_cpu);
 
+  /**
+   * \brief TODO Replaces each element a[i] of the distributed array with f(i, a).
+   *        Note that the index i and the local partition is passed to the
+   *        functor.
+   *
+   * @param result DC to save the result
+   * @param f MapStencilFuncotr
+   * @param neutral_value_functor NeutralValueFunctor
+   */
+  template<typename MapStencilFunctor, typename NeutralValueFunctor>
+  void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+  /**
+  * @brief TODO Non-inplace variant of the mapStencil skeleton.
+  *
+  * @tparam MapStencilFunctor Functor for the Stencil Calculation
+  * @tparam NeutralValueFunctor Functor to return the NV
+  * @param result DC to save the result
+  * @param f MapStencilFuncotr
+  * @param neutral_value_functor NeutralValueFunctor
+  */
+  template<typename MapStencilFunctor, typename NeutralValueFunctor>
+  void mapStencil(DC<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
   //
   // SKELETONS / COMMUNICATION
@@ -549,12 +572,12 @@ public:
    * @return void
    */
 
-  void upload();
+  void updateDevice();
 
   /**
    * \brief Manually download the local partition from GPU memory.
    */
-  void download();
+  void updateHost();
   /**
    * \brief Manually download the local partition from GPU memory.
    */
@@ -609,6 +632,10 @@ public:
    * \brief Each process prints its local partition of the distributed array.
    */
   void printLocal();
+  /**
+   * \brief Each process prints its local partition of the distributed array.
+   */
+  int getnCPU();
 
 private:
   //

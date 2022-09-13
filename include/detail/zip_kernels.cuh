@@ -3,7 +3,8 @@
  *
  *      Authors: Steffen Ernsting <s.ernsting@uni-muenster.de>
  *               Herbert Kuchen <kuchen@uni-muenster.de>
- * 
+ *               Nina Herrmann <nina.herrmann@uni-muenster.de.
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -37,105 +38,201 @@
 
 namespace msl {
 
-namespace detail {
+    namespace detail {
 
-template<typename T1, typename T2, typename R, typename FCT2>
-__global__ void
-zipKernel(T1* in1,
-          T2* in2,
-          R* out,
-          size_t n,   
-          FCT2 func);
+        /**
+      * \brief Zip function for Index less Variants of DA and DM.
+      * \em Remark: this function could also be called with a DC in case threads are started 1D
+      *
+      * @param in1 Pointer to gpu memory of datastructure (DA or DM) which provides the data to calcuate on.
+      * @param in2 Pointer to gpu memory of datastructure (DA or DM) which provides the data to calcuate on.
+      * @param out Pointer to gpu memory of datastructure (DA or DM) where the data is written to.
+      * @param size of the data.
+      * @param func functor to be called.
+      */
+        template<typename T1, typename T2, typename R, typename FCT2>
+        __global__ void
+        zipKernel(T1 *in0,
+                  T2 *in1,
+                  R *out,
+                  size_t n,
+                  FCT2 func);
 
-template<typename T1, typename T2, typename R, typename FCT2>
-__global__ void
-zip3DKernel(T1* in1,
-          T2* in2,
-          R* out,
-          GPUExecutionPlan<T1> plan,
-          FCT2 func, int nrow, int ncol);
-		  
-template<typename T1, typename T2, typename T3, typename R, typename FCT3>
-__global__ void
-zipKernel(T1* in1,
-	  T2* in2,
-	  T3* in3,
-	  R* out,
-	  size_t n,
-	  FCT3 func);
+        /**
+         * \brief Zip function for Index less Variants of DA and DM.
+         *
+         * @param in1 Pointer to gpu memory of datastructure which provides the data to calcuate on.
+         * @param in2 Pointer to gpu memory of datastructure which provides the data to calcuate on.
+         * @param out Pointer to gpu memory of datastructure where the data is written to.
+         * @param func functor to be called.
+         * @param gpuDepth Depth per GPU.
+         * @param gpuRows Rows per GPU.
+         * @param gpuCols Cols per GPU.
+         */
+        template<typename T1, typename T2, typename R, typename FCT2>
+        __global__ void
+        zip3DKernel(T1 *in1,
+                    T2 *in2,
+                    R *out,
+                    FCT2 func, int gpuDepth, int gpuRow, int gpuCol);
+        /**
+         * \brief From HK Zip function for InPlace Variants of DA and DM.
+         * \em Remark: this function could also be called with a DC in case threads are started 1D
+         *
+         * @param in1 Pointer to gpu memory of datastructure which provides the data to calculate on.
+         * @param in2 Pointer to gpu memory of datastructure which provides the data to calculate on.
+         * @param in3 Pointer to gpu memory of datastructure which provides the data to calculate on.
+         * @param out Pointer to gpu memory of datastructure where the data is written to.
+         * @param size of the data.
+         * @param func functor to be called.
+         */
+        template<typename T1, typename T2, typename T3, typename R, typename FCT3>
+        __global__ void
+        zipKernel(T1 *in1,
+                  T2 *in2,
+                  T3 *in3,
+                  R *out,
+                  size_t n,
+                  FCT3 func);
 
-// new kernel for DM
-template<typename T1, typename T2, typename R, typename FCT3>
-__global__ void
-zipIndexKernel(T1* in1,	  	   
-               T2* in2,
-      	       R* out,
-	       size_t n,
-  	       int first,
-	       FCT3 func,
-  	       int ncols);
+        /**
+       * \brief From HK Zip Skeleton for Index Variants of DMs.
+       *
+       * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param out Pointer to gpu memory of DM where the data is written to.
+       * @param size of the data.
+       * @param first index of first element
+       * @param func functor to be called.
+       * @param nCols number of columns
+       */
+        template<typename T1, typename T2, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernelDM(T1 *in1,
+                       T2 *in2,
+                       R *out,
+                       size_t n,
+                       int first,
+                       FCT3 func,
+                       int nCols);
 
-// new kernel for DM
-template<typename T1, typename T2, typename R, typename FCT3>
-__global__ void
-crossZipIndexKernel(T1* in1,
-               T2* in2,
-               R* out,
-               size_t n,
-               int first,
-               FCT3 func,
-               int ncols);
-// new kernel for DM
-template<typename T1, typename T2, typename FCT3>
-__global__ void
-crossZipInPlaceIndexKernel(T1* in1,
-               T2* in2,
-               size_t n,
-               int first,
-               FCT3 func,
-               int ncols);
-// new kernel for zipping a DM, two DAs and a DM		  	   	  	   
-template <typename T1, typename T2, typename T3, typename T4, typename R, typename FCT3>
-__global__ void 
-zipKernelAAM(T1* in1, 
-             T2* in2, 
-             T3* in3, 
-             T4* in4,
-             R* out, 
-             size_t n, 
-             int first,
-             int first2, 
-             FCT3 func, 
-             int ncols);
+        /**
+         * \brief Original usage read data from another point than the current index for DMs
+         * - e.g. \em examples/archiveMuesli2/gaussian.cu
+         * TODO In my opinion crosszip does not really capture what the skeleton is doing
+         * TODO as merely two data structures can be read. This would be more suitable if
+         * an area which is read is defined (zipStencil?)
+         *
+         * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+         * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+         * @param out Pointer to gpu memory of DM where the data is written to.
+         * @param size of the data.
+         * @param first index of first element
+         * @param func functor to be called.
+         * @param nCols number of columns
+         */
+        template<typename T1, typename T2, typename R, typename FCT3>
+        __global__ void
+        crossZipIndexKernel(T1 *in1,
+                            T2 *in2,
+                            R *out,
+                            size_t n,
+                            int first,
+                            FCT3 func,
+                            int ncols);
 
-template<typename T1, typename T2, typename R, typename FCT3>
-__global__ void
-zipIndexKernel(T1* in1,
-		  	   T2* in2,
-		  	   R* out,
-		  	   size_t n,
-		  	   int first,
-		  	   FCT3 func,
-		  	   bool localIndices);
+        /**
+         * \brief Original usage read data from another point than the current index for DMs(inPlace)
+         * - e.g. \em examples/archiveMuesli2/gaussian.cu
+         * TODO In my opinion crosszip does not really capture what the skeleton is doing
+         * TODO as merely two data structures can be read. This would be more suitable if
+         * an area which is read is defined (zipStencil?)
+         *
+         * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+         * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+         * @param out Pointer to gpu memory of DM where the data is written to.
+         * @param size of the data.
+         * @param first index of first element
+         * @param func functor to be called.
+         * @param nCols number of columns
+         */
+        template<typename T1, typename T2, typename FCT3>
+        __global__ void
+        crossZipInPlaceIndexKernel(T1 *in1,
+                                   T2 *in2,
+                                   size_t n,
+                                   int first,
+                                   FCT3 func,
+                                   int nCols);
 
-template<typename T1, typename T2, typename R, typename FCT4>
-__global__ void
-zipIndexKernel(T1* in1,
-		       T2* in2,
-		       R* out,
-		       GPUExecutionPlan<T1> plan,
-		       FCT4 func,
-			   bool localIndices);
+        /**
+        * \brief HK 20.11.2020 Zip a DM two DAs and a DM - assumed all have the same number of elements
+        * - e.g. \em examples/archiveMuesli2/gaussian.cu
+        * TODO Very specific - it would be nice to find a more generic way to pass multiple arguments.
+        *
+        * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+        * @param in2 Pointer to gpu memory of DA which provides the data to calculate on.
+        * @param in3 Pointer to gpu memory of DA which provides the data to calculate on.
+        * @param in4 Pointer to gpu memory of DM which provides the data to calculate on.
+        * @param out Pointer to gpu memory of DM where the data is written to.
+        * @param size of the data.
+        * @param first index of first element
+        * @param first2 is used to calculate an index for arrays. This could be troublesome when having
+         * an unknown number of arguments.
+        * @param func functor to be called.
+        * @param nCols number of columns
+        */
+        template<typename T1, typename T2, typename T3, typename T4, typename R, typename FCT3>
+        __global__ void
+        zipKernelAAM(T1 *in1,
+                     T2 *in2,
+                     T3 *in3,
+                     T4 *in4,
+                     R *out,
+                     size_t n,
+                     int first,
+                     int first2,
+                     FCT3 func,
+                     int nCols);
 
-template<typename T1, typename T2, typename R, typename FCT4>
-__global__ void
-zipIndexKernel(T1* in1,
-               T2* in2,
-               R* out,
-               GPUExecutionPlan<T1> plan,
-               FCT4 func,
-               bool localIndices, int nrow, int ncol, bool dim3);
-}
+        /**
+       * \brief ZipIndex Skeleton for DA (one index Argument)
+       *
+       * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param out Pointer to gpu memory of DM where the data is written to.
+       * @param size of the data.
+       * @param first index of first element
+       * @param func functor to be called.
+       */
+        template<typename T1, typename T2, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernelDA(T1 *in1,
+                       T2 *in2,
+                       R *out,
+                       size_t n,
+                       int first,
+                       FCT3 func);
+
+        /**
+       * \brief ZipIndex Skeleton for DA (one index Argument)
+       *
+       * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param out Pointer to gpu memory of DM where the data is written to.
+       * @param size of the data.
+       * @param first index of first element
+       * @param func functor to be called.
+       */
+        template<typename T1, typename T2, typename R, typename FCT4>
+        __global__ void
+        zipIndexKernelDC(T1 *in1,
+                       T2 *in2,
+                       R *out,
+                       FCT4 func,
+                       int gpuRow, int gpuCol, int gpuDepth,
+                       int firstRow, int firstCol, int firstDepth);
+    }
 }
 
 #include "../../src/zip_kernels.cu"

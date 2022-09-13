@@ -218,26 +218,20 @@ T msl::DA<T>::get(int index) const {
 
     // element with global index is locally stored
     if (isLocal(index)) {
+        if (index < firstIndex + nCPU || cpuMemoryInSync) {
+            message = localPartition[index - firstIndex];
+        } else {
 #ifdef __CUDACC__
-        // element might not be up to date in cpu memory
-        if (!cpuMemoryInSync) {
-          // find GPU that stores the desired element
           int device = getGpuId(index);
           cudaSetDevice(device);
-          // updateHost element
           int offset = index - plans[device].first;
-          (
-              cudaMemcpyAsync(&message,
+          (cudaMemcpyAsync(&message,
                   plans[device].d_Data+offset,
                   sizeof(T),
                   cudaMemcpyDeviceToHost,
                   Muesli::streams[device]));
-        } else {  // element is up to date in cpu memory
-          message = localPartition[index-firstIndex];
-        }
-#else
-        message = localPartition[index - firstIndex];
 #endif
+        }
         idSource = Muesli::proc_id;
     }
         // Element with global index is stored on another node.
@@ -477,8 +471,8 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
       cudaSetDevice(i);
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-          plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f, false);
+      detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+          plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first, f);
     }
 #endif
     // calculate offsets for indices
@@ -532,9 +526,9 @@ msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor &f) {
       cudaSetDevice(i);
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::mapIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+      detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
-                plans[i].first, f, false);
+                plans[i].first, f);
     }
 #endif
     // map on CPU cores
@@ -602,9 +596,9 @@ void msl::DA<T>::zipIndexInPlace(msl::DA<T2> &b, ZipIndexFunctor &f) {
       cudaSetDevice(i);
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+      detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
           plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].nLocal,
-          plans[i].first, f, false);
+          plans[i].first, f);
     }
 #endif
     // zip on CPU cores
@@ -658,9 +652,9 @@ msl::DA<T> msl::DA<T>::zipIndex(msl::DA<T2> &b, ZipIndexFunctor &f) {  // should
       cudaSetDevice(i);
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+      detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
           plans[i].d_Data, b.getExecPlans()[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].nLocal,
-          plans[i].first, f, false);
+          plans[i].first, f);
     }
 #endif
     // zip on CPU cores

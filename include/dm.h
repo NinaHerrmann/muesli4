@@ -204,7 +204,7 @@ namespace msl {
         DM<T> mapIndex(MapIndexFunctor &f); // should be return type DA<R>; debug
 
         /**
-         * \brief Replaces each element a[i] of the distributed array with f(i, a).
+         * \brief TODO Replaces each element a[i] of the distributed array with f(i, a).
          *        Note that the index i and the local partition is passed to the
          *        functor.
          *
@@ -214,7 +214,7 @@ namespace msl {
         template<typename MapStencilFunctor, typename NeutralValueFunctor>
         void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
         /**
-        * @brief Non-inplace variant of the mapStencil skeleton.
+        * @brief TODO Non-inplace variant of the mapStencil skeleton.
         *
         * @tparam R type of the resulting matrix
         * @tparam the dm to save the result

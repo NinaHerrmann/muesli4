@@ -106,22 +106,19 @@ namespace msl {
         */
         template<typename T, typename R, typename F>
         __global__ void mapIndexKernelDC(T *in, R *out, int gpuRows, int gpuCols,
-                                         int gpuDepth, F func);
+                                         int gpuDepth, int firstRow, int firstCol, int firstDepth, F func);
 
         /**
         * \brief MapInPlace function for DC. \em Calls Functor which has one Arguments: the value at the index.
         *
-        * @param in Pointer to gpu memory of datastructure (DC) which provides the data to calcuate on.
-        * @param out Pointer to gpu memory of datastructure (DC) where the data is written to.
+        * @param inout Pointer to gpu memory of datastructure (DC) which provides the data to calcuate on.
         * @param gpuRows Rows per GPU.
         * @param gpuCols Cols per GPU.
         * @param gpuDepth Depth per GPU.
         * @param func functor to be called.
-        * @param localIndices Evaluate - is this feature necessary? Can be used to calculate with local indices.
-        * @param dim3 Additional param for 3 dim.
         */
-        template<typename T, typename R, typename F>
-        __global__ void mapInPlaceKernelDC(T *in, R *out, int gpuRows, int gpuCols,
+        template<typename T, typename F>
+        __global__ void mapInPlaceKernelDC(T *inout, int gpuRows, int gpuCols,
                                            int gpuDepth, F func);
 
 /*
