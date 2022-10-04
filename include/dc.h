@@ -35,10 +35,9 @@
 
 #include <type_traits>
 
+#include "muesli.h"
 #include "detail/exception.h"
 #include "functors.h"
-#include "muesli.h"
-
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 #include <utility>
@@ -232,10 +231,9 @@ public:
    * @return The newly created distributed array.
    */
   template <typename F>
-  msl::DC<T>
-  map(F &f); // preliminary simplification, in order to avoid type error
-  // should be: msl::DA<R> map(F& f);
-
+  void
+  map(F &f, DC<T> &result);
+  
   /**
    * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
    *        that besides the element itself also its index is passed to the
@@ -247,7 +245,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename MapIndexFunctor>
-  DC<T> mapIndex(MapIndexFunctor &f); // should be return type DA<R>; debug
+  void mapIndex(MapIndexFunctor &f, DC<T> &result); // should be return type DA<R>; debug
 /*
     TODO Stencil Functor
   */
@@ -312,7 +310,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipFunctor>
-  DC<T> zip(DC<T2> &b, ZipFunctor &f); // should have result type DA<R>; debug
+  void zip(DC<T2> &b, DC <T2> &result, ZipFunctor &f); // should have result type DA<R>; debug
 
   /**
    * \brief Non-inplace variant of the zipIndex skeleton.
@@ -324,7 +322,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename T2, typename ZipIndexFunctor>
-  DC<T> zipIndex(DC<T2> &b, ZipIndexFunctor &f);
+  void zipIndex(DC<T2> &b, DC <T2> &result, ZipIndexFunctor &f);
 
   /**
    * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j],

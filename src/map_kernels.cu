@@ -78,14 +78,15 @@ __global__ void msl::detail::mapIndexKernelDA(T *in, R *out, size_t size,
 
 template<typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernelDC(T *in, R *out, int gpuRows, int gpuCols,
-                                              int gpuDepth, int firstRow, int firstCol, int firstDepth,F func) {
+                                              int gpuDepth, int firstRow, int firstCol, int firstDepth, F func) {
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
 
     int localoverall = (z * (gpuRows * gpuCols)) + (y * gpuCols) + x;
     if (z < gpuDepth && y < gpuRows && x < gpuCols) {
-        out[localoverall] = func(y + firstRow, x + firstCol, z + firstDepth, in[localoverall]);
+        out[localoverall] = func(y + firstRow, x + firstCol, z + firstDepth,
+                                 in[localoverall]);
     }
 
 }

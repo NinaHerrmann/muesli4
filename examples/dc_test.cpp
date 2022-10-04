@@ -79,7 +79,7 @@ namespace msl {
 
         class Sum5 : public Functor5<int, int, int, int, int, int>{
         public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {
-            return i+j+x+y+l;}
+            return (i+j+x+y+l);}//(i+j+x) % 50;}
         };
 
 
@@ -149,7 +149,7 @@ namespace msl {
 
                 t = MPI_Wtime();
                 for (int i = 0; i<reps; i++) {
-                    map_dest = b.map(mult);
+                    map_dest.map(mult, b);
                 }
                 mapResults = map_dest.gather();
                 map0_time += MPI_Wtime() - t;
@@ -208,8 +208,7 @@ namespace msl {
                 DC<int> mapIndex(dim, dim, dim, 6);
                 t = MPI_Wtime();
                 for (int i = 0; i<reps; i++) {
-                    b = mapIndex.mapIndex(sum4);
-                    //   mapResults = b.gather();
+                    b.mapIndex(sum4, mapIndex);
                 }
                 mapResults = b.gather();
                 map2_time += MPI_Wtime() - t;
@@ -301,8 +300,8 @@ namespace msl {
             }
             // ************* Zip *********************** //
             DC<int> c(dim, dim, dim, 3);
-            DC<int> d (dim,dim,dim);
-
+            //DC<int>* d = new DC<int>(dim,dim,dim); delete d;
+            DC<int> d(dim,dim,dim);
             int * zipResults = new int [dim*dim*dim];
             int * manzipResults = new int [dim*dim*dim];
             if (strstr(skeletons, "zip,") != NULL || strstr(skeletons, "all") != NULL) {
@@ -312,7 +311,7 @@ namespace msl {
                 t = MPI_Wtime();
 
                 for (int i = 0; i<reps; i++) {
-                    d = b.zip(c,sum);
+                    d.zip(c, b, sum);
                 }
                 zipResults = d.gather();
                 zip0_time += MPI_Wtime() - t;
@@ -369,8 +368,9 @@ namespace msl {
                 b.fill(7);
                 c.fill(5);
                 t = MPI_Wtime();
+
                 for (int i = 0; i<reps; i++) {
-                    d = b.zipIndex(c, sum5);
+                    d.zipIndex(c, b, sum5);
                 }
                 zipResults = d.gather();
                 zip2_time += MPI_Wtime() - t;
