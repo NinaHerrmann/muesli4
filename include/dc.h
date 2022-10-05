@@ -233,7 +233,7 @@ public:
   template <typename F>
   void
   map(F &f, DC<T> &result);
-  
+
   /**
    * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
    *        that besides the element itself also its index is passed to the

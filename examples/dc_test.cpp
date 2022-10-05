@@ -483,7 +483,7 @@ int main(int argc, char** argv){
   std::string nextfile;
   if (msl::isRootProcess()) {
       std::stringstream ss;
-      ss << "local_dc_" << std::to_string(msl::Muesli::num_total_procs) << "_" <<std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus);
+      ss << "dc2" << std::to_string(msl::Muesli::num_total_procs) << "_" << std::to_string(reps) << "_" << std::to_string(msl::Muesli::num_gpus) << std::to_string(msl::Muesli::cpu_fraction) ;
       nextfile = ss.str();
       if (OUTPUT) {
           std::ofstream outputFile;

@@ -320,7 +320,14 @@ public:
 };
 
 // ***************** Various *************
-
+class DeviceOutOfMemory: public Exception
+    {
+    public:
+        std::string tostring() const
+        {
+            return "Device is out of Memory";
+        }
+    };
 inline std::ostream&
 operator<<(std::ostream& os, const Exception& e)
 {

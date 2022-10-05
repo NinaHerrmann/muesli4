@@ -195,6 +195,12 @@ void terminateSkeletons();
  */
 void printv(const char *format, ...);
 
+#ifdef __CUDACC__
+/**
+ * \brief Wrapper for printing device properties
+ */
+void printDevProps();
+#endif
 /**
  * \brief Sets the number of CPU threads.
  *

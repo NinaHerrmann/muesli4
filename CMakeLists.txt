@@ -332,7 +332,7 @@ foreach (example_src ${EXAMPLE_SRCS})
     cuda_add_executable(${example_name}_gpu ${CMAKE_CURRENT_BINARY_DIR}/${example_src_tmp} OPTIONS ${GPU_COMPILER_OPTIONS} DEBUG ${GPU_COMPILER_OPTIONS_DEBUG} ${GPU_HOST_COMPILER_OPTIONS_DEBUG} RELEASE ${GPU_COMPILER_OPTIONS_RELEASE} ${GPU_HOST_COMPILER_OPTIONS_RELEASE} RELWITHDEBINFO ${GPU_COMPILER_OPTIONS_RELWITHDEBINFO} ${GPU_HOST_COMPILER_OPTIONS_RELWITHDEBINFO} MINSIZEREL ${GPU_COMPILER_OPTIONS_MINSIZEREL} ${GPU_HOST_COMPILER_OPTIONS_MINSIZEREL}) # copy hack: use copied file
 
     ## link libs
-    target_link_libraries(${example_name}_gpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS})
+    target_link_libraries(${example_name}_gpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS} cuda)
     set_property(TARGET ${example_name}_gpu PROPERTY CUDA_ARCHITECTURES 75)
 
     ### add to custom targets

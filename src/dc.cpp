@@ -34,7 +34,8 @@
 #include <chrono>
 #include <iostream>
 #include <dc.h>
-
+#include "cuda_runtime.h"
+#include "cuda.h"
 
 template<typename T>
 msl::DC<T>::DC()
@@ -331,6 +332,12 @@ void msl::DC<T>::initGPUs() {
             plans[i].gpuCols = plans[i].lastCol - plans[i].firstCol;
         }
         plans[i].h_Data = localPartition + gpuBase;
+        size_t total; size_t free;
+        cuMemGetInfo(&free, &total);
+        if (plans[i].bytes > free) {
+            throws(detail::DeviceOutOfMemory());
+            exit(0);
+        }
         (cudaMalloc(&plans[i].d_Data, plans[i].bytes));
         gpuBase += plans[i].size;
     }
@@ -737,6 +744,7 @@ int msl::DC<T>::getnCPU(){
 template<typename T>
 template<typename MapFunctor>
 void msl::DC<T>::mapInPlace(MapFunctor &f) {
+
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
