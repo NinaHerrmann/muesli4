@@ -33,6 +33,9 @@
 #include "muesli.h"
 #include <iostream>
 #include <dc.h>
+#ifdef __CUDACC__
+#include "map_kernels.cuh"
+#endif
 
 template<typename T>
 msl::DC<T>::DC()
@@ -386,10 +389,10 @@ void msl::DC<T>::mapIndexInPlace(MapIndexFunctor &f) {
     for (int i = 0; i <this->ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(8, 8, 8);
-        int dimrow = ceil(this->plans[i].gpuRows / 8.0);
         int dimcol = ceil(this->plans[i].gpuCols / 8.0);
+        int dimrow = ceil(this->plans[i].gpuRows / 8.0);
         int dimdepth = ceil(this->plans[i].gpuDepth / 8.0);
-        dim3 dimGrid(dimrow, dimcol, dimdepth);
+        dim3 dimGrid(dimcol, dimrow, dimdepth);
         detail::mapIndexKernelDC<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].gpuRows, this->plans[i].gpuCols,
                 this->plans[i].gpuDepth, this->plans[i].firstRow, this->plans[i].firstCol, this->plans[i].firstDepth, f);
@@ -564,9 +567,22 @@ void msl::DC<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
 }
 
 template<typename T>
-template<typename MapStencilFunctor, typename NeutralValueFunctor>
-void msl::DC<T>::mapStencil(DC<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
+template<msl::DCMapStencilFunctor<T> f>
+void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralValue) {
+#ifdef __CUDACC__
+    this->updateDevice();
+    syncPLCubes(stencilSize, neutralValue);
+    msl::syncStreams();
+    Muesli::start_time = MPI_Wtime(); // For performance testing.
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
+        PLCube<T> cube = this->plCubes[i];
+        detail::mapStencilKernelDC<T, f><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, cube, result.plans[i].size);
+    }
+    msl::syncStreams();
+    result.setCpuMemoryInSync(false);
+#endif
 }
 

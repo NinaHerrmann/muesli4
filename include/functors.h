@@ -33,25 +33,18 @@
 
 #include <type_traits>
 
-#include "detail/exception.h"
-#include "functors.h"
 #include "muesli.h"
+#include "detail/exception.h"
 
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 /*#include "plmatrix.h"*/
 #include <utility>
 
-#ifdef __CUDACC__
-#include "detail/copy_kernel.cuh"
-
-#include "detail/fold_kernels.cuh"
-#include "detail/map_kernels.cuh"
-#include "detail/properties.cuh"
-#include "detail/zip_kernels.cuh"
-#endif
 #include "argtype.h"
 #include "detail/functor_base.h"
+#include "plcube.h"
+
 namespace msl {
 
 /**************************************************************************
@@ -414,4 +407,8 @@ protected:
         int stencil_size;
         bool shared_memory = false;
     };
+
+    template <typename T>
+    using DCMapStencilFunctor = T(*)(const PLCube<T> &cs, int x, int y, int z);
+
 } // namespace msl

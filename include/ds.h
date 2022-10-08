@@ -519,6 +519,10 @@ namespace msl {
 
         void show(const std::string &descr = std::string());
 
+        /**
+         * \brief Each process prints its local partition of the ds.
+         */
+        void printLocal();
 
         /**
          * \brief Each process prints its local partition of the ds.
