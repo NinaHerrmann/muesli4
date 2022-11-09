@@ -187,8 +187,19 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename F>
-        msl::DM<T>
-        map(F &f);
+        void
+        map(F &f, DM<T> &result);
+        /**
+         * \brief Returns a new distributed array with a_new[i] = f(a[i]).
+         *
+         * @param f The map functor, must be of type \em AMapFunctor.
+         * @tparam MapFunctor Functor type.
+         * @tparam R Return type.
+         * @return The newly created distributed array.
+         */
+        template<typename F>
+        DM<T>
+        mapComp(F &f);
 
         /**
          * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
@@ -201,7 +212,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename MapIndexFunctor>
-        DM<T> mapIndex(MapIndexFunctor &f); // should be return type DA<R>; debug
+        void mapIndex(MapIndexFunctor &f, DM<T> &result); // should be return type DA<R>; debug
 
         /**
          * \brief TODO Replaces each element a[i] of the distributed array with f(i, a).
@@ -274,7 +285,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename T2, typename ZipFunctor>
-        DM<T> zip(DM<T2> &b, ZipFunctor &f); // should have result type DA<R>; debug
+        void zip(DM<T2> &b, DM<T> &result, ZipFunctor &f); // should have result type DA<R>; debug
 
         /**
          * \brief Non-inplace variant of the zipIndex skeleton.
@@ -286,7 +297,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename T2, typename ZipIndexFunctor>
-        DM<T> zipIndex(DM<T2> &b, ZipIndexFunctor &f);
+        void zipIndex(DM<T2> &b, DM<T2> &result, ZipIndexFunctor &f);
 
         /**
          * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j],

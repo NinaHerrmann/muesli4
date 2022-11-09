@@ -200,7 +200,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename F>
-        msl::DA<T> map(F &f);  // preliminary simplification, in order to avoid type error
+        void map(F &f, DA<T> &result);  // preliminary simplification, in order to avoid type error
         // should be: msl::DA<R> map(F& f);
 
         /**
@@ -213,7 +213,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename MapIndexFunctor>
-        DA<T> mapIndex(MapIndexFunctor &f);  // should be return type DA<R>; debug
+        void mapIndex(MapIndexFunctor &f, DA<T> &result);  // should be return type DA<R>; debug
 
         /**
          * \brief Replaces each element a[i] of the distributed array with f(i, a).
@@ -271,7 +271,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename T2, typename ZipFunctor>
-        msl::DA<T> zip(DA<T2> &b, ZipFunctor &f);  // should have result type DA<R>; debug!
+        void zip(DA<T2> &b, DA<T2> &result, ZipFunctor &f);  // should have result type DA<R>; debug!
 
         /**
          * \brief Non-inplace variant of the zipIndex skeleton.
@@ -283,7 +283,7 @@ namespace msl {
          * @return The newly created distributed array.
          */
         template<typename T2, typename ZipIndexFunctor>
-        msl::DA<T> zipIndex(DA<T2> &b, ZipIndexFunctor &f);  // should be return type DA<R>; debug!
+        void zipIndex(DA<T2> &b, DA<T2> &result, ZipIndexFunctor &f);  // should be return type DA<R>; debug!
 
         /**
           * \brief Replaces each element a[i] of the distributed array by f(a[i], b[i], c[i])

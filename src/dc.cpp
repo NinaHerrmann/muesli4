@@ -755,6 +755,8 @@ void msl::DC<T>::mapInPlace(MapFunctor &f) {
         dim3 dimGrid(dimrow, dimcol, dimdepth);
         detail::mapInPlaceKernelDC<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, plans[i].gpuRows, plans[i].gpuCols, plans[i].gpuDepth, f); // in, out, #plan, function
+
+
     }
 #endif
 

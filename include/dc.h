@@ -681,9 +681,9 @@ private:
   // number of GPUs per node (= Muesli::num_gpus)
   int ng;
   // number of elements per GPU (all the same!)
-  int nGPU;
+  long nGPU;
   // number of elements on CPU
-  int nCPU;
+  long nCPU;
   // firstIndex caclulated by GPU
   int indexGPU;
 

@@ -581,8 +581,25 @@ void msl::DS<T>::mapIndexInPlace(MapIndexFunctor &f) {
 template<typename T>
 template<typename F>
 void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in order to avoid type error
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
+#ifdef __CUDACC__
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::mapKernel3D<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                b.getExecPlans()[i].d_Data, plans[i].d_Data, f, plans[i].gpuRows,
+                plans[i].gpuCols, plans[i].gpuDepth);
+    }
+#endif
+
+#pragma omp parallel for
+for (int k = 0; k < nCPU; k++) {
+        setLocal(k, f(b.getLocal(k)));
+    }
+
+    // check for errors during gpu computation
+    msl::syncStreams();
+    setCpuMemoryInSync(false);
 }
 
 
@@ -606,7 +623,7 @@ template<typename T2, typename ZipFunctor>
 void
 msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
                 ZipFunctor &f) { // should have result type DS<R>; debug
-    printf("mapStencilInPlace\n");
+    printf("Zip\n");
     throws(detail::NotYetImplementedException());
 }
 

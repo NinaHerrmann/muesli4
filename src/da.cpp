@@ -489,8 +489,8 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
 
 template<typename T>
 template<typename F>
-msl::DA<T> msl::DA<T>::map(F &f) { //preliminary simplification in order to avoid type error
-    DA <T> result(n);                 // should be: DA<R>
+void msl::DA<T>::map(F &f, DA<T> &result) { //preliminary simplification in order to avoid type error
+    // should be: DA<R>
     updateDevice();
 
     // map
@@ -511,13 +511,12 @@ msl::DA<T> msl::DA<T>::map(F &f) { //preliminary simplification in order to avoi
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>
 template<typename MapIndexFunctor>
-msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor &f) {
-    DA <T> result(n);
+void msl::DA<T>::mapIndex(MapIndexFunctor &f, DA<T> &result) {
+
     updateDevice();
 
     // map on GPUs
@@ -540,7 +539,6 @@ msl::DA<T> msl::DA<T>::mapIndex(MapIndexFunctor &f) {
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>
@@ -614,8 +612,7 @@ void msl::DA<T>::zipIndexInPlace(msl::DA<T2> &b, ZipIndexFunctor &f) {
 
 template<typename T>
 template<typename T2, typename ZipFunctor>
-msl::DA<T> msl::DA<T>::zip(msl::DA<T2> &b, ZipFunctor &f) {   // should have result type DA<R>; debug type error!
-    msl::DA<T> result(n);
+void msl::DA<T>::zip(msl::DA<T2> &b, DA<T2> &result, ZipFunctor &f) {   // should have result type DA<R>; debug type error!
     updateDevice();
 
     // zip on GPUs
@@ -637,13 +634,11 @@ msl::DA<T> msl::DA<T>::zip(msl::DA<T2> &b, ZipFunctor &f) {   // should have res
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-msl::DA<T> msl::DA<T>::zipIndex(msl::DA<T2> &b, ZipIndexFunctor &f) {  // should be return type DA<R>; debug type error!
-    msl::DA<T> result(n);
+void msl::DA<T>::zipIndex(msl::DA<T2> &b, msl::DA<T2> &result, ZipIndexFunctor &f) {  // should be return type DA<R>; debug type error!
     updateDevice();
 
     // zip on GPUs
@@ -666,7 +661,6 @@ msl::DA<T> msl::DA<T>::zipIndex(msl::DA<T2> &b, ZipIndexFunctor &f) {  // should
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>

@@ -766,13 +766,11 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor &f) {
 
     cpuMemoryInSync = false;
 }
-
 template<typename T>
 template<typename F>
-msl::DM<T> msl::DM<T>::map(
-        F &f) {        // preliminary simplification in order to avoid type error
+msl::DM<T> msl::DM<T>::mapComp(F &f) {        // preliminary simplification in order to avoid type error
+    DM<T> result(nrow, ncol);
     updateDevice();
-    DM <T> result(nrow, ncol); // should be: DM<R>
 #ifdef __CUDACC__
 
     // map
@@ -781,7 +779,7 @@ msl::DM<T> msl::DM<T>::map(
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                plans[i].d_Data, result.getExecPlans()[i].d_Data, plans[i].size, f);
+                plans[i].d_Data,  result.getExecPlans()[i].d_Data, plans[i].size, f);
     }
 #endif
 #pragma omp parallel for
@@ -794,11 +792,34 @@ msl::DM<T> msl::DM<T>::map(
     result.setCpuMemoryInSync(false);
     return result;
 }
+template<typename T>
+template<typename F>
+void msl::DM<T>::map(F &f, DM<T> &result) {        // preliminary simplification in order to avoid type error
+    updateDevice();
+#ifdef __CUDACC__
+
+    // map
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                plans[i].d_Data,  result.getExecPlans()[i].d_Data, plans[i].size, f);
+    }
+#endif
+#pragma omp parallel for
+    for (int k = 0; k < nCPU; k++) {
+        result.setLocal(k, f(localPartition[k]));
+    }
+
+    // check for errors during gpu computation
+    msl::syncStreams();
+    result.setCpuMemoryInSync(false);
+}
 
 template<typename T>
 template<typename MapIndexFunctor>
-msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
-    DM <T> result(nrow, ncol);
+void msl::DM<T>::mapIndex(MapIndexFunctor &f, DM<T> &result) {
     updateDevice();
 #ifdef __CUDACC__
 
@@ -822,7 +843,6 @@ msl::DM<T> msl::DM<T>::mapIndex(MapIndexFunctor &f) {
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 // ************************************ zip *************************************
@@ -855,10 +875,8 @@ void msl::DM<T>::zipInPlace(DM <T2> &b, ZipFunctor &f) {
 
 template<typename T>
 template<typename T2, typename ZipFunctor>
-msl::DM<T>
-msl::DM<T>::zip(DM <T2> &b,
+void msl::DM<T>::zip(DM<T2> &b, DM<T> &result,
                 ZipFunctor &f) { // should have result type DA<R>; debug
-    DM <T> result(nrow, ncol);
     updateDevice();
 
     // zip on GPUs
@@ -882,7 +900,6 @@ msl::DM<T>::zip(DM <T2> &b,
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>
@@ -916,8 +933,7 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
 
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {
-    DM <T> result(nrow, ncol);
+void msl::DM<T>::zipIndex(DM <T2> &b, DM<T2> &result, ZipIndexFunctor &f) {
     updateDevice();
 
     // zip on GPUs
@@ -944,7 +960,6 @@ msl::DM<T> msl::DM<T>::zipIndex(DM <T2> &b, ZipIndexFunctor &f) {
     // check for errors during gpu computation
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
-    return result;
 }
 
 template<typename T>

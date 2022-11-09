@@ -34,7 +34,7 @@
 
 template <typename T> struct GPUExecutionPlan {
   // Number of elements per GPU
-  int size;
+  long size;
 
   // Number of byte stored on the GPU
   size_t bytes;

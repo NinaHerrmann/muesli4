@@ -150,10 +150,11 @@ namespace msl {
             Sum4 sum4;
             Sum5 sum5;
             int * mapResults = new int[dim];
+            DA<int> map_dest(dim);
 
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
-                DA<int> map_dest = b.map(mult);
+                b.map(mult, map_dest);
                 map_dest.gather(mapResults);
                 if(CHECK){
                     if (msl::isRootProcess()) {
@@ -201,14 +202,15 @@ namespace msl {
             }
 
             DA<int> mapIndex(dim, 6);
+            DA<int> check(dim);
             int * mapResults2 = new int[dim];
             DA<int> bb(dim, 6);
             //DA<int> check(dim, 6);
             t = MPI_Wtime();
             for (int i = 0; i<reps; i++) {
-                DA<int> check = mapIndex.mapIndex(sum);
-                check.gather(mapResults2);
+                mapIndex.mapIndex(sum, check);
             }
+            check.gather(mapResults2);
             map2_time += MPI_Wtime() - t;
             if(CHECK){
                 int *mapIndex_comp = new int[elements];
@@ -292,12 +294,13 @@ namespace msl {
             // ************* Zip *********************** //
             b.fill(10);
             DA<int> c(dim, 3);
+            DA<int> d(dim, 3);
             c.fill(20);
             int * zipResults = new int[dim];
 
             for (int i = 0; i<reps; i++) {
                 t = MPI_Wtime();
-                DA<int> d = b.zip(c,sum);
+                b.zip(c, d,sum);
                 d.gather(zipResults);
                 zip0_time += MPI_Wtime() - t;
                 if(CHECK){
@@ -349,10 +352,11 @@ namespace msl {
             bb.fill(7);
             c.fill(5);
             t = MPI_Wtime();
+            DA<int> dd(dim);
             for (int i = 0; i<reps; i++) {
-                DA<int> dd = bb.zipIndex(c, sum3);
-                dd.gather(zipResults);
+                bb.zipIndex(c, dd, sum3);
             }
+            dd.gather(zipResults);
             zip2_time += MPI_Wtime() - t;
 
             if(CHECK){
