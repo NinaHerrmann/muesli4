@@ -32,6 +32,8 @@
  */
 
 #pragma once
+#ifndef MUESLI_DS_H
+#define MUESLI_DS_H
 
 #include <type_traits>
 
@@ -42,6 +44,7 @@
 #include "detail/exec_plan.h"
 #include <utility>
 #include "plmatrix.h"
+#include "detail/common_skeleton_helper.h"
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
@@ -64,176 +67,152 @@ namespace msl {
      *
      * \tparam T Element type. Restricted to classes without pointer data members.
      */
-template <typename T>
-class DS{
-public:
-  //
-  // CONSTRUCTORS / DESTRUCTOR
-  //
+    template<typename T>
+    class DS {
+    public:
+        //
+        // CONSTRUCTORS / DESTRUCTOR
+        //
 
-  /**
-   * \brief Default constructor.
-   */
-  DS();
+        /**
+         * \brief Default constructor.
+         */
+        DS();
 
-  /**
-   * \brief Creates an empty datastructure with \em elements datapoints.
-   *
-   * @param elements Size of the ds.
-   */
-  DS(int elements, int dimensions);
-  
-  /**
-   * \brief Creates an empty datastructure with \em elements datapoints and value
-   *        \em initial_value.
-   *
-   * @param elements Size of the ds.
-   * @param initial_value Initial value for all elements.
-   */
-  DS(int elements, int dimensions, const T &initial_value);
-  
+        /**
+         * \brief Creates an empty datastructure with \em elements datapoints.
+         *
+         * @param elements Size of the ds.
+         */
+        DS(int elements);
+
+        /**
+         * \brief Creates an empty datastructure with \em elements datapoints and value
+         *        \em initial_value.
+         *
+         * @param elements Size of the ds.
+         * @param initial_value Initial value for all elements.
+         */
+        DS(int elements, const T &initial_value);
+
 //#pragma region Rule of five
-  /**
-   * For more details see https://cpppatterns.com/patterns/rule-of-five.html
-   * The 5 functions here are needed to perform operations such as std::move.
-   */
+        /**
+         * For more details see https://cpppatterns.com/patterns/rule-of-five.html
+         * The 5 functions here are needed to perform operations such as std::move.
+         */
 
-  /**
-   * @brief Copy constructor. Fully copies the object and it's data.
-   *
-   */
-  DS(const DS<T> &other);
+        /**
+         * @brief Copy constructor. Fully copies the object and it's data.
+         *
+         */
+        DS(const DS<T> &other);
 
-  /**
-   * @brief Move constructor. Transfers ownership of resources allocated by \em
-   * other to the object that is being created
-   *
-   * @param other
-   */
-  DS(DS<T> &&other);
+        /**
+         * @brief Move constructor. Transfers ownership of resources allocated by \em
+         * other to the object that is being created
+         *
+         * @param other
+         */
+        DS(DS<T> &&other);
 
-  /**
-   * @brief Copy assignment operator. Works the same as the copy constructor.
-   *
-   * @param other
-   * @return DS<T>&
-   */
-  DS<T> &operator=(const DS<T> &other);
+        /**
+         * @brief Copy assignment operator. Works the same as the copy constructor.
+         *
+         * @param other
+         * @return DS<T>&
+         */
+        DS<T> &operator=(const DS<T> &other);
 
-  /**
-   * @brief Move assignment operator. This assigs the object defined in \em
-   * other to the left hand side of the operation without creating copies
-   *
-   * @param other
-   * @return DS<T>&
-   */
-  DS<T> &operator=(DS<T> &&other);
+        /**
+         * @brief Move assignment operator. This assigs the object defined in \em
+         * other to the left hand side of the operation without creating copies
+         *
+         * @param other
+         * @return DS<T>&
+         */
+        DS<T> &operator=(DS<T> &&other);
 
-  /**
-   * \brief Destructor.
-   */
-  ~DS();
+        /**
+         * \brief Destructor.
+         */
+        ~DS();
 
 //#pragma endregion
 
-  /**
-   * \brief Initializes the elements of the ds with the value \em
-   *        value.
-   *
-   * @param value The value.
-   */
-  void fill(const T &element);
+        /**
+         * \brief Initializes the elements of the ds with the value \em
+         *        value.
+         *
+         * @param value The value.
+         */
+        void fill(const T &element);
 
-  /**
-   * \brief Initializes the elements of the ds with the elements
-   *        of the given array of values. Note that the length of \em values
-   * must match the size of the ds TODO(not checked).
-   *
-   * @param values The array of values.
-   */
-  void fill(T *const values);
+        /**
+         * \brief Initializes the elements of the ds with the elements
+         *        of the given array of values. Note that the length of \em values
+         * must match the size of the ds TODO(not checked).
+         *
+         * @param values The array of values.
+         */
+        void fill(T *const values);
 
-  /**
-   * \brief Initializes the elements of the ds via the given
-   *        function \em f. Note that global indices are pass to this function
-   *        as arguments.
-   *
-   * @param f The initializer function.
-   */
-  void fill(T (*f)(int));
+        /**
+         * \brief Initializes the elements of the ds via the given
+         *        function \em f. Note that global indices are pass to this function
+         *        as arguments.
+         *
+         * @param f The initializer function.
+         */
+        void fill(T (*f)(int));
 
-  /**
-   * \brief Initializes the elements of the ds via the given
-   *        functor \em f. Note that global indices are pass to this functor
-   *        as arguments.
-   *
-   * @param f The initializer functor.
-   * @tparam F2 Functor type.
-   */
-  template<typename F>
-  void fill(const F &f);
+        /**
+         * \brief Initializes the elements of the ds via the given
+         *        functor \em f. Note that global indices are pass to this functor
+         *        as arguments.
+         *
+         * @param f The initializer functor.
+         * @tparam F2 Functor type.
+         */
+        template<typename F>
+        void fill(const F &f);
 
-  /**
-   * \brief Initializes the elements of the ds with the elements
-   *        of the given array of values. Note that the length of \em values
-   * must match the size of the ds (not checked). The array is
-   * only read by the root process, and afterwards the data is distributed among
-   * all processes.
-   *
-   * @param values The array of values.
-   */
-  void fill_root_init(T *const values);
+        /**
+         * \brief Initializes the elements of the ds with the elements
+         *        of the given array of values. Note that the length of \em values
+         * must match the size of the ds (not checked). The array is
+         * only read by the root process, and afterwards the data is distributed among
+         * all processes.
+         *
+         * @param values The array of values.
+         */
+        void fill_root_init(T *const values);
 
-  //
-  // SKELETONS / COMPUTATION
-  //
+        //
+        // SKELETONS / COMPUTATION
+        //
 
-  // SKELETONS / COMPUTATION / MAP
+        // SKELETONS / COMPUTATION / MAP
 
-  /**
-   * \brief Replaces each element a[i] of the ds with f(a[i]).
-   *
-   * @param f The map functor, must be of type \em AMapFunctor.
-   * @tparam MapFunctor Functor type.
-   */
-  template <typename MapFunctor> void mapInPlace(MapFunctor &f);
+        /**
+         * \brief Replaces each element a[i] of the ds with f(a[i]).
+         *
+         * @param f The map functor, must be of type \em AMapFunctor.
+         * @tparam MapFunctor Functor type.
+         */
+        template<typename MapFunctor>
+        void mapInPlace(MapFunctor &f);
 
-  /**
-   * \brief Replaces each element a[i] of the ds with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor.
-   *
-   * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
-   * @tparam MapIndexFunctor Functor type.
-   */
-  template <typename MapIndexFunctor> void mapIndexInPlace(MapIndexFunctor &f);
+        /**
+         * \brief Returns a new ds with a_new[i] = f(a[i]).
+         *
+         * @param f The map functor, must be of type \em AMapFunctor.
+         * @tparam MapFunctor Functor type.
+         * @tparam R Return type.
+         * @return The newly created ds.
+         */
+        template<typename F>
+        void map(F &f, DS<T> &b);
 
-  /**
-   * \brief Returns a new ds with a_new[i] = f(a[i]).
-   *
-   * @param f The map functor, must be of type \em AMapFunctor.
-   * @tparam MapFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created ds.
-   */
-  template <typename F>
-  void map(F &f, DS<T> &result);
-
-  /**
-   * \brief Returns a new ds with a_new[i] = f(i, a[i]). Note
-   *        that besides the element itself also its index is passed to the
-   * functor.
-   *
-   * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
-   * @tparam MapIndexFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created ds.
-   */
-  template <typename MapIndexFunctor>
-  void mapIndex(MapIndexFunctor &f, DS<T> &result); // should be return type DA<R>; debug
-/*
-    TODO Stencil Functor
-  */
 /**
    * \brief Replaces each element a[i] of the ds with f(i, a).
    *        Note that the index i and the local partition is passed to the
@@ -249,429 +228,375 @@ public:
   void mapStencilMM(DS<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 */
 
-  // SKELETONS / COMPUTATION / ZIP
+        // SKELETONS / COMPUTATION / ZIP
 
-  /**
-   * \brief Replaces each element a[i] of the ds with f(a[i],
-   * b[i]) with \em b being another ds of the same size.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the ds to zip with.
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename ZipFunctor>
-  void zipInPlace(DS<T2> &b, ZipFunctor &f);
+        /**
+         * \brief Replaces each element a[i] of the ds with f(a[i],
+         * b[i]) with \em b being another ds of the same size.
+         *
+         * @param f The zip functor, must be of type \em AZipFunctor.
+         * @tparam T2 Element type of the ds to zip with.
+         * @tparam ZipFunctor Functor type.
+         */
+        template<typename T2, typename ZipFunctor>
+        void zipInPlace(DS<T2> &b, ZipFunctor &f);
 
-  /**
-   * \brief Replaces each element a[i] of the ds with f(i, a[i],
-   * b[i]). Note that besides the elements themselves also the index is passed
-   * to the functor.
-   *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam T2 Element type of the ds to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   */
-  template <typename T2, typename ZipIndexFunctor>
-  void zipIndexInPlace(DS<T2> &b, ZipIndexFunctor &f);
-  /**
-   * \brief Replaces each element a[i] of the ds with f(i, a[i],
-   * *b[]). Note that besides the elements themselves also the index is passed
-   * to the functor. Also note that the whole column is passed.
-   *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam T2 Element type of the ds to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   */
-  template <typename T2, typename ZipIndexFunctor>
-  void crossZipIndexInPlace(DS<T2> &b, ZipIndexFunctor &f);
+        /**
+         * \brief Non-inplace variant of the zip skeleton.
+         *
+         * @param f The zip functor, must be of type \em AZipFunctor.
+         * @tparam R Return type.
+         * @tparam T2 Element type of the ds to zip with.
+         * @tparam ZipFunctor Functor type.
+         * @return The newly created ds.
+         */
+        template<typename T2, typename ZipFunctor>
+        void zip(DS<T2> &b, DS<T2> &result, ZipFunctor &f); // should have result type DA<R>; debug
 
-  /**
-   * \brief Non-inplace variant of the zip skeleton.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the ds to zip with.
-   * @tparam ZipFunctor Functor type.
-   * @return The newly created ds.
-   */
-  template <typename T2, typename ZipFunctor>
-  void zip(DS<T2> &b, DS <T2> &result, ZipFunctor &f); // should have result type DA<R>; debug
-
-  /**
-   * \brief Non-inplace variant of the zipIndex skeleton.
-   *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the ds to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   * @return The newly created ds.
-   */
-  template <typename T2, typename ZipIndexFunctor>
-  void zipIndex(DS<T2> &b, DS <T2> &result, ZipIndexFunctor &f);
-
-  /**
-   * \brief Replaces each element a[i,j] of the ds by f(a[i,j],
-   * b[i,j], c[i,j]) with \em b and \em c being other distributed matrices of
-   * the same size.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the 1st ds to zip with.
-   * @tparam T3 Element type of the 2nd ds to zip with.
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename T3, typename ZipFunctor>
-  void zipInPlace3(DS<T2> &b, DS<T3> &c, ZipFunctor &f);
+        /**
+         * \brief Replaces each element a[i,j] of the ds by f(a[i,j],
+         * b[i,j], c[i,j]) with \em b and \em c being other distributed matrices of
+         * the same size.
+         *
+         * @param f The zip functor, must be of type \em AZipFunctor.
+         * @tparam T2 Element type of the 1st ds to zip with.
+         * @tparam T3 Element type of the 2nd ds to zip with.
+         * @tparam ZipFunctor Functor type.
+         */
+        template<typename T2, typename T3, typename ZipFunctor>
+        void zipInPlace3(DS<T2> &b, DS<T3> &c, ZipFunctor &f);
 
 
-  /**
-   * \brief fold skeleton.
-   *
-   * @param f The fold functor
-   * @tparam T Element type of the ds to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   * @return the result of combining all elements of the arra by the binary,
-   * associative and commutativ operation f
-   */
+        /**
+         * \brief fold skeleton.
+         *
+         * @param f The fold functor
+         * @tparam T Element type of the ds to zip with.
+         * @tparam fold Functor type.
+         * @return the result of combining all elements of the arra by the binary,
+         * associative and commutativ operation f
+         */
 
-  template <typename FoldFunctor>
-  T fold(FoldFunctor &f, bool final_fold_on_cpu);
+        template<typename FoldFunctor>
+        T fold(FoldFunctor &f, bool final_fold_on_cpu);
 
-  /**
-   * \brief TODO Replaces each element a[i] of the ds with f(i, a).
-   *        Note that the index i and the local partition is passed to the
-   *        functor.
-   *
-   * @param result DS to save the result
-   * @param f MapStencilFuncotr
-   * @param neutral_value_functor NeutralValueFunctor
-   */
-  template<typename MapStencilFunctor, typename NeutralValueFunctor>
-  void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
-  /**
-  * @brief TODO Non-inplace variant of the mapStencil skeleton.
-  *
-  * @tparam MapStencilFunctor Functor for the Stencil Calculation
-  * @tparam NeutralValueFunctor Functor to return the NV
-  * @param result DS to save the result
-  * @param f MapStencilFuncotr
-  * @param neutral_value_functor NeutralValueFunctor
-  */
-  template<typename MapStencilFunctor, typename NeutralValueFunctor>
-  void mapStencil(DS<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+        //
+        // SKELETONS / COMMUNICATION
+        //
 
-  //
-  // SKELETONS / COMMUNICATION
-  //
+        // SKELETONS / COMMUNICATION / BROADSAST PARTITION
 
-  // SKELETONS / COMMUNICATION / BROADSAST PARTITION
+        /**
+         * \brief Transforms a ds to an ordinary array by copying each
+         *        element to the given array \em b. \em b must at least be of length
+         *        \em size.
+         *
+         * @param b The array to store the elements of the ds.
+         */
+        T *gather();
 
-  /**
-   * \brief Transforms a ds to an ordinary array by copying each
-   *        element to the given array \em b. \em b must at least be of length
-   *        \em size.
-   *
-   * @param b The array to store the elements of the ds.
-   */
-  T* gather();
+        /**
+         * \brief Transforms a ds to a copy distributed distributed
+         * array by copying each element to the given ds \em da. \em da
+         *        must be copy distributed, otherwise this function immediately
+         * returns.
+         *
+         * @param da The (copy distributed) ds to stores the elements
+         * of the ds.
+         */
+        void gather(msl::DS<T> &ds);
 
-  /**
-   * \brief Transforms a ds to a copy distributed distributed
-   * array by copying each element to the given ds \em da. \em da
-   *        must be copy distributed, otherwise this function immediately
-   * returns.
-   *
-   * @param da The (copy distributed) ds to stores the elements
-   * of the ds.
-   */
-  void gather(msl::DS<T> &ds);
+        // SKELETONS / COMMUNICATION / PERMUTE PARTITION
 
-  // SKELETONS / COMMUNICATION / PERMUTE PARTITION
+        /**
+         * \brief Permutes the partitions of the ds according to the
+         *        given function \em f. \em f must be bijective and return the ID
+         *        of the new process p_i to store the partition, with 0 <= i < np.
+         *
+         * @param f bijective functor
+         * @tparam F Function type for \em f.
+         */
+        //template <typename Functor> inline void permutePartition(Functor &f);
 
-  /**
-   * \brief Permutes the partitions of the ds according to the
-   *        given function \em f. \em f must be bijective and return the ID
-   *        of the new process p_i to store the partition, with 0 <= i < np.
-   *
-   * @param f bijective functor
-   * @tparam F Function type for \em f.
-   */
-  //template <typename Functor> inline void permutePartition(Functor &f);
+        /**
+         * \brief Permutes the partitions of the ds according to the
+         *        given function \em f. \em f must be bijective and return the the
+         *        ID of the new process p_i to store the partition, with 0 <= i < np.
+         *
+         * @param f The bijective function.
+         */
+        // inline void permutePartition(int (*f)(int));
 
-  /**
-   * \brief Permutes the partitions of the ds according to the
-   *        given function \em f. \em f must be bijective and return the the
-   *        ID of the new process p_i to store the partition, with 0 <= i < np.
-   *
-   * @param f The bijective function.
-   */
-  // inline void permutePartition(int (*f)(int));
+        //
+        // GETTERS AND SETTERS
+        //
 
-  //
-  // GETTERS AND SETTERS
-  //
+        /**
+         * \brief Returns the local partition.
+         *
+         * @return The local partition.
+         */
+        T *getLocalPartition();
 
-  /**
-   * \brief Returns the local partition.
-   *
-   * @return The local partition.
-   */
-  T *getLocalPartition();
+        /**
+         * \briefs Sets the local partition.
+         *
+         * @param elements for the local partition.
+         */
+        void setLocalPartition(T *elements);
 
-  /**
-   * \briefs Sets the local partition.
-   *
-   * @param elements for the local partition.
-   */
-  void setLocalPartition(T *elements);
+        /**
+         * \brief Returns the element at the given global index \em index.
+         *
+         * @param index The global index.
+         * @return The element at the given global index.
+         */
+        T get(int index) const;
 
-  /**
-   * \brief Returns the element at the given global index \em index.
-   *
-   * @param index The global index.
-   * @return The element at the given global index.
-   */
-  T get(int index) const;
-
-    /**
+        virtual /**
      * \brief Returns the element at the given row \em row and column \em column.
      *
      * @param row The global row.
      * @param column The global column.
      * @return The element at the given global index.
      */
-    T get_shared(int row, int column) const;
-  /**
-   * \brief Sets the element at the given global index \em globalIndex to the
-   *        given value \em v, with 0 <= globalIndex < size.
-   *
-   * @param globalIndex The global index.
-   * @param v The new value.
-   */
-  void set(int globalIndex, const T &v);
+        T get_shared(int row, int column) const;
 
-  /**
-   * \brief Returns the global size of the ds.
-   *
-   * @return The global size.
-   */
-  int getSize() const;
+        /**
+         * \brief Sets the element at the given global index \em globalIndex to the
+         *        given value \em v, with 0 <= globalIndex < size.
+         *
+         * @param globalIndex The global index.
+         * @param v The new value.
+         */
+        void set(int globalIndex, const T &v);
 
-  /**
-   * \brief Returns the size of local partitions of the ds.
-   *
-   * @return The size of local partitions.
-   */
-  int getLocalSize() const;
+        /**
+         * \brief Returns the global size of the ds.
+         *
+         * @return The global size.
+         */
+        int getSize() const;
 
-  /**
-   * \brief Returns the first (global) index of the local partition.
-   *
-   * @return The first (global) index.
-   */
-  int getFirstIndex() const;
+        /**
+         * \brief Returns the size of local partitions of the ds.
+         *
+         * @return The size of local partitions.
+         */
+        int getLocalSize() const;
 
-  /**
-   * \brief Setter for cpuMemoryInSync
-   *
-   * @param b new value of cpuMemoryInSync
-   */
-  void setCpuMemoryInSync(bool b);
+        /**
+         * \brief Returns the first (global) index of the local partition.
+         *
+         * @return The first (global) index.
+         */
+        int getFirstIndex() const;
 
-  /**
-   * \brief Checks whether the element at the given global index \em index is
-   *        locally stored.
-   *
-   * @param index The global index.
-   * @return True if the element is locally stored.
-   */
-  bool isLocal(int index) const;
+        /**
+         * \brief Setter for cpuMemoryInSync
+         *
+         * @param b new value of cpuMemoryInSync
+         */
+        void setCpuMemoryInSync(bool b);
 
-  /**
-   * \brief Returns the element at the given local index \em index. Note that
-   *        0 <= \em index < getLocalSize() must hold (will not be checked, for
-   *        reasons of performance).
-   *
-   * @param index The local index.
-   */
-  T getLocal(int localIndex);
+        /**
+         * \brief Checks whether the element at the given global index \em index is
+         *        locally stored.
+         *
+         * @param index The global index.
+         * @return True if the element is locally stored.
+         */
+        bool isLocal(int index) const;
 
-  /**
-   * \brief Sets the element at the given local index \em localIndex to the
-   *        given value \em v.
-   *
-   * @param localIndex The local index.
-   * @param v The new value.
-   */
-  void setLocal(int localIndex, const T &v);
-  /**
-   * \brief returns CPU pointer
-   *
-   * @param index the index.
-   */
-  //T& operator[](int index);
+        /**
+         * \brief Returns the element at the given local index \em index. Note that
+         *        0 <= \em index < getLocalSize() must hold (will not be checked, for
+         *        reasons of performance).
+         *
+         * @param index The local index.
+         */
+        T getLocal(int localIndex);
 
-  /**
-   * \brief Returns the GPU execution plans that store information about size,
-   * etc. for the GPU partitions. For internal purposes.
-   *
-   * @return The GPU execution plans.
-   */
-  GPUExecutionPlan<T> *getExecPlans();
+        /**
+         * \brief Sets the element at the given local index \em localIndex to the
+         *        given value \em v.
+         *
+         * @param localIndex The local index.
+         * @param v The new value.
+         */
+        void setLocal(int localIndex, const T &v);
+        /**
+         * \brief returns CPU pointer
+         *
+         * @param index the index.
+         */
+        //T& operator[](int index);
 
-  /**
-   * \brief Returns the GPU execution plan for device \em device.
-   *        For internal purposes.
-   *
-   * @param device The device to get the execution plan for.
-   * @return The GPU execution plan for device \em device.
-   */
-  GPUExecutionPlan<T> getExecPlan(int device);
+        /**
+         * \brief Returns the GPU execution plans that store information about size,
+         * etc. for the GPU partitions. For internal purposes.
+         *
+         * @return The GPU execution plans.
+         */
+        GPUExecutionPlan<T> *getExecPlans();
 
-  /**
-   * \brief Switch the distribution scheme from distributed to copy distributed.
-   */
-  void setCopyDistribution();
+        /**
+         * \brief Returns the GPU execution plan for device \em device.
+         *        For internal purposes.
+         *
+         * @param device The device to get the execution plan for.
+         * @return The GPU execution plan for device \em device.
+         */
+        GPUExecutionPlan<T> getExecPlan(int device);
 
-  /**
-   * \brief Switch the distribution scheme from copy distributed to distributed.
-   */
-  void setDistribution();
+        /**
+         * \brief Switch the distribution scheme from distributed to copy distributed.
+         */
+        void setCopyDistribution();
 
-  //
-  // AUXILIARY
-  //
+        /**
+         * \brief Switch the distribution scheme from copy distributed to distributed.
+         */
+        void setDistribution();
 
-  /**
-   * \brief Manually upload the local partition to GPU memory.
-   *
-   * @return void
-   */
+        //
+        // AUXILIARY
+        //
 
-  void updateDevice();
+        /**
+         * \brief Manually upload the local partition to GPU memory.
+         *
+         * @return void
+         */
 
-  /**
-   * \brief Manually download the local partition from GPU memory.
-   */
-  void updateHost();
+        void updateDevice();
 
-  /**
-   * \brief Manually free device memory.
-   */
-  void freeDevice();
-  /**
-   * \brief Print stencil time.
-   */
-  void printTime();
+        /**
+         * \brief Manually download the local partition from GPU memory.
+         */
+        void updateHost();
 
-  /**
-   * \brief Set how the local partition is distributed among the GPUs. Current
-   *        distribution schemes are: distributed, copy distributed.
-   *
-   * @param dist The GPU distribution scheme.
-   */
-  void setGpuDistribution(Distribution dist);
+        /**
+         * \brief Manually free device memory.
+         */
+        void freeDevice();
 
-  /**
-   * \brief Returns the current GPU distribution scheme.
-   *
-   * @return The GPU distribution scheme.
-   */
-  Distribution getGpuDistribution();
+        /**
+         * \brief Print stencil time.
+         */
+        void printTime();
 
-  /**
+        /**
+         * \brief Set how the local partition is distributed among the GPUs. Current
+         *        distribution schemes are: distributed, copy distributed.
+         *
+         * @param dist The GPU distribution scheme.
+         */
+        void setGpuDistribution(Distribution dist);
+
+        /**
+         * \brief Returns the current GPU distribution scheme.
+         *
+         * @return The GPU distribution scheme.
+         */
+        Distribution getGpuDistribution();
+
+        virtual /**
    * \brief Prints the local partion of the root processor of the distributed
    * array to standard output. Optionally, the user may pass a description that
    * will be printed with the output. Just useful for debugging.
    *
    * @param descr The description string.
    */
-  void showLocal(const std::string &descr);
+        void showLocal(const std::string &descr);
 
-  /**
+        virtual /**
    * \brief Prints the ds to standard output. Optionally, the
    * user may pass a description that will be printed with the output.
    *
    * @param descr The description string.
    */
-  void show(const std::string &descr = std::string());
+        void show(const std::string &descr = std::string());
 
-  /**
-   * \brief Each process prints its local partition of the ds.
-   */
-  void printLocal();
-  /**
-   * \brief Each process prints its local partition of the ds.
-   */
-  int getnCPU();
+        /**
+         * \brief Each process prints its local partition of the ds.
+         */
+        void printLocal();
 
-private:
-  //
-  // Attributes
-  //
+        /**
+         * \brief Each process prints its local partition of the ds.
+         */
+        int getnCPU();
 
-  // local partition
-  T *localPartition;
-  // position of processor in data parallel group of processors; zero-base
-  int id;
+        T *localPartition;
 
-  // number of elements
-  int n;
+        // initializes ds (used in constructors).
+        void init();
 
-  // dimensions - must be compatible to elements.
-  int dim;
+        virtual // initializes the GPU execution plans.
+        void initGPUs();
 
-  // number of local elements
-  int nLocal;
+        // returns the GPU id that locally stores the element at index index.
+        int getGpuId(int index) const;
 
-  // first (global) index of local partition
-  int firstIndex;
-  // total number of MPI processes
-  int np;
-  // tells, whether data is up to date in main (cpu) memory; true := up-to-date,
-  // false := newer data on GPU
-  bool cpuMemoryInSync;
-  // execution plans for each gpu
-  GPUExecutionPlan<T> *plans = 0;
-  // checks whether data is copy distributed among all processes
-  Distribution dist;
-  // checks whether data is copy distributed among all gpus
-  bool gpuCopyDistributed = 0;
-  // number of GPUs per node (= Muesli::num_gpus)
-  int ng;
-  // number of elements per GPU (all the same!)
-  long nGPU;
-  // number of elements on CPU
-  long nCPU;
-  // firstIndex caclulated by GPU
-  int indexGPU;
+        int getFirstGpuRow() const;
 
-  bool plinitMM = false; // pl matrix initialized?
+        void copyLocalPartition(const DS<T> &other);
 
-  // points to the right data?
-  std::vector<T*> all_data;
-  T* padding_stencil;
+        void freeLocalPartition();
 
-  //
-  // AUXILIARY
-  //
+        void freePlans();
 
-  // initializes ds (used in constructors).
-  void init();
+        //
+        // Attributes
+        //
 
-  // initializes the GPU execution plans.
-  void initGPUs();
+        // local partition
+        // position of processor in data parallel group of processors; zero-base
+        int id;
 
-  // returns the GPU id that locally stores the element at index index.
-  int getGpuId(int index) const;
+        // number of elements
+        int n;
 
-  int getFirstGpuRow() const;
+        // number of local elements
+        int nLocal;
 
-  void copyLocalPartition(const DS<T> &other);
-  void freeLocalPartition();
+        // first (global) index of local partition
+        int firstIndex;
+        // total number of MPI processes
+        int np;
+        // tells, whether data is up to date in main (cpu) memory; true := up-to-date,
+        // false := newer data on GPU
+        bool cpuMemoryInSync;
+        // execution plans for each gpu
+        GPUExecutionPlan<T> *plans = 0;
+        // checks whether data is copy distributed among all processes
+        Distribution dist;
+        // checks whether data is copy distributed among all gpus
+        bool gpuCopyDistributed = 0;
+        // number of GPUs per node (= Muesli::num_gpus)
+        int ng;
+        // number of elements per GPU (all the same!)
+        long nGPU;
+        // number of elements on CPU
+        long nCPU;
+        // firstIndex caclulated by GPU
+        int indexGPU;
 
-  void freePlans();
-};
+        bool plinitMM = false; // pl matrix initialized?
+
+        // points to the right data?
+        std::vector<T *> all_data;
+        T *padding_stencil;
+
+        //
+        // AUXILIARY
+        //
+
+    };
 
 } // namespace msl
 
 #include "../src/ds.cpp"
+
+#endif

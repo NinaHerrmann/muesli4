@@ -33,6 +33,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <cstring>
 
 #include "muesli.h"
 #include "dm.h"

@@ -84,16 +84,19 @@ namespace msl::test {
 
         void dc_test(int dim, std::string nextfile, int reps, char * skeletons) {
             if (msl::isRootProcess()) {
-                //printf("Starting dc_test...\n");
+               // printf("Starting dc_test...\n");
             }
+
 
             // ************* Init *********************** //
             int elements = dim * dim * dim;
             double fill_time = 0.0, const_time = 0.0, map0_time =  0.0, map1_time =  0.0, map2_time =  0.0, map3_time =  0.0, zip0_time =  0.0, zip1_time =  0.0, zip2_time =  0.0, zip3_time =  0.0, fold0_time = 0.0, fold1_time = 0.0;
             double t = MPI_Wtime();
 
-            if (strstr(skeletons, "Fill,") != NULL || strstr(skeletons, "all") != NULL) {
-                t = MPI_Wtime();
+
+            if (strstr(skeletons, "Fill,") != nullptr || strstr(skeletons, "all") != nullptr) {
+
+                /*t = MPI_Wtime();
                 DC<int> a(dim,dim,dim);
                 a.fill(2);
                 // TODO does not work for all sizes.
@@ -114,12 +117,14 @@ namespace msl::test {
                 }
 
                 fill_time += MPI_Wtime() - t;
-                t = MPI_Wtime();
+                t = MPI_Wtime();*/
             }
-            DC<int> b(dim, dim, dim, 3);
+
+
+           DC<int> b(dim, dim, dim, 3);
 
             if (strstr(skeletons, "Initfill,") != NULL || strstr(skeletons, "all") != NULL) {
-                int * constructorResult = b.gather();
+               /* int * constructorResult = b.gather();
 
                 if(CHECK && msl::isRootProcess()){
                     if (msl::isRootProcess()) {
@@ -134,7 +139,7 @@ namespace msl::test {
                         }
                     }
                 }
-                const_time += MPI_Wtime() - t;
+                const_time += MPI_Wtime() - t;*/
             }
             Mult5 mul5(3);
             Mult mult(3);
@@ -144,6 +149,8 @@ namespace msl::test {
             int * mapResults = new int [dim*dim*dim];
             int * manmapResults = new int [dim*dim*dim];
             DC<int> map_dest(dim, dim, dim, 5);
+            /*
+            *//*
             if (strstr(skeletons, "map,") != NULL || strstr(skeletons, "all") != NULL) {
 
                 t = MPI_Wtime();
@@ -201,13 +208,18 @@ namespace msl::test {
 	                    }
 	                }
 	            }
-	        }
-	        if (strstr(skeletons, "mapIndex,") != NULL || strstr(skeletons, "all") != NULL) {
+	        }*//*
+*/
+            b.fill(2);
+
+            // TODO
+            if (strstr(skeletons, "mapIndex,") != NULL || strstr(skeletons, "all") != NULL) {
 
                 DC<int> mapIndex(dim, dim, dim, 6);
                 t = MPI_Wtime();
                 for (int i = 0; i<reps; i++) {
                     b.mapIndex(sum4, mapIndex);
+
                 }
                 mapResults = b.gather();
                 map2_time += MPI_Wtime() - t;
@@ -231,7 +243,7 @@ namespace msl::test {
                     }
                 }
             }
-
+/*
             b.fill(3);
             t = MPI_Wtime();
             if (strstr(skeletons, "mapIndexInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
@@ -361,10 +373,10 @@ namespace msl::test {
                         }
                     }
                 }
-            }
+            }*/
             if (strstr(skeletons, "zipIndex,") != NULL || strstr(skeletons, "all") != NULL) {
 
-                b.fill(7);
+               /* b.fill(7);
                 c.fill(5);
                 t = MPI_Wtime();
 
@@ -391,10 +403,10 @@ namespace msl::test {
                             }
                         }
                     }
-                }
+                }*/
             }
 
-            b.fill(3);
+           /* b.fill(3);
             c.fill(2);
             if (strstr(skeletons, "zipIndexInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
                 t = MPI_Wtime();
@@ -443,6 +455,7 @@ namespace msl::test {
                // printf("Filltime ; consttime ; Map ; Mapinplace ; mapindex ; mapindexinplace, fold, zip, zipinplace, zipindex, zipindexinplace\n");
                printf("%f; %f; %f; %f; %f; %f; %f; %f; %f; %f; %f\n", fill_time, const_time,
                        map0_time, map1_time, map2_time, map3_time, fold0_time, zip0_time, zip1_time, zip2_time, zip3_time);}
+*/
 
           return;
         }
@@ -473,10 +486,10 @@ int main(int argc, char** argv){
       reps = atoi(argv[5]);
   }
   char * skeletons;
-  if (argc >= 7) {
+  if (argc >= 6) {
       skeletons = argv[6];
   } else {
-      skeletons = "all";
+      skeletons = "mapIndex,";
   }
   msl::setNumGpus(nGPUs);
   std::string nextfile;
