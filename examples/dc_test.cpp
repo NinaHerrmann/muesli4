@@ -33,15 +33,14 @@
 
 #include <iostream>
 #include <cmath>
+#include <cstring>
 
 #include "muesli.h"
 #include "dc.h"
 
 int CHECK = 0;
 int OUTPUT = 1;
-namespace msl {
-    namespace test {
-
+namespace msl::test {
 
         class Mult : public Functor<int, int> {
         private: int y;
@@ -447,7 +446,7 @@ namespace msl {
 
           return;
         }
-    }} // close namespaces
+    } // close namespaces
 
 int main(int argc, char** argv){
   //printf("Starting Main...\n");
