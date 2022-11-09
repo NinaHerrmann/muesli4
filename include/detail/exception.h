@@ -68,6 +68,15 @@ public:
   }
 };
 
+class NotSameSizeException: public Exception
+{
+public:
+  std::string tostring() const
+  {
+    return "NotSameSizeException";
+  }
+};
+
 class IllegalDistributionException: public Exception
 {
 public:

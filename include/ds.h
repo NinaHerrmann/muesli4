@@ -81,7 +81,7 @@ public:
    *
    * @param elements Size of the ds.
    */
-  DS(int elements);
+  DS(int elements, int dimensions);
   
   /**
    * \brief Creates an empty datastructure with \em elements datapoints and value
@@ -90,7 +90,7 @@ public:
    * @param elements Size of the ds.
    * @param initial_value Initial value for all elements.
    */
-  DS(int elements, const T &initial_value);
+  DS(int elements, int dimensions, const T &initial_value);
   
 //#pragma region Rule of five
   /**
@@ -508,7 +508,7 @@ public:
    *
    * @param index the index.
    */
-  T& operator[](int index);
+  //T& operator[](int index);
 
   /**
    * \brief Returns the GPU execution plans that store information about size,
@@ -616,6 +616,9 @@ private:
 
   // number of elements
   int n;
+
+  // dimensions - must be compatible to elements.
+  int dim;
 
   // number of local elements
   int nLocal;

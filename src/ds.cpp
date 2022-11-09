@@ -41,6 +41,7 @@ template<typename T>
 msl::DS<T>::DS()
         :       // distributed array (resides on GPUs until deleted!)
         n(0), // number of elements of distributed array
+        dim(0), // number of elements of distributed array
         nLocal(0), // number of local elements on a node
         np(0),             // number of (MPI-) nodes (= Muesli::num_local_procs)
         id(0),             // id of local node among all nodes (= Muesli::proc_id)
@@ -60,7 +61,7 @@ msl::DS<T>::DS()
 
 // constructor creates a non-initialized DS
 template<typename T>
-msl::DS<T>::DS(int size) : n(size) {
+msl::DS<T>::DS(int size, int dimensions) : n(size), dim(dimensions) {
     init();
 #ifdef __CUDACC__
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
@@ -74,8 +75,8 @@ msl::DS<T>::DS(int size) : n(size) {
 
 // constructor creates a DS, initialized with v
 template<typename T>
-msl::DS<T>::DS(int elements, const T &v)
-: n(elements) {
+msl::DS<T>::DS(int elements, int dimensions, const T &v)
+: n(elements), dim(dimensions) {
     init();
     localPartition = new T[nLocal];
 
@@ -96,7 +97,7 @@ msl::DS<T>::DS(int elements, const T &v)
 
 template<typename T>
 msl::DS<T>::DS(const DS <T> &other)
-        : id(other.id), n(other.n), nLocal(other.nLocal),
+        : id(other.id), n(other.n), nLocal(other.nLocal), dim(other.dim),
           firstIndex(other.firstIndex), np(other.np),
           cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
                 *(other.plans)}},
@@ -110,7 +111,7 @@ msl::DS<T>::DS(const DS <T> &other)
 
 template<typename T>
 msl::DS<T>::DS(DS <T> &&other)
-    : id(other.id), n(other.n), nLocal(other.nLocal),
+    : id(other.id), n(other.n), nLocal(other.nLocal), dim(other.dim),
     firstIndex(other.firstIndex), np(other.np),
     cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
     *(other.plans)}},
@@ -123,13 +124,13 @@ msl::DS<T>::DS(DS <T> &&other)
 
 template<typename T>
 msl::DS<T> &msl::DS<T>::operator=(DS <T> &&other) {
-    printf("mapStencilInPlace\n");
+    printf("=\n");
     throws(detail::NotYetImplementedException());
 }
 
 template<typename T>
 msl::DS<T> &msl::DS<T>::operator=(const DS <T> &other) {
-    printf("mapStencilInPlace\n");
+    printf("=\n");
     throws(detail::NotYetImplementedException());
 }
 
@@ -178,6 +179,7 @@ void msl::DS<T>::init() {
     if (Muesli::proc_entrance == UNDEFINED) {
         throws(detail::MissingInitializationException());
     }
+
     id = Muesli::proc_id;
     np = Muesli::num_total_procs;
     ng = Muesli::num_gpus;
@@ -257,13 +259,15 @@ void msl::DS<T>::setLocalPartition(T *elements) {
 }
 template<typename T>
 void msl::DS<T>::fill(const T &element) {
-    #pragma omp parallel for
+    #pragma omp parallel for default(none) shared(element)
     for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
     cpuMemoryInSync = true;
+#ifdef __CUDACC__
     initGPUs();
     updateDevice();
+#endif
 }
 template<typename T>
 T msl::DS<T>::get(int index) const {
@@ -294,13 +298,13 @@ T msl::DS<T>::get(int index) const {
     else {
         idSource = (int) (index / nLocal);
     }
-    msl::MSL_Broadsast(idSource, &message, 1);
+    msl::MSL_Broadcast(idSource, &message, 1);
     return message;
 }
 
 template<typename T>
 T msl::DS<T>::get_shared(int row, int column) const {
-    printf("mapStencilInPlace\n");
+    printf("get_shared\n");
     throws(detail::NotYetImplementedException());
 }
 template<typename T>
@@ -332,30 +336,26 @@ T msl::DS<T>::getLocal(int localIndex) {
         updateHost();}
     return localPartition[localIndex];
 }
-
+/*
 template<typename T>
 T& msl::DS<T>::operator[](int index) {
-    return get(index);
-}
+    return static_cast<int &>(static_cast<int &>(get(index)));
+}*/
 // TODO:adjust to new structure
 template<typename T>
 void msl::DS<T>::setLocal(int localIndex, const T &v) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
-    /*if (localIndex < nCPU) {
+    if (localIndex < nCPU) {
         localPartition[localIndex] = v;
-    } else if (localIndex >= nLocal)
+    } else if (localIndex >= nLocal) {
         throws(detail::NonLocalAccessException());
-    else {
+    } else {
 #ifdef __CUDACC__
-        // TODO adjust to new!
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
         cudaSetDevice(gpuId);
-        (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T),
-                                     cudaMemcpyHostToDevice));
+        (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T), cudaMemcpyHostToDevice));
 #endif
-    }*/
+    }
 }
 
 template<typename T>
@@ -419,11 +419,6 @@ int msl::DS<T>::getGpuId(int index) const {
     return (index - firstIndex - nCPU) / nGPU;
 }
 
-template<typename T>
-int msl::DS<T>::getFirstGpuRow() const {
-    return indexGPU / ncol;
-}
-
 // method (only) useful for debbuging
 template<typename T>
 void msl::DS<T>::showLocal(const std::string &descr) {
@@ -445,25 +440,54 @@ void msl::DS<T>::showLocal(const std::string &descr) {
 
 template<typename T>
 void msl::DS<T>::show(const std::string &descr) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
+    T *b = new T[n];
+    std::ostringstream s;
+    if (!descr.empty())
+        s << descr << ": " << std::endl;
+    if (!cpuMemoryInSync) {
+        updateHost();
+    }
+    msl::allgather(localPartition, b, nLocal);
+
+    if (msl::isRootProcess()) {
+        s << "[";
+        for (int i = 0; i < n - 1; i++) {
+            s << b[i];
+            s << " ";
+        }
+        s << b[n - 1] << "]" << std::endl;
+        s << std::endl;
+    }
+
+    delete[] b;
+
+    if (msl::isRootProcess()) printf("%s", s.str().c_str());
 }
 
 // SKELETONS / COMMUNICATION / BROADCAST PARTITION
 // SKELETONS / COMMUNICATION / GATHER
 template<typename T>
 T* msl::DS<T>::gather() {
-    T *b = new T[n];
-    std::cout.precision(2);
-    std::ostringstream s;
+    if (msl::Muesli::num_total_procs > 1) {
+        T *b = new T[n];
+        std::cout.precision(2);
+        std::ostringstream s;
 
 #ifdef __CUDACC__
-if (!cpuMemoryInSync) {
-    updateHost();
-}
+        if (!cpuMemoryInSync) {
+            updateHost();
+        }
 #endif
-    msl::allgather(localPartition, b, nLocal);
-    return b;
+        msl::allgather(localPartition, b, nLocal);
+        return b;
+    } else {
+#ifdef __CUDACC__
+        if (!cpuMemoryInSync) {
+            updateHost();
+        }
+#endif
+        return localPartition;
+    }
 }
 template<typename T>
 void msl::DS<T>::gather(msl::DS<T> &da) {
@@ -562,43 +586,59 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
                 f);
     }
 #endif
-
+    if (nCPU > 0) {
 #pragma omp parallel for
-    for (int k = 0; k < nCPU; k++) {
-        localPartition[k] = f(localPartition[k]);
+        for (int k = 0; k < nCPU; k++) {
+            localPartition[k] = f(localPartition[k]);
+        }
     }
-    msl::syncStreams();
     cpuMemoryInSync = false;
 }
 
 template<typename T>
 template<typename MapIndexFunctor>
 void msl::DS<T>::mapIndexInPlace(MapIndexFunctor &f) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
-}
-
-template<typename T>
-template<typename F>
-void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in order to avoid type error
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::mapKernel3D<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                b.getExecPlans()[i].d_Data, plans[i].d_Data, f, plans[i].gpuRows,
-                plans[i].gpuCols, plans[i].gpuDepth);
+        detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                plans[i].d_Data, plans[i].d_Data, plans[i].size,
+                f);
     }
 #endif
+    if (nCPU > 0) {
+#pragma omp parallel for
+        for (int k = 0; k < nCPU; k++) {
+            localPartition[k] = f(localPartition[k]);
+        }
+    }
+    cpuMemoryInSync = false;}
+
+template<typename T>
+template<typename F>
+void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in order to avoid type error
+
+    updateDevice();
+
+    // map
+#ifdef __CUDACC__
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+      cudaSetDevice(i);
+      dim3 dimBlock(Muesli::threads_per_block);
+      dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+      detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+              b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
+    }
+#endif
+if (nCPU > 0) {
 
 #pragma omp parallel for
-for (int k = 0; k < nCPU; k++) {
-        setLocal(k, f(b.getLocal(k)));
+    for (int i = 0; i < nCPU; i++) {
+        localPartition[i] = f(b.getLocal(i));
     }
-
-    // check for errors during gpu computation
-    msl::syncStreams();
+}
     setCpuMemoryInSync(false);
 }
 
@@ -606,15 +646,41 @@ for (int k = 0; k < nCPU; k++) {
 template<typename T>
 template<typename MapIndexFunctor>
 void msl::DS<T>::mapIndex(MapIndexFunctor &f, DS <T> &b) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
+    if (getSize() != b.getSize()) {
+        throws(detail::NotSameSizeException());
+    }
+    updateDevice();
+    if (dim == 1) {
+#ifdef __CUDACC__
+        for (int i = 0; i < Muesli::num_gpus; i++) {
+      cudaSetDevice(i);
+      dim3 dimBlock(Muesli::threads_per_block);
+      dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+      detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].nLocal,
+                plans[i].first, f);
+    }
+#endif
+        // map on CPU cores
+#pragma omp parallel for
+        for (int i = 0; i < nCPU; i++) {
+            b.setLocal(i, f((i + firstIndex), localPartition[i]));
+        }
+    } else if (dim == 2){
+
+    }
+    msl::syncStreams();
+    b.setCpuMemoryInSync(false);
+    return b;
+//    printf("mapIndex\n");
+//    throws(detail::NotYetImplementedException());
 }
 // ************************************ zip
 // ***************************************
 template<typename T>
 template<typename T2, typename ZipFunctor>
 void msl::DS<T>::zipInPlace(DS <T2> &b, ZipFunctor &f) {
-    printf("mapStencilInPlace\n");
+    printf("zipInPlace\n");
     throws(detail::NotYetImplementedException());
 }
 
@@ -630,26 +696,26 @@ msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
 void msl::DS<T>::zipIndexInPlace(DS <T2> &b, ZipIndexFunctor &f) {
-    printf("mapStencilInPlace\n");
+    printf("zipIndexInPlace\n");
     throws(detail::NotYetImplementedException());
 }
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
 void msl::DS<T>::crossZipIndexInPlace(DS <T2> &b, ZipIndexFunctor &f) {
-    printf("mapStencilInPlace\n");
+    printf("crossZipIndexInPlace\n");
     throws(detail::NotYetImplementedException());
 }
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
 void msl::DS<T>::zipIndex(DS <T2> &b, DS <T2> &c, ZipIndexFunctor &f) {
-    printf("mapStencilInPlace\n");
+    printf("zipIndex\n");
     throws(detail::NotYetImplementedException());
 }
 
 template<typename T>
 template<typename T2, typename T3, typename ZipFunctor>
 void msl::DS<T>::zipInPlace3(DS <T2> &b, DS <T3> &c, ZipFunctor &f) {
-    printf("mapStencilInPlace\n");
+    printf("zipInPlace3\n");
     throws(detail::NotYetImplementedException());
 }
 
@@ -869,6 +935,6 @@ void msl::DS<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
 template<typename T>
 template<typename MapStencilFunctor, typename NeutralValueFunctor>
 void msl::DS<T>::mapStencil(DS<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor) {
-    printf("mapStencilInPlace\n");
+    printf("mapStencilIn\n");
     throws(detail::NotYetImplementedException());
 }
