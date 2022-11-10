@@ -801,4 +801,10 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     // T* globalResults = new T[np];
     return global_result;
 }
+
+template<typename T>
+T &msl::DS<T>::operator[](int index) {
+    return get(index);
+}
+
 #endif

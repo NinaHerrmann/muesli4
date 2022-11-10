@@ -48,7 +48,6 @@
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
-
 #include "detail/fold_kernels.cuh"
 #include "detail/map_kernels.cuh"
 #include "detail/properties.cuh"
@@ -62,7 +61,7 @@ namespace msl {
      *
      * A distributed Cuboid represents a one-dimensional parallel container and is
      * distributed among all MPI processes the application was started with. It
-     * includes data parallel skeletons such as map, mapStencil, zip, and fold as
+     * includes data parallel skeletons such as map, mapStencil, and zip as
      * well as variants of these skeletons.
      *
      * \tparam T Element type. Restricted to classes without pointer data members.
@@ -309,13 +308,11 @@ public:
      * @return The element at the given global index.
      */
     T get_shared(int row, int column) const;
+
+      /**
+      * \brief Override DS function to initialize depth, col, row.
+      */
     void initGPUs();
-  /**
-   * \brief returns CPU pointer
-   *
-   * @param index the index.
-   */
-  T& operator[](int index);
 
   /**
    * \brief Manually download the local partition from GPU memory.
@@ -355,7 +352,7 @@ private:
   // Number of local rows. If the distribution is not row complete, a row will
   // be counted if one or more elements from that row are part of this
   // partition.
-  int nlocalRows{};
+  int nlocalRows;
 
   // number of cols
   int ncol;
@@ -368,7 +365,7 @@ private:
 
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
-  bool rowComplete{};
+  bool rowComplete;
 
 };
 

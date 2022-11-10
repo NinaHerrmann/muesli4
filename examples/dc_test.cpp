@@ -45,10 +45,10 @@ namespace msl::test {
         class Mult : public Functor<int, int> {
         private: int y;
         public:
-            Mult(int factor):
+            explicit Mult(int factor):
                 y(factor){}
 
-            MSL_USERFUNC int operator() (int x) const {
+            MSL_USERFUNC int operator() (int x) const override {
                 return y * x;
             }
         };
@@ -56,33 +56,33 @@ namespace msl::test {
         class Mult5 : public Functor5<int, int, int, int, int, int> {
         private: int y;
         public:
-            Mult5(int factor):
+            explicit Mult5(int factor):
             y(factor){}
 
-            MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const {
+            MSL_USERFUNC int operator() (int i, int j, int l, int Ai, int Bi) const override {
                 return i * j * l * Ai * Bi * y;
             }
         };
 
         class Sum : public Functor2<int, int, int>{
-        public: MSL_USERFUNC int operator() (int x, int y) const {
+        public: MSL_USERFUNC int operator() (int x, int y) const override {
             return y + x;
         }
         };
 
 
         class Sum4 : public Functor4<int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const {
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y) const override {
             return i+j+x+y;}
         };
 
         class Sum5 : public Functor5<int, int, int, int, int, int>{
-        public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const {
+        public: MSL_USERFUNC int operator() (int i, int j, int x, int y, int l) const override {
             return (i+j+x+y+l);}//(i+j+x) % 50;}
         };
 
 
-        void dc_test(int dim, std::string nextfile, int reps, const char * skeletons) {
+        void dc_test(int dim, const std::string& nextfile, int reps, const char * skeletons) {
             if (msl::isRootProcess()) {
                printf("Starting dc_test...\n");
             }
@@ -154,7 +154,7 @@ namespace msl::test {
             DC<int> map_dest(dim, dim, dim, 5);
 
 
-            if (strstr(skeletons, "map,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "map,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
                 t = MPI_Wtime();
                 for (int i = 0; i<reps; i++) {
@@ -179,7 +179,7 @@ namespace msl::test {
 
             b.fill(2);
 	        t = MPI_Wtime();
-	        if (strstr(skeletons, "mapInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
+	        if (strstr(skeletons, "mapInPlace,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
 	            for (int i = 0; i<reps; i++) {
 	                b.mapInPlace(mult);
@@ -249,7 +249,7 @@ namespace msl::test {
 
             b.fill(3);
             t = MPI_Wtime();
-            if (strstr(skeletons, "mapIndexInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "mapIndexInPlace,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
                 for (int i = 0; i<reps; i++) {
                     b.mapIndexInPlace(sum4);
@@ -283,7 +283,7 @@ namespace msl::test {
                 }
             }
             // ************* Fold *********************** //
-            if (strstr(skeletons, "fold,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "fold,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
                 b.fill(3);
                 int result = 0;
@@ -319,7 +319,7 @@ namespace msl::test {
             int * zipResults = new int [dim*dim*dim];
             int * manzipResults = new int [dim*dim*dim];
 
-            if (strstr(skeletons, "zip,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "zip,") != nullptr || strstr(skeletons, "all") != nullptr) {
                 b.fill(10);
                 c.fill(20);
 
@@ -345,7 +345,7 @@ namespace msl::test {
                     }
                 }
             }
-            if (strstr(skeletons, "zipInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "zipInPlace,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
                 b.fill(10);
                 c.fill(10);
@@ -379,7 +379,7 @@ namespace msl::test {
                 }
             }
 
-            if (strstr(skeletons, "zipIndex,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "zipIndex,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
 
                 b.fill(7);
@@ -416,7 +416,7 @@ namespace msl::test {
 
             b.fill(3);
             c.fill(2);
-            if (strstr(skeletons, "zipIndexInPlace,") != NULL || strstr(skeletons, "all") != NULL) {
+            if (strstr(skeletons, "zipIndexInPlace,") != nullptr || strstr(skeletons, "all") != nullptr) {
                 t = MPI_Wtime();
 
                 for (int i = 0; i<reps; i++) {
@@ -477,8 +477,8 @@ int main(int argc, char** argv){
   int nGPUs = 1;
   int reps = 1;
   if (argc >= 3) {
-      dim = atoi(argv[1]);
-      nGPUs = atoi(argv[2]);
+      dim = std::stoi(argv[1]);
+      nGPUs = std::stoi(argv[2]);
   }
   if (argc >= 4) {
       msl::Muesli::cpu_fraction = atof(argv[3]);
@@ -487,10 +487,10 @@ int main(int argc, char** argv){
       }
   }
   if (argc >= 5) {
-      CHECK = atoi(argv[4]);
+      CHECK = std::stoi(argv[4]);
   }
   if (argc >= 6) {
-      reps = atoi(argv[5]);
+      reps = std::stoi(argv[5]);
   }
   const char * skeletons;
   if (argc >= 7) {

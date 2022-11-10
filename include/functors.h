@@ -52,8 +52,6 @@
 #endif
 #include "argtype.h"
 #include "detail/functor_base.h"
-#include "dm.h"
-
 namespace msl {
 
 /**************************************************************************

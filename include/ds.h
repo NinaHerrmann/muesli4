@@ -58,9 +58,9 @@
 
 namespace msl {
     /**
-     * \brief Class DS represents a distributed Cuboid.
+     * \brief Class DS represents a distributed Structure.
      *
-     * A distributed Cuboid represents a one-dimensional parallel container and is
+     * A distributed Structure represents a one-dimensional parallel container and is
      * distributed among all MPI processes the application was started with. It
      * includes data parallel skeletons such as map, mapStencil, zip, and fold as
      * well as variants of these skeletons.
@@ -430,7 +430,7 @@ namespace msl {
          *
          * @param index the index.
          */
-        //T& operator[](int index);
+        T& operator[](int index);
 
         /**
          * \brief Returns the GPU execution plans that store information about size,
@@ -518,10 +518,6 @@ namespace msl {
    */
         void show(const std::string &descr = std::string());
 
-        /**
-         * \brief Each process prints its local partition of the ds.
-         */
-        void printLocal();
 
         /**
          * \brief Each process prints its local partition of the ds.
@@ -530,23 +526,40 @@ namespace msl {
 
         T *localPartition;
 
-        // initializes ds (used in constructors).
+        /**
+        * \brief Calculates the indexes handeled by the node, localElements,
+        * number of Elements on GPU and CPU, and similar...
+        */
         void init();
 
+        /**
+         * \brief Malloc the necessary space for all GPUs and generates the necessary GPU plans.
+         */
         virtual // initializes the GPU execution plans.
         void initGPUs();
 
-        // returns the GPU id that locally stores the element at index index.
+        /**
+       * \brief returns the GPU id that locally stores the element at (the global) index \em index.
+       */
         int getGpuId(int index) const;
 
+
         int getFirstGpuRow() const;
+        /**
+         * \brief Copies the data of another DM to the localPartition of this DM.
+         *
+         * @param other Another distributed dm which should be copied
+         */
+        void copyLocalPartition(const DM<T> &other);
 
-        void copyLocalPartition(const DS<T> &other);
-
+        /**
+        * \brief Deletes the local Partition.
+        */
         void freeLocalPartition();
-
+        /**
+        * \brief Deletes the gpu Plans.
+        */
         void freePlans();
-
         //
         // Attributes
         //
@@ -593,6 +606,7 @@ namespace msl {
         // AUXILIARY
         //
 
+        void copyLocalPartition(const DS <T> &other);
     };
 
 } // namespace msl

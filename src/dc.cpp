@@ -318,11 +318,6 @@ T msl::DC<T>::get_shared(int row, int column) const {
 }
 
 
-template<typename T>
-T& msl::DC<T>::operator[](int index) {
-    return this->get(index);
-}
-
 // method (only) useful for debbuging.
 template<typename T>
 void msl::DC<T>::showLocal(const std::string &descr) {
