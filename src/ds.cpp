@@ -536,8 +536,28 @@ void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in o
 template<typename T>
 template<typename T2, typename ZipFunctor>
 void msl::DS<T>::zipInPlace(DS <T2> &b, ZipFunctor &f) {
-    printf("zipInPlace\n");
-    throws(detail::NotYetImplementedException());
+    // zip on GPU
+    updateDevice();
+#ifdef __CUDACC__
+
+    for (int i = 0; i < ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        auto bplans = b.getExecPlans();
+        detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                plans[i].d_Data, bplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+    }
+#endif
+    T2 *bPartition = b.getLocalPartition();
+#pragma omp parallel for
+    for (int k = 0; k < nCPU; k++) {
+        localPartition[k] = f(localPartition[k], bPartition[k]);
+    }
+
+    // check for errors during gpu computation
+    msl::syncStreams();
+    cpuMemoryInSync = false;
 }
 
 template<typename T>
@@ -545,8 +565,29 @@ template<typename T2, typename ZipFunctor>
 void
 msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
                 ZipFunctor &f) { // should have result type DS<R>; debug
-    printf("Zip\n");
-    throws(detail::NotYetImplementedException());
+    updateDevice();
+
+    // zip on GPUs
+#ifdef __CUDACC__
+
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                b.getExecPlans()[i].d_Data, c.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
+    }
+#endif
+    // zip on CPU cores
+    T2 *bPartition = b.getLocalPartition();
+    T2 *cPartition = c.getLocalPartition();
+#pragma omp parallel for
+    for (int k = 0; k < nCPU; k++) {
+        setLocal(k, f(cPartition[k], bPartition[k]));
+    }
+    // check for errors during gpu computation
+    msl::syncStreams();
+    setCpuMemoryInSync(false);
 }
 
 template<typename T>

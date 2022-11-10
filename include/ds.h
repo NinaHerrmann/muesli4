@@ -573,7 +573,7 @@ namespace msl {
         // checks whether data is copy distributed among all processes
         Distribution dist;
         // checks whether data is copy distributed among all gpus
-        bool gpuCopyDistributed = 0;
+        bool gpuCopyDistributed = false;
         // number of GPUs per node (= Muesli::num_gpus)
         int ng;
         // number of elements per GPU (all the same!)

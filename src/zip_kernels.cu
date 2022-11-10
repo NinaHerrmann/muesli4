@@ -31,6 +31,8 @@
  * THE SOFTWARE.
  *
  */
+#include "../include/detail/zip_kernels.cuh"
+
 
 template <typename T1, typename T2, typename R, typename FCT2>
 __global__ void msl::detail::zipKernel(T1* in1, T2* in2, R* out, size_t n, FCT2 func){

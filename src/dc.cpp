@@ -604,12 +604,11 @@ void msl::DC<T>::zipIndex(DC <T2> &b, DC <T2> &c, ZipIndexFunctor &f) {
             int l = (k + this->firstIndex) / (ncol*nrow);
             int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
             int i = (k + this->firstIndex) % ncol;
-            setLocal(k, f(i, j, l, cPartition[k], bPartition[k]));
+            this->localPartition[k] = f(i, j, l, cPartition[k], bPartition[k]);
         }
     }
     this->cpuMemoryInSync = false;
-    // check for errors during gpu computation
-    (msl::syncStreams());
+    msl::syncStreams();
 }
 
 
