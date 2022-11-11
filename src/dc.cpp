@@ -44,89 +44,43 @@ msl::DC<T>::DC()
 
 // constructor creates a non-initialized DC
 template<typename T>
-msl::DC<T>::DC(int row, int col, int depth) : ncol(col), nrow(row), depth(depth) {
-    this->n = (col * row * depth);
-
-    this->init();
+msl::DC<T>::DC(int row, int col, int depth) : ncol(col), nrow(row), depth(depth), DS<T>(row*col*depth) {
     firstRow = this->firstIndex / ncol;
 
 #ifdef __CUDACC__
-    (cudaMallocHost( &this->localPartition, this->nLocal * sizeof(T)));
-    this->initGPUs();
-#else
-    this->localPartition = new T[this->nLocal];
+    initGPUs();
 #endif
-    this->setCpuMemoryInSync(false);
 }
 
 template<typename T>
 msl::DC<T>::DC(int row, int col, int depth, bool rowComplete)
-: ncol(col), nrow(row), depth(depth), rowComplete(rowComplete) {
+: ncol(col), nrow(row), depth(depth), rowComplete(rowComplete), DS<T>(row*col*depth) {
 
-
-    this->n = (col * row * depth);
-
-    this->init();
     firstRow = this->firstIndex / ncol;
-
-
 #ifdef __CUDACC__
-    (cudaMallocHost( &this->localPartition, this->nLocal * sizeof(T)));
     initGPUs();
-#else
-    this->localPartition = new T[this->nLocal];
 #endif
-    this->cpuMemoryInSync = false;
 }
 
 // constructor creates a DC, initialized with v
 template<typename T>
 msl::DC<T>::DC(int row, int col, int depth, const T &v)
-: ncol(col), nrow(row), depth(depth) {
+: ncol(col), nrow(row), depth(depth), DS<T>(row*col*depth, v) {
 
-    this->n = col * row * depth;
-
-    this->init();
     firstRow = this->firstIndex / ncol;
-    this->localPartition = new T[this->nLocal];
-
-#ifdef __CUDACC__
-    // TODO die CPU Elemente brauchen wir nicht unbedingt.
-    (cudaMallocHost(&this->localPartition, this->nLocal * sizeof(T)));
-    initGPUs();
-#endif
-#pragma omp parallel for
-    for (int i = 0; i < this->nLocal; i++){
-        this->localPartition[i] = v;
-    }
-    this->cpuMemoryInSync = true;
 #ifdef __CUDACC__
     initGPUs();
 #endif
-    this->updateDevice();
 }
 
 template<typename T>
 msl::DC<T>::DC(int row, int col, int depth, const T &v, bool rowComplete)
-        : ncol(col), nrow(row), depth(depth), rowComplete(rowComplete) {
-    this->n = col * row * depth;
+        : ncol(col), nrow(row), depth(depth), rowComplete(rowComplete), DS<T>(row*col*depth, v) {
 
-    this->init();
     firstRow = this->firstIndex / ncol;
-
 #ifdef __CUDACC__
-    // TODO die CPU Elemente brauchen wir nicht unbedingt.
-    (cudaMallocHost( &this->localPartition, this->nLocal * sizeof(T)));
     initGPUs();
-#else
-    this->localPartition = new T[this->nLocal];
 #endif
-#pragma omp parallel for
-    for (int i = 0; i < this->nLocal; i++)
-        this->localPartition[i] = v;
-
-    this->cpuMemoryInSync = true;
-    this->updateDevice();
 }
 
 template<typename T>
@@ -223,14 +177,8 @@ msl::DC<T> &msl::DC<T>::operator=(const DC <T> &other) noexcept {
 template<typename T>
 void msl::DC<T>::initGPUs() {
 #ifdef __CUDACC__
-    this->plans = new GPUExecutionPlan<T>[this->ng];
-    int gpuBase = this->indexGPU;
     for (int i = 0; i <this->ng; i++) {
         cudaSetDevice(i);
-        this->plans[i].size = this->nGPU;
-        this->plans[i].nLocal = this->plans[i].size;
-        this->plans[i].bytes = this->plans[i].size * sizeof(T);
-        this->plans[i].first = gpuBase + this->firstIndex;
         this->plans[i].firstDepth = this->plans[i].first / (ncol * nrow);
         this->plans[i].firstRow = (this->plans[i].first - this->plans[i].firstDepth * (ncol*nrow)) / ncol;
         this->plans[i].firstCol = this->plans[i].first % ncol;
@@ -251,15 +199,6 @@ void msl::DC<T>::initGPUs() {
         } else if (this->plans[i].gpuRows > 0) {
             this->plans[i].gpuCols = this->plans[i].lastCol - this->plans[i].firstCol;
         }
-        this->plans[i].h_Data = this->localPartition + gpuBase;
-        size_t total; size_t free;
-        cuMemGetInfo(&free, &total);
-        if (this->plans[i].bytes > free) {
-            throws(detail::DeviceOutOfMemory());
-            exit(0);
-        }
-        (cudaMalloc(&this->plans[i].d_Data, this->plans[i].bytes));
-        gpuBase += this->plans[i].size;
     }
 #endif
 }

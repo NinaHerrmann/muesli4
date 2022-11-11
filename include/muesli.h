@@ -46,11 +46,10 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <math.h>
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
-
 #include "conversion.h"
 #include "exception.h"
 #include "timer.h"

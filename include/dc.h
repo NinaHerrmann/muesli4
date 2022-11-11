@@ -352,7 +352,7 @@ private:
   // Number of local rows. If the distribution is not row complete, a row will
   // be counted if one or more elements from that row are part of this
   // partition.
-  int nlocalRows;
+  int nlocalRows{};
 
   // number of cols
   int ncol;
@@ -365,7 +365,7 @@ private:
 
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
-  bool rowComplete;
+  bool rowComplete{};
 
 };
 

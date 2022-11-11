@@ -44,7 +44,6 @@
 #include "detail/exec_plan.h"
 #include <utility>
 #include "plmatrix.h"
-#include "detail/common_skeleton_helper.h"
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
@@ -84,7 +83,7 @@ namespace msl {
          *
          * @param elements Size of the ds.
          */
-        DS(int elements);
+        DS(int size);
 
         /**
          * \brief Creates an empty datastructure with \em elements datapoints and value
@@ -93,7 +92,7 @@ namespace msl {
          * @param elements Size of the ds.
          * @param initial_value Initial value for all elements.
          */
-        DS(int elements, const T &initial_value);
+        DS(int elements, const T &v);
 
 //#pragma region Rule of five
         /**
@@ -113,7 +112,7 @@ namespace msl {
          *
          * @param other
          */
-        DS(DS<T> &&other);
+        DS(DS<T> &&other) noexcept ;
 
         /**
          * @brief Copy assignment operator. Works the same as the copy constructor.
@@ -130,7 +129,7 @@ namespace msl {
          * @param other
          * @return DS<T>&
          */
-        DS<T> &operator=(DS<T> &&other);
+        DS<T> &operator=(DS<T> &&other) noexcept ;
 
         /**
          * \brief Destructor.
@@ -353,13 +352,13 @@ namespace msl {
          */
         T get(int index) const;
 
-        virtual /**
-     * \brief Returns the element at the given row \em row and column \em column.
-     *
-     * @param row The global row.
-     * @param column The global column.
-     * @return The element at the given global index.
-     */
+        /**
+         * \brief Returns the element at the given row \em row and column \em column.
+         *
+         * @param row The global row.
+         * @param column The global column.
+         * @return The element at the given global index.
+         */
         T get_shared(int row, int column) const;
 
         /**
@@ -510,21 +509,20 @@ namespace msl {
    */
         void showLocal(const std::string &descr);
 
-        virtual /**
-   * \brief Prints the ds to standard output. Optionally, the
-   * user may pass a description that will be printed with the output.
-   *
-   * @param descr The description string.
-   */
+        /**
+       * \brief Prints the ds to standard output. Optionally, the
+       * user may pass a description that will be printed with the output.
+       *
+       * @param descr The description string.
+       */
+
         void show(const std::string &descr = std::string());
 
 
         /**
          * \brief Each process prints its local partition of the ds.
          */
-        int getnCPU();
-
-        T *localPartition;
+        long getnCPU();
 
         /**
         * \brief Calculates the indexes handeled by the node, localElements,
@@ -544,7 +542,6 @@ namespace msl {
         int getGpuId(int index) const;
 
 
-        int getFirstGpuRow() const;
         /**
          * \brief Copies the data of another DM to the localPartition of this DM.
          *
@@ -566,35 +563,36 @@ namespace msl {
 
         // local partition
         // position of processor in data parallel group of processors; zero-base
-        int id;
+        int id{};
+        T *localPartition;
 
         // number of elements
         int n;
 
         // number of local elements
-        int nLocal;
+        int nLocal{};
 
         // first (global) index of local partition
-        int firstIndex;
+        int firstIndex{};
         // total number of MPI processes
-        int np;
+        int np{};
         // tells, whether data is up to date in main (cpu) memory; true := up-to-date,
         // false := newer data on GPU
         bool cpuMemoryInSync;
         // execution plans for each gpu
         GPUExecutionPlan<T> *plans = 0;
         // checks whether data is copy distributed among all processes
-        Distribution dist;
+        Distribution dist = DIST;
         // checks whether data is copy distributed among all gpus
         bool gpuCopyDistributed = false;
         // number of GPUs per node (= Muesli::num_gpus)
-        int ng;
+        int ng{};
         // number of elements per GPU (all the same!)
-        long nGPU;
+        long nGPU{};
         // number of elements on CPU
-        long nCPU;
+        long nCPU{};
         // firstIndex caclulated by GPU
-        int indexGPU;
+        int indexGPU{};
 
         bool plinitMM = false; // pl matrix initialized?
 

@@ -325,9 +325,9 @@ private:
     // Number of local rows. If the distribution is not row complete, a row will
     // be counted if one or more elements from that row are part of this
     // partition.
-    int nlocalRows;
+    int nlocalRows{};
     // first (global) row in local partition
-    int firstRow;
+    int firstRow{};
 
     std::vector<PLMatrix<T> *> vplm;
 

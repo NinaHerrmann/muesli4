@@ -31,7 +31,6 @@
  *
  */
 #include "muesli.h"
-#include <chrono>
 #include <iostream>
 #include <ds.h>
 #include "cuda_runtime.h"
@@ -80,7 +79,6 @@ msl::DS<T>::DS(int elements, const T &v)
     localPartition = new T[nLocal];
 
 #ifdef __CUDACC__
-    // TODO die CPU Elemente brauchen wir nicht unbedingt.
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
 #endif
 #pragma omp parallel for
@@ -110,7 +108,7 @@ msl::DS<T>::DS(const DS <T> &other)
 
 template<typename T>
 msl::DS<T>::DS(DS <T> &&other)
-    : id(other.id), n(other.n), nLocal(other.nLocal),
+ noexcept     : id(other.id), n(other.n), nLocal(other.nLocal),
     firstIndex(other.firstIndex), np(other.np),
     cpuMemoryInSync(other.cpuMemoryInSync), plans{new GPUExecutionPlan<T>{
     *(other.plans)}},
@@ -120,9 +118,8 @@ msl::DS<T>::DS(DS <T> &&other)
     localPartition = other.localPartition;
     other.localPartition = nullptr;
 }
-
 template<typename T>
-msl::DS<T> &msl::DS<T>::operator=(DS <T> &&other) {
+msl::DS<T> &msl::DS<T>::operator=(msl::DS<T> &&other) noexcept {
     printf("=\n");
     throws(detail::NotYetImplementedException());
 }
@@ -200,6 +197,7 @@ void msl::DS<T>::init() {
 // auxiliary method initGPUs
 template<typename T>
 void msl::DS<T>::initGPUs() {
+
 #ifdef __CUDACC__
     plans = new GPUExecutionPlan<T>[ng];
     int gpuBase = indexGPU;
@@ -302,7 +300,7 @@ T msl::DS<T>::get(int index) const {
 }
 
 template<typename T>
-T msl::DS<T>::get_shared(int row, int column) const {
+[[maybe_unused]] T msl::DS<T>::get_shared(int row, int column) const {
     printf("get_shared\n");
     throws(detail::NotYetImplementedException());
 }
@@ -335,11 +333,12 @@ T msl::DS<T>::getLocal(int localIndex) {
         updateHost();}
     return localPartition[localIndex];
 }
-/*
+
 template<typename T>
-T& msl::DS<T>::operator[](int index) {
-    return static_cast<int &>(static_cast<int &>(get(index)));
-}*/
+T &msl::DS<T>::operator[](int index) {
+    return get(index);
+}
+
 // TODO:adjust to new structure
 template<typename T>
 void msl::DS<T>::setLocal(int localIndex, const T &v) {
@@ -361,8 +360,12 @@ template<typename T>
 void msl::DS<T>::set(int globalIndex, const T &v) {
     if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
         setLocal(globalIndex - firstIndex, v);
+    } else {
+        printf("Set global - ");
+        throws(detail::NotYetImplementedException());
+
+        // TODO: Set global
     }
-    // TODO: Set global
 }
 
 template<typename T>
@@ -426,7 +429,7 @@ void msl::DS<T>::showLocal(const std::string &descr) {
     }
     if (msl::isRootProcess()) {
         std::ostringstream s;
-        if (descr.size() > 0)
+        if (!descr.empty())
             s << descr << ": ";
         s << "[";
         for (int i = 0; i < nLocal; i++) {
@@ -514,21 +517,55 @@ void msl::DS<T>::freeDevice() {
 
 //*********************************** Maps ********************************
 template<typename T>
-int msl::DS<T>::getnCPU(){
+long msl::DS<T>::getnCPU(){
     return nCPU;
 }
 template<typename T>
 template<typename MapFunctor>
 void msl::DS<T>::mapInPlace(MapFunctor &f) {
-    detail::mapInPlaceGen(this, plans,f);
+#ifdef __CUDACC__
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                plans[i].d_Data, plans[i].d_Data, plans[i].size,
+                f);
+    }
+#endif
+    if (nCPU > 0) {
+#pragma omp parallel for
+        for (int k = 0; k < nCPU; k++) {
+            localPartition[k] = f(localPartition[k]);
+        }
+    }
+    setCpuMemoryInSync(false);
 }
 
 template<typename T>
 template<typename F>
 void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in order to avoid type error
 
-    detail::mapGen(this, plans, f, b);
+    updateDevice();
 
+    // map
+#ifdef __CUDACC__
+    for (int i = 0; i < Muesli::num_gpus; i++) {
+      cudaSetDevice(i);
+      dim3 dimBlock(Muesli::threads_per_block);
+      dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
+      detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+              b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
+    }
+#endif
+
+    if (nCPU > 0) {
+#pragma omp parallel for
+        for (int k = 0; k < nCPU; k++) {
+            localPartition[k] = f(b.getLocal(k));
+        }
+    }
+    setCpuMemoryInSync(false);
 }
 
 // ************************************ zip
@@ -802,9 +839,5 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     return global_result;
 }
 
-template<typename T>
-T &msl::DS<T>::operator[](int index) {
-    return get(index);
-}
 
 #endif
