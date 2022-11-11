@@ -41,99 +41,100 @@
 int CHECK = 0;
 int OUTPUT = 0;
 namespace msl::test {
-
-    class Square : public Functor<int, int> {
-    public:
-        MSL_USERFUNC int operator()(int y) const { return y * y; }
-    };
-
     class Mult : public Functor<int, int> {
     private:
         int y;
     public:
-        Mult(int factor) :
+        explicit Mult(int factor) :
                 y(factor) {}
 
-        MSL_USERFUNC int operator()(int x) const { return x * y; }
+        MSL_USERFUNC int operator()(int x) const override { return x * y; }
     };
 
     struct Produkt : public Functor3<int, int, int, int> {
-        MSL_USERFUNC int operator()(int i, int j, int Ai) const { return (i * j * Ai); }
+        MSL_USERFUNC int operator()(int i, int j, int Ai) const override { return (i * j * Ai); }
     };
 
     class Mult4 : public Functor4<int, int, int, int, int> {
     private:
         int y;
     public:
-        Mult4(int factor) :
+        explicit Mult4(int factor) :
                 y(factor) {}
 
-        MSL_USERFUNC int operator()(int i, int j, int Ai, int Bi) const { return (i * j * Ai * Bi * y); }
+        MSL_USERFUNC int operator()(int i, int j, int Ai, int Bi) const override { return (i * j * Ai * Bi * y); }
     };
 
     class Sum : public Functor2<int, int, int> {
     public:
-        MSL_USERFUNC int operator()(int x, int y) const { return x + y; }
+        MSL_USERFUNC int operator()(int x, int y) const override { return x + y; }
     };
 
     class Sum3 : public Functor3<int, int, int, int> {
     public:
-        MSL_USERFUNC int operator()(int i, int j, int x) const { return i + j + x; }
+        MSL_USERFUNC int operator()(int i, int j, int x) const override { return i + j + x; }
     };
 
     class Index : public Functor3<int, int, int, int> {
     private:
         int y;
     public:
-        Index(int cols) :
+        explicit Index(int cols) :
                 y(cols) {}
 
-        MSL_USERFUNC int operator()(int i, int j, int x) const { return (i * y) + j; }
+        MSL_USERFUNC int operator()(int i, int j, int x) const override { return (i * y) + j; }
     };
 
 
     class Sum4 : public Functor4<int, int, int, int, int> {
     public:
-        MSL_USERFUNC int operator()(int i, int j, int x, int y) const { return i + j + x + y; }
+        MSL_USERFUNC int operator()(int i, int j, int x, int y) const override { return i + j + x + y; }
     };
 
-    void dm_test(int dim, std::string nextfile, int reps, char *skeletons) {
+    void dm_test(int dim, const std::string& nextfile, int reps, const char *skeletons) {
         // ************* Init *********************** //
-        double fill_time = 0.0, const_time = 0.0, map0_time = 0.0, map1_time = 0.0, map2_time = 0.0, map3_time = 0.0, zip0_time = 0.0, zip1_time = 0.0, zip2_time = 0.0, zip3_time = 0.0, fold0_time = 0.0, fold1_time = 0.0;
+        double fill_time = 0.0, t = 0.0, const_time = 0.0, map0_time = 0.0, map1_time = 0.0, map2_time = 0.0, map3_time = 0.0, zip0_time = 0.0, zip1_time = 0.0, zip2_time = 0.0, zip3_time = 0.0, fold0_time = 0.0;
 
         DM<int> a(dim, dim, 2);
-        double t = MPI_Wtime();
-        a.fill(2);
         int elements = dim * dim;
-        int *fillResult = a.gather();
-        fill_time += MPI_Wtime() - t;
 
-        if (CHECK && msl::isRootProcess()) {
-            for (int i = 0; i < elements; i++) {
-                if (fillResult[i] != 2) {
-                    printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i,
-                           fillResult[i]);
-                    break;
-                }
-                if (i == (elements) - 1) {
-                    printf("Fill \t\t\t \xE2\x9C\x93\n");
+        if (strstr(skeletons, "Fill,") != nullptr || strstr(skeletons, "all") != nullptr) {
+
+            t = MPI_Wtime();
+            a.fill(2);
+            int *fillResult = a.gather();
+            fill_time += MPI_Wtime() - t;
+
+            if (CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++) {
+                    if (fillResult[i] != 2) {
+                        printf("Fill \t\t\t\t \xE2\x9C\x97 At Index At Index %d - Value %d No further checking.\n", i,
+                               fillResult[i]);
+                        break;
+                    }
+                    if (i == (elements) - 1) {
+                        printf("Fill \t\t\t \xE2\x9C\x93\n");
+                    }
                 }
             }
         }
-        t = MPI_Wtime();
-        DM<int> b(dim, dim, 5);
-        const_time += MPI_Wtime() - t;
-        int *constResult = b.gather();
+        if (strstr(skeletons, "Initfill,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
-        if (CHECK && msl::isRootProcess()) {
-            for (int i = 0; i < elements; i++) {
-                if (constResult[i] != 5) {
-                    printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i,
-                           constResult[i]);
-                    break;
-                }
-                if (i == (elements) - 1) {
-                    printf("Initialize+fill \t \xE2\x9C\x93\n");
+            t = MPI_Wtime();
+            DM<int> b(dim, dim, 5);
+            const_time += MPI_Wtime() - t;
+            int *constResult = b.gather();
+
+            if (CHECK && msl::isRootProcess()) {
+                for (int i = 0; i < elements; i++) {
+                    if (constResult[i] != 5) {
+                        printf("Initialize+fill \xE2\x9C\x97 At Index %d - Value %d No further checking.\n", i,
+                               constResult[i]);
+                        break;
+                    }
+                    if (i == (elements) - 1) {
+                        printf("Initialize+fill \t \xE2\x9C\x93\n");
+                    }
                 }
             }
         }
@@ -162,7 +163,7 @@ namespace msl::test {
            rotate.rotateCols(-5);*/
         int *mapResults;
 
-        if (strstr(skeletons, "map,") != NULL || strstr(skeletons, "all") != NULL) {
+        if (strstr(skeletons, "map,") != nullptr || strstr(skeletons, "all") != nullptr) {
 
             DM<int> map(dim, dim, 3);
             t = MPI_Wtime();
@@ -483,7 +484,7 @@ int main(int argc, char **argv) {
     if (argc >= 6) {
         reps = atoi(argv[5]);
     }
-    char *skeletons;
+    const char *skeletons;
     if (argc >= 7) {
         skeletons = argv[6];
     } else {

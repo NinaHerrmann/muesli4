@@ -349,7 +349,9 @@ void msl::DM<T>::mapIndexInPlace(MapIndexFunctor &f) {
 long elementsCPU = this->nCPU;
 long firstIndexCPU = this->firstIndex;
 // all necessary calculations are performed otherwise some are skipped.
+#ifdef _OPENMP
 #pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f) default(none)
+#endif
     for (int k = 0; k < elementsCPU; k++) {
         int i = (k + firstIndexCPU) / ncol;
         int j = (k + firstIndexCPU) % ncol;
@@ -381,7 +383,9 @@ void msl::DM<T>::mapIndex(MapIndexFunctor &f, DM<T> &b) {
         //T2 *bPartition = b.getLocalPartition();
         long elementsCPU = this->nCPU;
         long firstIndexCPU = this->firstIndex;
+#ifdef _OPENMP
 #pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, b) default(none)
+#endif
         for (int k = 0; k < elementsCPU; k++) {
             int j = (k + firstIndexCPU) / ncol;
             int i = (k + firstIndexCPU) % ncol;
@@ -414,7 +418,9 @@ void msl::DM<T>::zipIndexInPlace(DM <T2> &b, ZipIndexFunctor &f) {
         T2 *bPartition = b.getLocalPartition();
         long elementsCPU = this->nCPU;
         long firstIndexCPU = this->firstIndex;
+#ifdef _OPENMP
 #pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, bPartition) default(none)
+#endif
         for (int k = 0; k < elementsCPU; k++) {
             int i = (k + firstIndexCPU) / ncol;
             int j = (k + firstIndexCPU) % ncol;
@@ -450,7 +456,9 @@ void msl::DM<T>::zipIndex(DM <T2> &b, DM<T2> &c, ZipIndexFunctor &f) {
         T2 *cPartition = c.getLocalPartition();
         long elementsCPU = this->nCPU;
         long firstIndexCPU = this->firstIndex;
+#ifdef _OPENMP
 #pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, bPartition, cPartition) default(none)
+#endif
         for (int k = 0; k < elementsCPU; k++) {
             int i = (k + firstIndexCPU) / ncol;
             int j = (k + firstIndexCPU) % ncol;
@@ -484,7 +492,9 @@ if (this->nCPU > 0) {
     long elementsCPU = this->nCPU;
     long firstIndexCPU = this->firstIndex;
 // all necessary calculations are performed otherwise some are skipped.
+#ifdef _OPENMP
 #pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, bPartition) default(none)
+#endif
     for (int k = 0; k < elementsCPU; k++) {
         int i = (k + firstIndexCPU) / ncol;
         int j = (k + firstIndexCPU) % ncol;

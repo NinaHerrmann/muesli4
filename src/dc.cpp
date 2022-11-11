@@ -396,7 +396,9 @@ void msl::DC<T>::mapIndexInPlace(MapIndexFunctor &f) {
     }
 #endif
 // all necessary calculations are performed otherwise some are skipped.
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int k = 0; k < this->nCPU; k++) {
         int l = (k + this->firstIndex) / (ncol*nrow);
         int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
@@ -430,7 +432,9 @@ void msl::DC<T>::mapIndex(MapIndexFunctor &f, DC <T> &b) {
 #endif
 
     if (this->nCPU > 0){
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int k = 0; k < this->nCPU; k++) {
         T *bPartition = b.getLocalPartition();
         int l = (k + this->firstIndex) / (ncol*nrow);
@@ -469,7 +473,9 @@ void msl::DC<T>::zipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
 #endif
     if (this->nCPU > 0){
         T2 *bPartition = b.getLocalPartition();
-        #pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (int k = 0; k < this->nCPU; k++) {
             int l = (k + this->firstIndex) / (ncol*nrow);
             int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
@@ -498,7 +504,9 @@ void msl::DC<T>::crossZipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
 #endif
     if (this->nCPU > 0){
         T2 *bPartition = b.getLocalPartition();
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (int k = 0; k < this->nCPU; k++) {
             int i = (k + this->firstIndex) / ncol;
             int j = (k + this->firstIndex) % ncol;
@@ -533,7 +541,9 @@ void msl::DC<T>::zipIndex(DC <T2> &b, DC <T2> &c, ZipIndexFunctor &f) {
         T2 *bPartition = b.getLocalPartition();
         T2 *cPartition = c.getLocalPartition();
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (int k = 0; k < this->nCPU; k++) {
             int l = (k + this->firstIndex) / (ncol*nrow);
             int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;

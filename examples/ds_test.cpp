@@ -90,7 +90,8 @@ namespace msl::test {
 
             // ************* Init *********************** //
             int elements = dim;
-            double fill_time = 0.0, const_time = 0.0, map0_time =  0.0, map1_time =  0.0, map2_time =  0.0, map3_time =  0.0, zip0_time =  0.0, zip1_time =  0.0, zip2_time =  0.0, zip3_time =  0.0, fold0_time = 0.0, fold1_time = 0.0;
+            double map0_time =  0.0, map1_time =  0.0 ;
+            // double fill_time = 0.0, const_time = 0.0, map0_time =  0.0, map1_time =  0.0, map2_time =  0.0, map3_time =  0.0, zip0_time =  0.0, zip1_time =  0.0, zip2_time =  0.0, zip3_time =  0.0, fold0_time = 0.0, fold1_time = 0.0;
             double t = MPI_Wtime();
 /*
             if (strstr(skeletons, "Fill,") != NULL || strstr(skeletons, "all") != NULL) {
@@ -456,8 +457,7 @@ namespace msl::test {
                printf("%f; %f; %f; %f; %f; %f; %f; %f; %f; %f; %f\n", fill_time, const_time,
                        map0_time, map1_time, map2_time, map3_time, fold0_time, zip0_time, zip1_time, zip2_time, zip3_time);}
 */
-          return;
-        }
+                 }
     } // close namespaces
 
 int main(int argc, char** argv){

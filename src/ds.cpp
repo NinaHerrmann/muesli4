@@ -81,7 +81,10 @@ msl::DS<T>::DS(int elements, const T &v)
 #ifdef __CUDACC__
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
 #endif
+
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int i = 0; i < nLocal; i++){
         localPartition[i] = v;
     }
@@ -256,7 +259,9 @@ void msl::DS<T>::setLocalPartition(T *elements) {
 
 template<typename T>
 void msl::DS<T>::fill(const T &element) {
-    #pragma omp parallel for default(none) shared(element)
+#ifdef _OPENMP
+#pragma omp parallel for default(none) shared(element)
+#endif
     for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
@@ -534,7 +539,9 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
     }
 #endif
     if (nCPU > 0) {
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (int k = 0; k < nCPU; k++) {
             localPartition[k] = f(localPartition[k]);
         }
@@ -560,7 +567,9 @@ void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in o
 #endif
 
     if (nCPU > 0) {
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (int k = 0; k < nCPU; k++) {
             localPartition[k] = f(b.getLocal(k));
         }
@@ -587,7 +596,9 @@ void msl::DS<T>::zipInPlace(DS <T2> &b, ZipFunctor &f) {
     }
 #endif
     T2 *bPartition = b.getLocalPartition();
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int k = 0; k < nCPU; k++) {
         localPartition[k] = f(localPartition[k], bPartition[k]);
     }
@@ -618,7 +629,9 @@ msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
     // zip on CPU cores
     T2 *bPartition = b.getLocalPartition();
     T2 *cPartition = c.getLocalPartition();
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int k = 0; k < nCPU; k++) {
         setLocal(k, f(cPartition[k], bPartition[k]));
     }
@@ -818,7 +831,9 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
     }
     T localresult = 0;
 
+#ifdef _OPENMP
 #pragma omp parallel for shared(localPartition) reduction(+: localresult)
+#endif
     for (int i = 0; i < nLocal; i++) {
         localresult = f(localresult, localPartition[i]);
     }
@@ -830,7 +845,9 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
     // calculate global result from local results
     T global_result = local_results[0];
+#ifdef _OPENMP
 #pragma omp parallel for shared(local_results) reduction(+: global_result)
+#endif
     for (int i = 1; i < np; i++) {
         global_result = f(global_result, local_results[i]);
     }
