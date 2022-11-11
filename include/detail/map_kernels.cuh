@@ -33,6 +33,8 @@
 #pragma once
 
 #include "exec_plan.h"
+#include "functors.h"
+#include "plcube.h"
 // #include "plmatrix.h"
 
 // #include "plarray.h"
@@ -120,6 +122,13 @@ namespace msl {
         template<typename T, typename F>
         __global__ void mapInPlaceKernelDC(T *inout, int gpuRows, int gpuCols,
                                            int gpuDepth, F func);
+
+        template <typename T, msl::DCMapStencilFunctor<T> f>
+        __global__ void mapStencilKernelDC(T *out, PLCube<T> in) {
+            int i = blockIdx.x * blockDim.x + threadIdx.x;
+            int3 coords = in.indexToCoordinate(in.dataStartIndex + i);
+            out[i] = f(in, coords.x, coords.y, coords.z);
+        }
 
 /*
 template <typename T, typename R, typename F, typename NeutralValueFunctor>

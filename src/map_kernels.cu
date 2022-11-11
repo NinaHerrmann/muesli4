@@ -1,6 +1,3 @@
-
-#include "../include/detail/map_kernels.cuh"
-
 /*
  * map_kernels.cpp
  *

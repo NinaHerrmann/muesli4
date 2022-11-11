@@ -126,7 +126,7 @@ if (BUILD_GPU)
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
 
-  set(GPU_COMPILER_OPTIONS "-arch=native;std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
+  set(GPU_COMPILER_OPTIONS "-arch=native;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
   set(GPU_COMPILER_OPTIONS_DEBUG "-g;-G;-O0")
   set(GPU_COMPILER_OPTIONS_RELEASE "-O3")
   set(GPU_COMPILER_OPTIONS_MINSIZEREL "-O2")
@@ -299,6 +299,7 @@ set(EXAMPLE_SRCS
 	${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
 	${PROJECT_SOURCE_DIR}/examples/da_test.cpp
 	${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
+    ${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
 )
 
 foreach (example_src ${EXAMPLE_SRCS})

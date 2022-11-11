@@ -44,7 +44,7 @@
 #include "detail/conversion.h"
 #include "detail/exec_plan.h"
 #include <utility>
-#include "plmatrix.h"
+#include "plcube.h"
 
 #ifdef __CUDACC__
 #include "detail/copy_kernel.cuh"
@@ -251,14 +251,12 @@ public:
   /**
   * @brief TODO Non-inplace variant of the mapStencil skeleton.
   *
-  * @tparam MapStencilFunctor Functor for the Stencil Calculation
-  * @tparam NeutralValueFunctor Functor to return the NV
   * @param result DC to save the result
   * @param f MapStencilFuncotr
   * @param neutral_value_functor NeutralValueFunctor
   */
-  template<typename MapStencilFunctor, typename NeutralValueFunctor>
-  void mapStencil(DC<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+  template<msl::DCMapStencilFunctor<T> f>
+  void mapStencil(DC<T> &result, size_t stencilSize, T neutralValue);
 
   //
   // SKELETONS / COMMUNICATION
@@ -314,6 +312,62 @@ public:
       */
     void initGPUs();
 
+    void initPLCubes(int stencilSize, T neutralValue) {
+        plCubes = std::vector<PLCube<T>*>(this->ng);
+        for (int i = 0; i < this->ng; i++) {
+            plCubes[i] = new PLCube<T>(
+                    {this->ncol, this->nrow, this->depth},
+                    {this->plans[i].firstCol, this->plans[i].firstRow, this->plans[i].firstDepth},
+                    {this->plans[i].lastCol, this->plans[i].lastRow, this->plans[i].lastDepth},
+                    stencilSize,
+                    neutralValue,
+                    this->plans[i].d_Data
+            );
+        }
+        supportedStencilSize = stencilSize;
+    }
+
+    void freePLCubes() {
+        for (int i = 0; i < this->ng; i++) {
+            delete &plCubes[i];
+        }
+        supportedStencilSize = -1;
+    }
+
+    void syncPLCubes(int stencilSize, T neutralValue) {
+        if (stencilSize > supportedStencilSize) {
+            freePLCubes();
+            initPLCubes(stencilSize, neutralValue);
+        }
+        for(int i = 1; i < this->ng; i++) {
+            size_t bottomPaddingSize = plCubes[i - 1]->getBottomPaddingElements() * sizeof(T);
+            cudaMemcpyPeerAsync(
+                    plCubes[i - 1]->bottomPadding, i - 1, plCubes[i]->data, i,
+                    bottomPaddingSize, msl::Muesli::streams[i - 1]
+            );
+
+            size_t topPaddingSize = plCubes[i]->getTopPaddingElements() * sizeof(T);
+            cudaMemcpyPeerAsync(
+                    plCubes[i]->topPadding, i, plCubes[i - 1]->data + (this->plans[i].size - topPaddingSize), i - 1,
+                    topPaddingSize, msl::Muesli::streams[i - 1]
+            );
+        }
+        msl::syncStreams();
+    }
+
+    void prettyPrint() {
+        this->updateHost();
+        for (int z = 0; z < this->depth; z++) {
+            for (int y = 0; y < this->nrow; y++) {
+                for (int x = 0; x < this->ncol; x++) {
+                    printf("%02f ", this->plans[0].h_Data[(z * (this->nrow) + y) * this->ncol + x]);
+                }
+                printf("\n");
+            }
+            printf("\n");
+        }
+    }
+
   /**
    * \brief Manually download the local partition from GPU memory.
    */
@@ -366,6 +420,9 @@ private:
   // Indicates whether the matrix should be distributed in full rows between
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete{};
+
+  std::vector<PLCube<T>*> plCubes;
+  int supportedStencilSize = -1;
 
 };
 

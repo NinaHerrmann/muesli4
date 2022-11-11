@@ -33,6 +33,7 @@
 #include "muesli.h"
 #include <iostream>
 #include <dc.h>
+#include "map_kernels.cuh"
 
 template<typename T>
 msl::DC<T>::DC()
@@ -564,9 +565,23 @@ void msl::DC<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
 }
 
 template<typename T>
-template<typename MapStencilFunctor, typename NeutralValueFunctor>
-void msl::DC<T>::mapStencil(DC<T> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor) {
-    printf("mapStencilInPlace\n");
-    throws(detail::NotYetImplementedException());
+template<msl::DCMapStencilFunctor<T> f>
+void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralValue) {
+    this->updateDevice();
+    syncPLCubes(stencilSize, neutralValue);
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+    }
+    for (int i = 0; i < this->ng; i++) {
+        detail::mapStencilKernelDC<T, f><<<1, this->plans[i].size>>>(result.plans[i].d_Data, *this->plCubes[i]);
+    }
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+    }
+    result.setCpuMemoryInSync(false);
 }
 
