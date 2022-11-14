@@ -1,14 +1,13 @@
 /*
- * plmatrix.h
+ * plcube.h
  *
- *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ *      Author: Justus Dieckmann
  *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2014 Steffen Ernsting <s.ernsting@uni-muenster.de>,
- *                Herbert Kuchen <kuchen@uni-muenster.de.
+ * Copyright 2022 Justus Dieckmann
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,29 +48,28 @@ namespace msl {
  */
     template <typename T>
     class PLCube {
-    private:
-        const int3 globalSize;
-        const std::array<int, 3> start;
-        const std::array<int, 3> end;
     public:
-        const int stencilSize;
-        const int dataStartIndex = 0;
-        const int dataEndIndex = 0;
-        const int topPaddingStartIndex = 0;
-        const int bottomPaddingEndIndex = 0;
-        const T neutralValue;
+        int width;
+        int height;
+        int depth;
+
+        int stencilSize;
+        T neutralValue;
+        int dataStartIndex = 0;
+        int dataEndIndex = 0;
+        int topPaddingStartIndex = 0;
+        int bottomPaddingEndIndex = 0;
         T *data;
         T *topPadding;
         T *bottomPadding;
 
-        PLCube() = default;
-
         /**
          * \brief Constructor: creates a PLCube.
          */
-        PLCube(const int3 globalSize, const std::array<int, 3> start, const std::array<int, 3> end,
-               const int stencilSize, const T neutralValue, T *data)
-            : globalSize(globalSize), start(start), end(end), stencilSize(stencilSize), data(data), neutralValue(neutralValue),
+        PLCube(int width, int height, int depth, std::array<int, 3> start, std::array<int, 3> end, int device,
+               int stencilSize, T neutralValue, T *data)
+            : width(width), height(height), depth(depth),
+            stencilSize(stencilSize), neutralValue(neutralValue),
             dataStartIndex(msl::PLCube<T>::coordinateToIndex(start)),
             dataEndIndex(msl::PLCube<T>::coordinateToIndex(end)),
             topPaddingStartIndex(msl::PLCube<T>::coordinateToIndex(
@@ -80,16 +78,18 @@ namespace msl {
                     std::max(start[2] - stencilSize, 0)
             )),
             bottomPaddingEndIndex(msl::PLCube<T>::coordinateToIndex(
-                    std::max(end[0] + stencilSize, globalSize.x),
-                    std::max(end[1] + stencilSize, globalSize.y),
-                    std::max(end[2] + stencilSize, globalSize.z)
-            )) {
+                    std::min(end[0] + stencilSize, width - 1),
+                    std::min(end[1] + stencilSize, height - 1),
+                    std::min(end[2] + stencilSize, depth - 1)
+            )),
+            data(data) {
+            cudaSetDevice(device);
             cudaMalloc(&topPadding, (dataStartIndex - topPaddingStartIndex) * sizeof(T));
             cudaMalloc(&bottomPadding, (bottomPaddingEndIndex - dataEndIndex) * sizeof(T));
         }
 
-        MSL_USERFUNC T operator() (int x, int y, int z) {
-            if (x < 0 || y < 0 || z < 0 || x >= globalSize.x || y >= globalSize.y || z >= globalSize.z) {
+        MSL_USERFUNC T operator() (int x, int y, int z) const {
+            if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
                 return neutralValue;
             }
             int index = coordinateToIndex(x, y, z);
@@ -104,27 +104,27 @@ namespace msl {
             }
         }
 
-        MSL_USERFUNC inline int coordinateToIndex(int x, int y, int z) {
-            return (z * globalSize.y + y) * globalSize.x + x;
+        MSL_USERFUNC inline int coordinateToIndex(int x, int y, int z) const {
+            return (z * height + y) * width + x;
         }
 
-        inline int coordinateToIndex(const std::array<int, 3> &coords) {
+        [[nodiscard]] inline int coordinateToIndex(const std::array<int, 3> &coords) const {
             return coordinateToIndex(coords[0], coords[1], coords[2]);
         }
 
-        MSL_USERFUNC int3 indexToCoordinate(int i) {
-            int x = i % globalSize.x;
-            i /= globalSize.x;
-            int y = i % globalSize.y;
-            int z = i / globalSize.y;
+        MSL_USERFUNC int3 indexToCoordinate(int i) const {
+            int x = i % width;
+            i /= width;
+            int y = i % height;
+            int z = i / height;
             return {x, y, z};
         }
 
-        inline int getTopPaddingElements() {
+        [[nodiscard]] inline int getTopPaddingElements() const {
             return dataStartIndex - topPaddingStartIndex;
         }
 
-        inline int getBottomPaddingElements() {
+        [[nodiscard]] inline int getBottomPaddingElements() const {
             return bottomPaddingEndIndex - dataEndIndex;
         }
     };

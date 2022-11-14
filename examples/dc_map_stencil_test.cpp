@@ -1,15 +1,13 @@
 /*
  * dc_test.cpp
  *
- *      Author: Nina Hermann,
- *  	        Herbert Kuchen <kuchen@uni-muenster.de>
+ *      Author: Justus Dieckmann
  * 
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
- * Copyright 2020  Herbert Kuchen <kuchen@uni-muenster.de>,
- *                 Nina Hermann
+ * Copyright 2022  Justus Dieckmann
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +31,6 @@
 
 #include <iostream>
 #include <cmath>
-#include <cstring>
 
 #include "muesli.h"
 #include "dc.h"
@@ -41,9 +38,44 @@
 
 int CHECK = 0;
 int OUTPUT = 1;
-namespace msl::dc_map_stencil_test {
+namespace msl::dc_map_stencil {
 
-    MSL_USERFUNC float averageStencil(PLCube<float> &cs, int x, int y, int z) {
+    inline int index(int x, int y, int z, int w, int h, int d) {
+        return (y) * w + x + (w * h) * z;
+    }
+
+    void printDC(DC<float4> &dc) {
+        dc.updateHost();
+        for (int y = 0; y < 5; y++) {
+            for (int x = 0; x < 5; x++) {
+                float4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
+                printf("(%f, %f, %f, %f), ", f.x, f.y, f.z, f.w);
+            }
+            printf("\n");
+        }
+    }
+
+    void printDC(DC<float> &dc) {
+        dc.updateHost();
+        for (int y = 0; y < 5; y++) {
+            for (int x = 0; x < 5; x++) {
+                printf("%f, ", dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())]);
+            }
+            printf("\n");
+        }
+    }
+
+    void printDC(DC<int> &dc) {
+        dc.updateHost();
+        for (int y = 0; y < 5; y++) {
+            for (int x = 0; x < 5; x++) {
+                printf("%i, ", dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())]);
+            }
+            printf("\n");
+        }
+    }
+
+    MSL_USERFUNC float averageStencil(const PLCube<float> &cs, int x, int y, int z) {
         float sum = 0;
         float multiplier = 1.0f / (float) std::pow(2 * 1 + 1, 3);
         for (int dx = -1; dx <= 1; dx++) {
@@ -56,17 +88,49 @@ namespace msl::dc_map_stencil_test {
         return sum;
     }
 
-    void dc_test(int dim) {
-        DC<float> dc(5, 5, 5);
-        DC<float> dc2(5, 5, 5);
-        dc.fill(0.f);
-        for (int i = 0; i < 5 * 5 * 5; i++) {
-            dc.set(i, (float)(i % 2));
+    MSL_USERFUNC int addStencil(const PLCube<int> &cs, int x, int y, int z) {
+        int sum = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    sum += cs(x + dx, y + dy, z + dz);
+                }
+            }
         }
-        dc.prettyPrint();
+        return sum;
+    }
+
+    MSL_USERFUNC float4 copy(const PLCube<float4> &cs, int x, int y, int z) {
+        return cs(x, y, z);
+    }
+
+    class Op {
+    public:
+        MSL_USERFUNC int operator()(int x, int y, int z, int i) {
+            return (int) 1;
+        }
+    };
+
+    void dc_test(int dim) {
+        Op op;
+        DC<int> dc(100, 100, 16);
+        DC<int> dc2(100, 100, 16);
+        dc.fill(1);
+        printDC(dc);
         printf("=== Executing stencil... ===\n\n");
-        dc.mapStencil<averageStencil>(dc2, 1, 0.f);
-        dc2.prettyPrint();
+        dc.mapStencil<addStencil>(dc2, 1, {});
+        printDC(dc2);
+        printf("\nCorners: \n");
+        for(int x = 0; x < dc2.getCols(); x++) {
+            for(int y = 0; y < dc2.getRows(); y++) {
+                for(int z = 0; z < dc2.getDepth(); z++) {
+                    int i = index(x, y, z, dc2.getCols(), dc2.getRows(), dc2.getDepth());
+                    if (dc2.localPartition[i] <= 8) {
+                        printf("(%i, %i, %i): %i\n", x, y, z, dc2.localPartition[i]);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -80,7 +144,7 @@ int main(int argc, char** argv){
       printf("%d; %d; %d; %d; %.2f\n", dim, msl::Muesli::num_total_procs,
              msl::Muesli::num_local_procs, msl::Muesli::num_gpus, msl::Muesli::cpu_fraction);
   }
-  msl::dc_map_stencil_test::dc_test(dim);
+  msl::dc_map_stencil::dc_test(dim);
   msl::terminateSkeletons();
   return EXIT_SUCCESS;
 }

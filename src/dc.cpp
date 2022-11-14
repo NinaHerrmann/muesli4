@@ -575,7 +575,11 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
         gpuErrchk(cudaDeviceSynchronize());
     }
     for (int i = 0; i < this->ng; i++) {
-        detail::mapStencilKernelDC<T, f><<<1, this->plans[i].size>>>(result.plans[i].d_Data, *this->plCubes[i]);
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        PLCube<T> cube = this->plCubes[i];
+        detail::mapStencilKernelDC<T, f><<<dimBlock, dimGrid>>>(result.plans[i].d_Data, cube, result.plans[i].size);
     }
     for (int i = 0; i < this->ng; i++) {
         cudaSetDevice(i);

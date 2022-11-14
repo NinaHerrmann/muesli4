@@ -409,6 +409,6 @@ protected:
     };
 
     template <typename T>
-    using DCMapStencilFunctor = T(*)(PLCube<T> &cs, int x, int y, int z);
+    using DCMapStencilFunctor = T(*)(const PLCube<T> &cs, int x, int y, int z);
 
 } // namespace msl

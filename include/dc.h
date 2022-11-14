@@ -313,12 +313,15 @@ public:
     void initGPUs();
 
     void initPLCubes(int stencilSize, T neutralValue) {
-        plCubes = std::vector<PLCube<T>*>(this->ng);
+        printf("%i, %i, %i\n", this->ncol, this->nrow, this->depth);
+        plCubes = std::vector<PLCube<T>>();
+        plCubes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
-            plCubes[i] = new PLCube<T>(
-                    {this->ncol, this->nrow, this->depth},
+            plCubes[i] = PLCube<T>(
+                    this->ncol, this->nrow, this->depth,
                     {this->plans[i].firstCol, this->plans[i].firstRow, this->plans[i].firstDepth},
                     {this->plans[i].lastCol, this->plans[i].lastRow, this->plans[i].lastDepth},
+                    i,
                     stencilSize,
                     neutralValue,
                     this->plans[i].d_Data
@@ -328,9 +331,6 @@ public:
     }
 
     void freePLCubes() {
-        for (int i = 0; i < this->ng; i++) {
-            delete &plCubes[i];
-        }
         supportedStencilSize = -1;
     }
 
@@ -340,17 +340,16 @@ public:
             initPLCubes(stencilSize, neutralValue);
         }
         for(int i = 1; i < this->ng; i++) {
-            size_t bottomPaddingSize = plCubes[i - 1]->getBottomPaddingElements() * sizeof(T);
-            cudaMemcpyPeerAsync(
-                    plCubes[i - 1]->bottomPadding, i - 1, plCubes[i]->data, i,
-                    bottomPaddingSize, msl::Muesli::streams[i - 1]
-            );
+            size_t bottomPaddingSize = plCubes[i - 1].getBottomPaddingElements() * sizeof(T);
+            gpuErrchk(cudaMemcpy(
+                    plCubes[i - 1].bottomPadding, plCubes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice
+            ));
 
-            size_t topPaddingSize = plCubes[i]->getTopPaddingElements() * sizeof(T);
-            cudaMemcpyPeerAsync(
-                    plCubes[i]->topPadding, i, plCubes[i - 1]->data + (this->plans[i].size - topPaddingSize), i - 1,
-                    topPaddingSize, msl::Muesli::streams[i - 1]
-            );
+            size_t topPaddingSize = plCubes[i].getTopPaddingElements() * sizeof(T);
+            gpuErrchk(cudaMemcpy(
+                    plCubes[i].topPadding, plCubes[i - 1].data + (this->plans[i - 1].size - plCubes[i].getTopPaddingElements()), topPaddingSize,
+                    cudaMemcpyDeviceToDevice
+            ));
         }
         msl::syncStreams();
     }
@@ -394,8 +393,18 @@ public:
    */
   void show(const std::string &descr = std::string());
 
+  int getCols() {
+      return ncol;
+  }
 
+  int getRows() {
+      return nrow;
+  }
 
+  int getDepth() {
+      return depth;
+  }
+        std::vector<PLCube<T>> plCubes;
 private:
   //
   // Attributes
@@ -421,7 +430,7 @@ private:
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete{};
 
-  std::vector<PLCube<T>*> plCubes;
+
   int supportedStencilSize = -1;
 
 };

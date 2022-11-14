@@ -124,10 +124,14 @@ namespace msl {
                                            int gpuDepth, F func);
 
         template <typename T, msl::DCMapStencilFunctor<T> f>
-        __global__ void mapStencilKernelDC(T *out, PLCube<T> in) {
+        __global__ void mapStencilKernelDC(T *out, const PLCube<T> in, unsigned int size) {
             int i = blockIdx.x * blockDim.x + threadIdx.x;
+            if (i >= size) {
+                return;
+            }
             int3 coords = in.indexToCoordinate(in.dataStartIndex + i);
-            out[i] = f(in, coords.x, coords.y, coords.z);
+            T v = f(in, coords.x, coords.y, coords.z);
+            out[i] = v;
         }
 
 /*

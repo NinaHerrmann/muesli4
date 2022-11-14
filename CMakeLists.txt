@@ -300,6 +300,7 @@ set(EXAMPLE_SRCS
 	${PROJECT_SOURCE_DIR}/examples/da_test.cpp
 	${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
     ${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
+    ${PROJECT_SOURCE_DIR}/examples/gassimulation_test.cpp
 )
 
 foreach (example_src ${EXAMPLE_SRCS})
