@@ -304,6 +304,7 @@ namespace msl {
          * of the ds.
          */
         void gather(msl::DS<T> &ds);
+        void gather(T *&templatepointer);
 
         // SKELETONS / COMMUNICATION / PERMUTE PARTITION
 
@@ -605,6 +606,7 @@ namespace msl {
         //
 
         void copyLocalPartition(const DS <T> &other);
+
     };
 
 } // namespace msl

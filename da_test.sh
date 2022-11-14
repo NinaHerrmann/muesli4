@@ -8,13 +8,11 @@
 # arg[4] check for correctness
 # arg[5] call skeletons repeatedly
 for size in 8 16; do
-    bin/da_test_seq $size 0 1 1
+    ./da_test_seq $size 0 1 true 1 
     for np in 1 2; do
-        mpirun -np $np bin/da_test_cpu $size 0 $cpu_p 1
-  		for gpu_n in 1 2; do
-    		for cpu_p in 0.00 0.5; do
-		        mpirun -np $np bin/da_test_gpu $size $gpu_n $cpu_p 1
-            done
+        mpirun -np $np ./da_test_cpu $size 0 $cpu_p true 1
+    	for cpu_p in 0.00 0.5; do
+		mpirun -np $np ./da_test_gpu $size 1 $cpu_p true 1
         done
     done
 done

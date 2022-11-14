@@ -34,6 +34,7 @@
 #include <iostream>
 #include <ds.h>
 #include "cuda_runtime.h"
+// Not used warning is wrong.
 #include "cuda.h"
 
 template<typename T>
@@ -272,6 +273,19 @@ void msl::DS<T>::fill(const T &element) {
 #endif
 }
 template<typename T>
+void msl::DS<T>::fill(T *const values) {
+    if (ng == 1) {
+        this->localPartition = values;
+    } else {
+        if (msl::isRootProcess()) {
+            printf("fill from array:\n");
+            throws(detail::NotYetImplementedException());
+            // TODO: in case of multiple nodes set offsetd messages to all nodes.
+        }
+    }
+    this->updateDevice();
+}
+template<typename T>
 T msl::DS<T>::get(int index) const {
     int idSource;
     T message;
@@ -503,6 +517,28 @@ void msl::DS<T>::gather(msl::DS<T> &da) {
         MPI_Gather(localPartition, rec_bytes, MPI_BYTE, localPartition, rec_bytes, MPI_BYTE, 0, MPI_COMM_WORLD);
     } else {
         MPI_Gather(localPartition, rec_bytes, MPI_BYTE, NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
+    }
+}
+template<typename T>
+void msl::DS<T>::gather(T * &templatepointer) {
+    if (msl::Muesli::num_total_procs > 1) {
+        std::cout.precision(2);
+        std::ostringstream s;
+
+#ifdef __CUDACC__
+        if (!cpuMemoryInSync) {
+            updateHost();
+        }
+#endif
+        msl::allgather(localPartition, templatepointer, nLocal);
+
+    } else {
+#ifdef __CUDACC__
+        if (!cpuMemoryInSync) {
+            updateHost();
+        }
+#endif
+        templatepointer = localPartition;
     }
 }
 

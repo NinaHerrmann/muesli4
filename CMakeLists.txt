@@ -119,7 +119,7 @@ endif (compiler_flag_wno_unknown_pragmas)
 ## GPU
 if (BUILD_GPU)
   ## include directories
-  cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/detail ${MPI_CXX_INCLUDE_PATH})
+  cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/examples/helpers ${PROJECT_SOURCE_DIR}/include/detail ${MPI_CXX_INCLUDE_PATH})
 
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
@@ -176,7 +176,9 @@ file(GLOB MUESLI_FILES
         ${PROJECT_SOURCE_DIR}/include/*.cuh
         ${PROJECT_SOURCE_DIR}/include/detail/*.cuh
         ${PROJECT_SOURCE_DIR}/src/*.cpp
-        ${PROJECT_SOURCE_DIR}/src/*.cu)
+        ${PROJECT_SOURCE_DIR}/src/*.cu
+        ${PROJECT_SOURCE_DIR}/include/test_hepers/*.cpp
+        )
 
 set_source_files_properties(${MUESLI_FILES} PROPERTIES HEADER_FILE_ONLY TRUE)
 add_custom_target(muesli_ide SOURCES ${MUESLI_FILES})
@@ -195,6 +197,7 @@ target_include_directories(muesli INTERFACE
         $<BUILD_INTERFACE:${MPI_CXX_INCLUDE_PATH}>
         $<INSTALL_INTERFACE:${MUESLI_INCLUDE_INSTALL_DIR}>
         $<INSTALL_INTERFACE:${MUESLI_INCLUDE_INSTALL_DIR}/detail>
+        $<INSTALL_INTERFACE:${MUESLI_INCLUDE_INSTALL_DIR}/test_helpers>
         )
 target_compile_options(muesli INTERFACE ${MPI_CXX_COMPILE_FLAGS} ${COMMON_COMPILER_OPTIONS})
 target_link_libraries(muesli INTERFACE ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES})
@@ -310,9 +313,10 @@ foreach (example_src ${EXAMPLE_SRCS})
   endif (BUILD_SEQ)
   if (BUILD_CPU)
     add_executable(${example_name}_cpu ${example_src})
-    target_link_libraries(${example_name}_cpu PRIVATE muesli_cpu)
+    target_link_libraries(${example_name}_cpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS} muesli_cpu)
+##    target_link_libraries(${example_name}_gpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS} cuda)
 
-    ### add to custom targets
+### add to custom targets
     add_dependencies(${example_name} ${example_name}_cpu)
     add_dependencies(cpu ${example_name}_cpu)
   endif (BUILD_CPU)
