@@ -324,6 +324,7 @@ template<typename T>
 [[maybe_unused]] T msl::DS<T>::get_shared(int row, int column) const {
     printf("get_shared\n");
     throws(detail::NotYetImplementedException());
+    exit(1);
 }
 template<typename T>
 int msl::DS<T>::getSize() const { return n; }

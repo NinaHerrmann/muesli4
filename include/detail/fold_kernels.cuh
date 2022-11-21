@@ -55,15 +55,15 @@ template<typename T, typename F, size_t blockSize, bool nIsPow2>
 __global__ void foldRowsKernel(T *g_idata, T *g_odata, size_t n, F func);
 
 template<typename T, typename F>
-void reduce(uint size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
+void reduce(unsigned int size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
             cudaStream_t& stream, int gpu);
 
 template<typename T, typename F>
-void foldCols(uint size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
+void foldCols(unsigned int size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
               cudaStream_t& stream, int gpu);
 
 template<typename T, typename F>
-void foldRows(uint size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
+void foldRows(unsigned int size, T* d_idata, T* d_odata, int threads, int blocks, F& f,
               cudaStream_t& stream, int gpu);
 
 }

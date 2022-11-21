@@ -293,7 +293,7 @@ __global__ void msl::detail::foldRowsKernel(T *g_idata, T *g_odata, size_t n,
 }
 
 template<typename T, typename F>
-void msl::detail::reduce(uint size, T* d_idata, T* d_odata, int threads,
+void msl::detail::reduce(unsigned int size, T* d_idata, T* d_odata, int threads,
                          int blocks, F& f, cudaStream_t& stream, int gpu) {
   cudaSetDevice(gpu);
   dim3 dimBlock(threads, 1, 1);
@@ -400,7 +400,7 @@ void msl::detail::reduce(uint size, T* d_idata, T* d_odata, int threads,
 }
 
 template<typename T, typename F>
-void msl::detail::foldCols(uint size, T* d_idata, T* d_odata, int threads,
+void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int threads,
                            int blocks, F& f, cudaStream_t& stream, int gpu) {
   cudaSetDevice(gpu);
   dim3 dimBlock(threads, 1, 1);
@@ -508,7 +508,7 @@ void msl::detail::foldCols(uint size, T* d_idata, T* d_odata, int threads,
 }
 
 template<typename T, typename F>
-void msl::detail::foldRows(uint size, T* d_idata, T* d_odata, int threads,
+void msl::detail::foldRows(unsigned int size, T* d_idata, T* d_odata, int threads,
                            int blocks, F& f, cudaStream_t& stream, int gpu) {
   cudaSetDevice(gpu);
   dim3 dimBlock(threads, 1, 1);

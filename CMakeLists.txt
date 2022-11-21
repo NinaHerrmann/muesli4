@@ -10,6 +10,8 @@ include(CMakePackageConfigHelpers)
 find_package(MPI REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 # config status messages
 message(STATUS "Host System: " ${CMAKE_HOST_SYSTEM})
 
@@ -119,12 +121,12 @@ endif (compiler_flag_wno_unknown_pragmas)
 ## GPU
 if (BUILD_GPU)
   ## include directories
-  cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/examples/helpers ${PROJECT_SOURCE_DIR}/include/detail ${MPI_CXX_INCLUDE_PATH})
+  enable_language(CUDA)
 
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
 
-  set(GPU_COMPILER_OPTIONS "-arch=sm_86;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
+  set(GPU_COMPILER_OPTIONS "-arch=native;std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
   set(GPU_COMPILER_OPTIONS_DEBUG "-g;-G;-O0")
   set(GPU_COMPILER_OPTIONS_RELEASE "-O3")
   set(GPU_COMPILER_OPTIONS_MINSIZEREL "-O2")
@@ -326,24 +328,16 @@ foreach (example_src ${EXAMPLE_SRCS})
     add_dependencies(cpu ${example_name}_cpu)
   endif (BUILD_CPU)
   if (BUILD_GPU)
-    ### TODO: this is not too nice. The source file is a cpp. Therefore, it is build with default c++ compiler; however, we need nvcc. With CUDA_SOURCE_PROPERTY_FORMAT it is possible to compile cpp files with nvcc. However, this breaks the seq, cpu, and phi targets. Therefore, the next lines copy the file to a tmp folder in the build tree, which is used for the gpu target.
-    ### possible "solution": should be possible to move this in another CMakeLists.txt file in another folder, then the properties are not valid for the other executables. However, not the whole build in one file anymore.
-    get_filename_component(example_name_tmp ${example_src} NAME)
-    set(example_src_tmp "tmp/${example_name_tmp}")
-    configure_file(${example_src} "${example_src_tmp}")
-    set_source_files_properties(${example_src_tmp} PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ)
-
-    ## if there is a header file, then copy it as well
-    if (EXISTS "${PROJECT_SOURCE_DIR}/examples/${example_name}.h")
-      configure_file(${PROJECT_SOURCE_DIR}/examples/${example_name}.h "tmp/${example_name}.h")
-    endif (EXISTS "${PROJECT_SOURCE_DIR}/examples/${example_name}.h")
+    set(example_tmp_src "${CMAKE_CURRENT_BINARY_DIR}/tmp/${example_name}.cu")
+    file(WRITE "${example_tmp_src}" "#include \"../../examples/${example_name}.cpp\"")
 
     ## build executable
-    cuda_add_executable(${example_name}_gpu ${CMAKE_CURRENT_BINARY_DIR}/${example_src_tmp} OPTIONS ${GPU_COMPILER_OPTIONS} DEBUG ${GPU_COMPILER_OPTIONS_DEBUG} ${GPU_HOST_COMPILER_OPTIONS_DEBUG} RELEASE ${GPU_COMPILER_OPTIONS_RELEASE} ${GPU_HOST_COMPILER_OPTIONS_RELEASE} RELWITHDEBINFO ${GPU_COMPILER_OPTIONS_RELWITHDEBINFO} ${GPU_HOST_COMPILER_OPTIONS_RELWITHDEBINFO} MINSIZEREL ${GPU_COMPILER_OPTIONS_MINSIZEREL} ${GPU_HOST_COMPILER_OPTIONS_MINSIZEREL}) # copy hack: use copied file
+    add_executable(${example_name}_gpu ${example_tmp_src})
 
     ## link libs
     target_link_libraries(${example_name}_gpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS} cuda)
-    set_property(TARGET ${example_name}_gpu PROPERTY CUDA_ARCHITECTURES 86)
+    set_property(TARGET ${example_name}_gpu PROPERTY CUDA_ARCHITECTURES "52;62;86")
+    target_include_directories(${example_name}_gpu PUBLIC  "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/include/detail" "${PROJECT_SOURCE_DIR}/examples/helpers" "${MPI_CXX_INCLUDE_PATH}")
 
     ### add to custom targets
     add_dependencies(${example_name} ${example_name}_gpu)
