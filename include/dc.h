@@ -317,7 +317,7 @@ public:
         plCubes = std::vector<PLCube<T>>();
         plCubes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
-            plCubes[i] = PLCube<T>(
+            plCubes.push_back(PLCube<T>(
                     this->ncol, this->nrow, this->depth,
                     {this->plans[i].firstCol, this->plans[i].firstRow, this->plans[i].firstDepth},
                     {this->plans[i].lastCol, this->plans[i].lastRow, this->plans[i].lastDepth},
@@ -325,7 +325,7 @@ public:
                     stencilSize,
                     neutralValue,
                     this->plans[i].d_Data
-            );
+            ));
         }
         supportedStencilSize = stencilSize;
     }
