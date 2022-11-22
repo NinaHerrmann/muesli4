@@ -39,7 +39,7 @@
 #include "muesli.h"
 #include "dm.h"
 
-bool CHECK = false;
+bool CHECK;
 bool OUTPUT = false;
 namespace msl::test {
     class Mult : public Functor<int, int> {
@@ -92,7 +92,7 @@ namespace msl::test {
         MSL_USERFUNC int operator()(int i, int j, int x, int y) const override { return i + j + x + y; }
     };
 
-    void dm_test(int dim, const std::string& nextfile, int reps, const char *skeletons) {
+    void dm_test(int dim, const std::string &nextfile, int reps, const char *skeletons) {
         // ************* Init *********************** //
         double runtimes[11] = {0.0};
         double t;
@@ -130,23 +130,25 @@ namespace msl::test {
         Sum3 sum3;
         Sum4 sum4;
         Index index(dim);
-        /*DM<int> rotate(dim, dim, 3);
-        rotate.mapIndexInPlace(index);
-        //if (CHECK) { rotate.show(); }
-           rotate.rotateRows(1);*/
-        /*
-           if (CHECK) { printf("Rotate 1 \n"); rotate.show(); }
-           rotate.rotateRows(-1);
-           if (CHECK) { printf("Rotate -1 \n");rotate.show(); }
-           rotate.rotateRows(2);
-           if (CHECK) { printf("Rotate 2 \n");rotate.show(); }
-           rotate.rotateRows(-2);
-           if (CHECK) { printf("Rotate -2 \n"); rotate.show(); }
-           //rotate.rotateRows(dim+1);
-           rotate.rotateCols(-2);
-           rotate.rotateCols(2);
-           rotate.rotateCols(5);
-           rotate.rotateCols(-5);*/
+        DM<int> rotate(dim, dim, 3);
+        if (check_str_inside(skeletons, "rotate,")) {
+            rotate.mapIndexInPlace(index);
+            if (CHECK) {}
+            rotate.rotateRows(1);
+            if (CHECK) {}
+            rotate.rotateCols(2);
+            if (CHECK) {}
+            rotate.rotateRows(-1);
+            if (CHECK) {
+                printf("Rotate -1 \n");
+            }
+            rotate.rotateCols(-2);
+            if (CHECK) {
+                printf("Rotate -2 \n");
+                rotate.show();
+            }
+        }
+
         int *muesliResults;
         int *manResults = new int[elements];
 
@@ -269,9 +271,9 @@ namespace msl::test {
         }
 
         if (check_str_inside(skeletons, "zipIndex,")) {
-            a.fill( 7);
-            b.fill( 2);
-            c.fill( 8);
+            a.fill(7);
+            b.fill(2);
+            c.fill(8);
             t = MPI_Wtime();
             for (int i = 0; i < reps; i++) {
                 b.zipIndex(c, a, sum4);
@@ -291,7 +293,7 @@ namespace msl::test {
         }
         if (check_str_inside(skeletons, "zipInPlace,")) {
 
-            a.fill( 10);
+            a.fill(10);
             b.fill(20);
             t = MPI_Wtime();
             for (int i = 0; i < reps; i++) {
@@ -315,7 +317,7 @@ namespace msl::test {
         if (check_str_inside(skeletons, "zipIndexInPlace,")) {
 
             a.fill(4);
-            b.fill( 2);
+            b.fill(2);
             for (int j = 0; j < elements; j++) {
                 manResults[j] = 4;
             }
@@ -346,7 +348,7 @@ namespace msl::test {
 int main(int argc, char **argv) {
     //printf("Starting Main...\n");
     int dim = 4, nGPUs = 1, reps = 1;
-    const char * skeletons;
+    const char *skeletons;
     arg_helper(argc, argv, dim, nGPUs, reps, CHECK, const_cast<char *&>(skeletons));
 
 

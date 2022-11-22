@@ -897,15 +897,15 @@ void msl::DM<T>::rotateRows(int a) {
     T *doublePartition = new T[this->nLocal];
 
     for (int i = 0; i < this->nLocal ; i++) {
-        doublePartition[i] =this->localPartition[i];
+        doublePartition[i] = this->localPartition[i];
     }
     if (negative) {
         for (int i = 0; i < howmuch * ncol; i++) {
-            switchPartition[i] =this->localPartition[i];
+            switchPartition[i] = this->localPartition[i];
         }
     } else {
         for (int i = 0; i < howmuch * ncol; i++) {
-            switchPartition[i] =this->localPartition[this->nLocal- (howmuch * ncol) + i];
+            switchPartition[i] = this->localPartition[this->nLocal - (howmuch * ncol) + i];
         }
     }
     // TODO switch between the MPI Processes
@@ -1005,7 +1005,7 @@ void msl::DM<T>::rotateRows(int a) {
 }
 
 /* rotateCols
- * A rowwise distribution is assumed. Otherwise not working.
+ * A rowwise distribution is assumed. Otherwise, not working.
  * 1 2 3 4    -1    2 3 4 1      2    4 1 2 3
  * 5 6 7 8  ------> 6 7 8 5   ------> 8 5 6 7
  */
@@ -1032,7 +1032,7 @@ void msl::DM<T>::rotateCols(int a) {
     }
     // easy case iterate where we are.
     if (rowComplete) {
-        for (int i = 0; i < nrow; i++) {
+        for (int i = 0; i < nlocalRows; i++) {
             for (int j = 0; j < ncol; j++) {
                 int colelement = (j + a);
                 if (colelement < 0) {

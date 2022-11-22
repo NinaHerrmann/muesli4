@@ -33,10 +33,12 @@
 #include "muesli.h"
 #include <iostream>
 #include <ds.h>
+#ifdef __CUDACC__
+
 #include "cuda_runtime.h"
 // Not used warning is wrong.
 #include "cuda.h"
-
+#endif
 template<typename T>
 msl::DS<T>::DS()
         :       // distributed array (resides on GPUs until deleted!)
