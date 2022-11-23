@@ -36,6 +36,13 @@
 #include "dc.h"
 #include "functors.h"
 
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float w;
+} f4;
+
 int CHECK = 0;
 int OUTPUT = 1;
 namespace msl::dc_map_stencil {
@@ -44,11 +51,11 @@ namespace msl::dc_map_stencil {
         return (y) * w + x + (w * h) * z;
     }
 
-    void printDC(DC<float4> &dc) {
+    void printDC(DC<f4> &dc) {
         dc.updateHost();
         for (int y = 0; y < 5; y++) {
             for (int x = 0; x < 5; x++) {
-                float4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
+                f4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
                 printf("(%f, %f, %f, %f), ", f.x, f.y, f.z, f.w);
             }
             printf("\n");
@@ -100,7 +107,7 @@ namespace msl::dc_map_stencil {
         return sum;
     }
 
-    MSL_USERFUNC float4 copy(const PLCube<float4> &cs, int x, int y, int z) {
+    MSL_USERFUNC f4 copy(const PLCube<f4> &cs, int x, int y, int z) {
         return cs(x, y, z);
     }
 

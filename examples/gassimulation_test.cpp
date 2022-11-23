@@ -39,7 +39,14 @@
 #include "dc.h"
 #include "functors.h"
 
-std::ostream& operator<< (std::ostream& os, const float4 f) {
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float w;
+} f4;
+
+std::ostream& operator<< (std::ostream& os, const f4 f) {
     os << "(" << f.x << ", " << f.y << ", " << f.z << ", " << f.w << ")";
 }
 
@@ -52,18 +59,18 @@ namespace msl::gassimulation {
     const float cellwidth = 0.05;
     const float EPSILON = 0.00001;
 
-    MSL_USERFUNC float4 updateU(const PLCube<float4> &cs, int x, int y, int z) {
-        const float4 u = cs(x, y, z);
-        const float4 u1n = cs(x - 1, y, z);
-        const float4 u1p = cs(x + 1, y, z);
-        const float4 u2n = cs(x, y - 1, z);
-        const float4 u2p = cs(x, y + 1, z);
-        const float4 u3n = cs(x, y, z - 1);
-        const float4 u3p = cs(x, y, z + 1);
+    MSL_USERFUNC f4 updateU(const PLCube<f4> &cs, int x, int y, int z) {
+        const f4 u = cs(x, y, z);
+        const f4 u1n = cs(x - 1, y, z);
+        const f4 u1p = cs(x + 1, y, z);
+        const f4 u2n = cs(x, y - 1, z);
+        const f4 u2p = cs(x, y + 1, z);
+        const f4 u3n = cs(x, y, z - 1);
+        const f4 u3p = cs(x, y, z + 1);
 
         const float f = 1.f / (2 * cellwidth) * (u1p.x - u1n.x + u2p.y - u2n.y + u3p.z - u3n.z);
 
-        float4 res;
+        f4 res;
         res.x = u.x + deltaT * (viscosity / (cellwidth * cellwidth) *
                                 (u1n.x + u1p.x + u2n.x + u2p.x + u3n.x + u3p.x - 6.f * u.x)
                                 - f * u.x
@@ -80,21 +87,21 @@ namespace msl::gassimulation {
         return res;
     }
 
-    MSL_USERFUNC float4 updateUFromP(const PLCube<float4> &cs, int x, int y, int z) {
-        float4 res = cs(x, y, z);
+    MSL_USERFUNC f4 updateUFromP(const PLCube<f4> &cs, int x, int y, int z) {
+        f4 res = cs(x, y, z);
         res.x -= (cs(x + 1, y, z).w - cs(x - 1, y, z).w) / (2 * cellwidth);
         res.y -= (cs(x, y + 1, z).w - cs(x, y - 1, z).w) / (2 * cellwidth);
         res.z -= (cs(x, y, z + 1).w - cs(x, y, z - 1).w) / (2 * cellwidth);
         return res;
     }
 
-    MSL_USERFUNC float4 updatePSingleIteration(const PLCube<float4> &cs, int x, int y, int z) {
-        const float4 u1n = cs(x - 1, y, z);
-        const float4 u1p = cs(x + 1, y, z);
-        const float4 u2n = cs(x, y - 1, z);
-        const float4 u2p = cs(x, y + 1, z);
-        const float4 u3n = cs(x, y, z - 1);
-        const float4 u3p = cs(x, y, z + 1);
+    MSL_USERFUNC f4 updatePSingleIteration(const PLCube<f4> &cs, int x, int y, int z) {
+        const f4 u1n = cs(x - 1, y, z);
+        const f4 u1p = cs(x + 1, y, z);
+        const f4 u2n = cs(x, y - 1, z);
+        const f4 u2p = cs(x, y + 1, z);
+        const f4 u3n = cs(x, y, z - 1);
+        const f4 u3p = cs(x, y, z + 1);
 
         float ud = (cellwidth / 2.f) * (
                 u1p.x - u1n.x
@@ -102,13 +109,13 @@ namespace msl::gassimulation {
                 + u3p.z - u3n.z
         );
 
-        float4 res = cs(x, y, z);
+        f4 res = cs(x, y, z);
         res.w = ((cellwidth * cellwidth) / 6.f) * (u1p.w + u1n.w + u2p.w + u2n.w + u3p.w + u3n.w - ud);
         return res;
     }
 
-    class CalcError : public Functor2<float4, float4, bool>{
-        public: MSL_USERFUNC bool operator() (float4 x, float4 y) const override {
+    class CalcError : public Functor2<f4, f4, bool>{
+        public: MSL_USERFUNC bool operator() (f4 x, f4 y) const override {
             return abs(x.w) - abs(y.w) / (abs(x.w) + abs(y.w)) > EPSILON;
         }
     };
@@ -123,11 +130,11 @@ namespace msl::gassimulation {
         return (y) * w + x + (w * h) * z;
     }
 
-    void printDC(DC<float4> &dc) {
+    void printDC(DC<f4> &dc) {
         dc.updateHost();
         for (int y = 0; y < 5; y++) {
             for (int x = 0; x < 5; x++) {
-                float4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
+                f4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
                 printf("(%f, %f, %f, %f), ", f.x, f.y, f.z, f.w);
             }
             printf("\n");
@@ -152,7 +159,7 @@ namespace msl::gassimulation {
         }
     };
 
-    MSL_USERFUNC float4 copy(const PLCube<float4> &cs, int x, int y, int z) {
+    MSL_USERFUNC f4 copy(const PLCube<f4> &cs, int x, int y, int z) {
         return cs(x, y, z);
     }
 
@@ -165,25 +172,25 @@ namespace msl::gassimulation {
         std::vector<char> buffer((std::istreambuf_iterator<char>(infile)),
                 std::istreambuf_iterator<char>());
 
-        auto* b = (float4*) buffer.data();
+        auto* b = (f4*) buffer.data();
 
-        DC<float4> dc(100, 100, 16);
+        DC<f4> dc(100, 100, 16);
         for (int i = 0; i < dc.getSize(); i++) {
             dc.localPartition[i] = b[i];
         }
         dc.setCpuMemoryInSync(true);
         dc.updateDevice();
 
-        DC<float4> dc2(100, 100, 16);
+        DC<f4> dc2(100, 100, 16);
         DC<bool> difference(100, 100, 16);
         CalcError calcError;
         Or orFunctor;
         printf("=== Executing stencil... ===\n");
-        float4 neutral{};
+        f4 neutral{};
 
         // Pointers for swapping.
-        DC<float4> *dcp1 = &dc;
-        DC<float4> *dcp2 = &dc2;
+        DC<f4> *dcp1 = &dc;
+        DC<f4> *dcp2 = &dc2;
 
         for (int i = 0; i < 2; i++) {
             int iterations = 0;
