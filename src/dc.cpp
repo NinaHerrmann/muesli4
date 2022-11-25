@@ -33,7 +33,9 @@
 #include "muesli.h"
 #include <iostream>
 #include <dc.h>
+#ifdef __CUDACC__
 #include "map_kernels.cuh"
+#endif
 
 template<typename T>
 msl::DC<T>::DC()
@@ -567,6 +569,7 @@ void msl::DC<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
 template<typename T>
 template<msl::DCMapStencilFunctor<T> f>
 void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralValue) {
+#ifdef __CUDACC__
     this->updateDevice();
     syncPLCubes(stencilSize, neutralValue);
     for (int i = 0; i < this->ng; i++) {
@@ -587,5 +590,6 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
         gpuErrchk(cudaDeviceSynchronize());
     }
     result.setCpuMemoryInSync(false);
+#endif
 }
 

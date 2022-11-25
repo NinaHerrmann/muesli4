@@ -335,6 +335,7 @@ public:
     }
 
     void syncPLCubes(int stencilSize, T neutralValue) {
+#ifdef __CUDACC__
         if (stencilSize > supportedStencilSize) {
             freePLCubes();
             initPLCubes(stencilSize, neutralValue);
@@ -352,6 +353,7 @@ public:
             ));
         }
         msl::syncStreams();
+#endif
     }
 
     void prettyPrint() {

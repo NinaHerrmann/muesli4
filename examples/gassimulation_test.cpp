@@ -54,10 +54,10 @@ int CHECK = 0;
 int OUTPUT = 1;
 namespace msl::gassimulation {
 
-    const float deltaT = 0.01f;
-    const float viscosity = 0.005;
-    const float cellwidth = 0.05;
-    const float EPSILON = 0.00001;
+    const float deltaT = 0.005f;
+    const float viscosity = 0.005f;
+    const float cellwidth = 0.05f;
+    const float EPSILON = 0.00001f;
 
     MSL_USERFUNC f4 updateU(const PLCube<f4> &cs, int x, int y, int z) {
         const f4 u = cs(x, y, z);
@@ -116,7 +116,7 @@ namespace msl::gassimulation {
 
     class CalcError : public Functor2<f4, f4, bool>{
         public: MSL_USERFUNC bool operator() (f4 x, f4 y) const override {
-            return abs(x.w) - abs(y.w) / (abs(x.w) + abs(y.w)) > EPSILON;
+            return std::abs(x.w) - std::abs(y.w) / (std::abs(x.w) + std::abs(y.w)) > EPSILON;
         }
     };
 
@@ -152,21 +152,8 @@ namespace msl::gassimulation {
         }
     }
 
-    template <typename T>
-    class Identity : public Functor<T, T> {
-    public: MSL_USERFUNC T operator() (T x) const override {
-            return x;
-        }
-    };
-
-    MSL_USERFUNC f4 copy(const PLCube<f4> &cs, int x, int y, int z) {
-        return cs(x, y, z);
-    }
-
-
-
     void dc_test() {
-        const std::string inputFile = "../Data/gassimulation.raw";
+        const std::string inputFile = "../Data/gassimulation.dat";
         std::ifstream infile(inputFile, std::ios_base::binary);
 
         std::vector<char> buffer((std::istreambuf_iterator<char>(infile)),
@@ -174,15 +161,18 @@ namespace msl::gassimulation {
 
         auto* b = (f4*) buffer.data();
 
-        DC<f4> dc(100, 100, 16);
+        DC<f4> dc(98, 98, 14);
+        dc.fill({0.f, 0.f, 0.f, 0.f});
         for (int i = 0; i < dc.getSize(); i++) {
             dc.localPartition[i] = b[i];
         }
         dc.setCpuMemoryInSync(true);
         dc.updateDevice();
+        printDC(dc);
 
-        DC<f4> dc2(100, 100, 16);
-        DC<bool> difference(100, 100, 16);
+        DC<f4> dc2(98, 98, 14);
+        dc2.fill({0.f, 0.f, 0.f, 0.f});
+        DC<bool> difference(98, 98, 14);
         CalcError calcError;
         Or orFunctor;
         printf("=== Executing stencil... ===\n");
@@ -192,31 +182,52 @@ namespace msl::gassimulation {
         DC<f4> *dcp1 = &dc;
         DC<f4> *dcp2 = &dc2;
 
-        for (int i = 0; i < 2; i++) {
+        double time = MPI_Wtime();
+
+        for (int i = 0; i < 1; i++) {
             int iterations = 0;
             dcp1->mapStencil<updateU>(*dcp2, 1, neutral);
-            printDC(*dcp1);
+            // printDC(*dcp1);
             printf("\n");
-            printDC(*dcp2);
+            // printDC(*dcp2);
             std::swap(dcp1, dcp2);
             printf("\nmapStencil updateU: \n");
 
-            do {
+            // do {
+            for (int j = 0; j < 5; j++) {
                 dcp1->mapStencil<updatePSingleIteration>(*dcp2, 1, neutral);
-                printf("\nmapStencil updatePSingleIteration: \n");
-                printDC(*dcp2);
+                // printf("\nmapStencil updatePSingleIteration: \n");
+                // printDC(*dcp2);
                 difference.zip(*dcp2, *dcp1, calcError);
-                printf("\ndifference: \n");
-                printDC(difference);
+                // printf("\ndifference: \n");
+                // printDC(difference);
                 std::swap(dcp1, dcp2);
                 iterations++;
-            } while (difference.fold(orFunctor, true));
+                difference.fold(orFunctor, true);
+                // } while (difference.fold(orFunctor, true));
+            }
 
             dcp1->mapStencil<updateUFromP>(*dcp2, 1, neutral);
             std::swap(dcp1, dcp2);
 
-            printf("iterations: %i\n", iterations);
+            if (iterations > 1) {
+                printf("iterations: %i\n", iterations);
+            }
         }
+
+        double totalTime = MPI_Wtime() - time;
+
+        printf("Time: %f\n", totalTime);
+
+        printDC(*dcp1);
+
+        const std::string outputFile = "output.dat";
+        std::ofstream outfile(outputFile, std::ios_base::binary);
+
+        dcp1->updateHost();
+
+
+        outfile.write((char*) dcp1->localPartition, dcp1->getSize() * sizeof(f4));
     }
 }
 

@@ -35,6 +35,12 @@
 #include "muesli.h"
 #include <array>
 
+#ifndef __CUDACC__
+typedef struct {
+    int x, y, z;
+} int3;
+#endif
+
 namespace msl {
 
 /**
@@ -83,9 +89,11 @@ namespace msl {
                     std::min(end[2] + stencilSize, depth - 1)
             )),
             data(data) {
+#ifdef __CUDACC__
             cudaSetDevice(device);
             cudaMalloc(&topPadding, (dataStartIndex - topPaddingStartIndex) * sizeof(T));
             cudaMalloc(&bottomPadding, (bottomPaddingEndIndex - dataEndIndex) * sizeof(T));
+#endif
         }
 
         MSL_USERFUNC T operator() (int x, int y, int z) const {
