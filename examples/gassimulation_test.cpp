@@ -38,196 +38,179 @@
 #include "muesli.h"
 #include "dc.h"
 #include "functors.h"
+#include "array.h"
+#include "vec3.h"
 
 typedef struct {
-    float x;
-    float y;
-    float z;
-    float w;
-} f4;
+    unsigned int mantissa : 23;
+    unsigned int exponent : 8;
+    unsigned int sign : 1;
+} floatparts;
 
-std::ostream& operator<< (std::ostream& os, const f4 f) {
-    os << "(" << f.x << ", " << f.y << ", " << f.z << ", " << f.w << ")";
+const size_t Q = 19;
+typedef array<float, Q> cell_t;
+typedef vec3<float> vec3f;
+
+std::ostream& operator<< (std::ostream& os, const cell_t f) {
+    os << "(" << f[0] << ", " << f[1] << ", " << f[2] << "...)";
 }
 
 int CHECK = 0;
 int OUTPUT = 1;
 namespace msl::gassimulation {
 
-    const float deltaT = 0.005f;
-    const float viscosity = 0.005f;
-    const float cellwidth = 0.05f;
-    const float EPSILON = 0.00001f;
+    __managed__ float deltaT = 0.001f;
 
-    MSL_USERFUNC f4 updateU(const PLCube<f4> &cs, int x, int y, int z) {
-        const f4 u = cs(x, y, z);
-        const f4 u1n = cs(x - 1, y, z);
-        const f4 u1p = cs(x + 1, y, z);
-        const f4 u2n = cs(x, y - 1, z);
-        const f4 u2p = cs(x, y + 1, z);
-        const f4 u3n = cs(x, y, z - 1);
-        const f4 u3p = cs(x, y, z + 1);
+    __managed__ float tau = 0.0007;
+    __managed__ float cellwidth = .01f;
 
-        const float f = 1.f / (2 * cellwidth) * (u1p.x - u1n.x + u2p.y - u2n.y + u3p.z - u3n.z);
+    __constant__ const array<vec3f, Q> offsets {
+    0, 0, 0,   // 0
+    -1, 0, 0,  // 1
+    1, 0, 0,   // 2
+    0, -1, 0,  // 3
+    0, 1, 0,   // 4
+    0, 0, -1,  // 5
+    0, 0, 1,   // 6
+    -1, -1, 0, // 7
+    -1, 1, 0,  // 8
+    1, -1, 0,  // 9
+    1, 1, 0,   // 10
+    -1, 0, -1, // 11
+    -1, 0, 1,  // 12
+    1, 0, -1,  // 13
+    1, 0, 1,   // 14
+    0, -1, -1, // 15
+    0, -1, 1,  // 16
+    0, 1, -1,  // 17
+    0, 1, 1,   // 18
+};
 
-        f4 res;
-        res.x = u.x + deltaT * (viscosity / (cellwidth * cellwidth) *
-                                (u1n.x + u1p.x + u2n.x + u2p.x + u3n.x + u3p.x - 6.f * u.x)
-                                - f * u.x
-                                - (u1n.w - u1p.w) / (2 * cellwidth));
-        res.y = u.y + deltaT * (viscosity / (cellwidth * cellwidth) *
-                                (u1n.y + u1p.y + u2n.y + u2p.y + u3n.y + u3p.y - 6.f * u.y)
-                                - f * u.y
-                                - (u2n.w - u2p.w) / (2 * cellwidth));
-        res.z = u.z + deltaT * (viscosity / (cellwidth * cellwidth) *
-                                (u1n.z + u1p.z + u2n.z + u2p.z + u3n.z + u3p.z - 6.f * u.z)
-                                - f * u.z
-                                - (u3n.w - u3p.w) / (2 * cellwidth));
-        res.w = u.w;
-        return res;
+__constant__ const array<unsigned char, Q> opposite = {
+        0,
+        2, 1, 4, 3, 6, 5,
+        10, 9, 8, 7, 14, 13, 12, 11, 18, 17, 16, 15
+};
+
+__constant__ const array<float, Q> wis {
+1.f / 3,
+1.f / 18,
+1.f / 18,
+1.f / 18,
+1.f / 18,
+1.f / 18,
+1.f / 18,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+1.f / 36,
+};
+
+    MSL_USERFUNC inline float feq(size_t i, float p, const vec3f& v) {
+        float wi = wis[i];
+        float c = cellwidth;
+        float dot = offsets[i] * c * v;
+        return wi * p * (1 + (1 / (c * c)) * (3 * dot + (9 / (2 * c * c)) * dot * dot - (3.f / 2) * (v * v)));
     }
 
-    MSL_USERFUNC f4 updateUFromP(const PLCube<f4> &cs, int x, int y, int z) {
-        f4 res = cs(x, y, z);
-        res.x -= (cs(x + 1, y, z).w - cs(x - 1, y, z).w) / (2 * cellwidth);
-        res.y -= (cs(x, y + 1, z).w - cs(x, y - 1, z).w) / (2 * cellwidth);
-        res.z -= (cs(x, y, z + 1).w - cs(x, y, z - 1).w) / (2 * cellwidth);
-        return res;
+    MSL_USERFUNC cell_t stream(const PLCube<cell_t> &plCube, int x, int y, int z) {
+        cell_t cell = plCube(x, y, z);
+
+        floatparts* parts = (floatparts*) &cell[0];
+
+        if (parts->exponent == 255) {
+            return plCube(x, y, z);
+        }
+
+        for (int i = 1; i < Q; i++) {
+            int sx = x + (int) offsets[i].x;
+            int sy = y + (int) offsets[i].y;
+            int sz = z + (int) offsets[i].z;
+            cell[i] = plCube(sx, sy, sz)[i];
+        }
+        return cell;
     }
 
-    MSL_USERFUNC f4 updatePSingleIteration(const PLCube<f4> &cs, int x, int y, int z) {
-        const f4 u1n = cs(x - 1, y, z);
-        const f4 u1p = cs(x + 1, y, z);
-        const f4 u2n = cs(x, y - 1, z);
-        const f4 u2p = cs(x, y + 1, z);
-        const f4 u3n = cs(x, y, z - 1);
-        const f4 u3p = cs(x, y, z + 1);
+    class Collision : public Functor<cell_t, cell_t> {
+    public:
+        MSL_USERFUNC cell_t operator() (cell_t cell) const override {
+            float p = 0;
+            float c = cellwidth;
+            floatparts* parts = (floatparts*) &cell[0];
+            if (parts->exponent == 255) {
+                if ((parts->mantissa & 1) != 0) {
+                    for (size_t i = 1; i < Q; i++) {
+                        cell[i] = cell[opposite[i]];
+                    }
+                }
+                return cell;
+            }
+            vec3f vp {0, 0, 0};
+            for (size_t i = 0; i < Q; i++) {
+                p += cell[i];
+                vp += offsets[i] * c * cell[i];
+            }
+            vec3f v = p == 0 ? vp : vp * (1 / p);
 
-        float ud = (cellwidth / 2.f) * (
-                u1p.x - u1n.x
-                + u2p.y - u2n.y
-                + u3p.z - u3n.z
-        );
-
-        f4 res = cs(x, y, z);
-        res.w = ((cellwidth * cellwidth) / 6.f) * (u1p.w + u1n.w + u2p.w + u2n.w + u3p.w + u3n.w - ud);
-        return res;
-    }
-
-    class CalcError : public Functor2<f4, f4, bool>{
-        public: MSL_USERFUNC bool operator() (f4 x, f4 y) const override {
-            return std::abs(x.w) - std::abs(y.w) / (std::abs(x.w) + std::abs(y.w)) > EPSILON;
+            for (size_t i = 0; i < Q; i++) {
+                cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
+            }
         }
     };
-
-    class Or : public Functor2<bool, bool, bool> {
-    public: MSL_USERFUNC bool operator() (bool x, bool y) const override {
-            return x || y;
-        }
-    };
-
-    inline int index(int x, int y, int z, int w, int h, int d) {
-        return (y) * w + x + (w * h) * z;
-    }
-
-    void printDC(DC<f4> &dc) {
-        dc.updateHost();
-        for (int y = 0; y < 5; y++) {
-            for (int x = 0; x < 5; x++) {
-                f4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
-                printf("(%f, %f, %f, %f), ", f.x, f.y, f.z, f.w);
-            }
-            printf("\n");
-        }
-    }
-
-    void printDC(DC<bool> &dc) {
-        dc.updateHost();
-        for (int y = 0; y < 5; y++) {
-            for (int x = 0; x < 5; x++) {
-                bool f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
-                printf("(%i), ", f);
-            }
-            printf("\n");
-        }
-    }
 
     void dc_test() {
-        const std::string inputFile = "../Data/gassimulation.dat";
+        const std::string inputFile = "../Data/gassimulation0.bin";
         std::ifstream infile(inputFile, std::ios_base::binary);
 
         std::vector<char> buffer((std::istreambuf_iterator<char>(infile)),
                 std::istreambuf_iterator<char>());
 
-        auto* b = (f4*) buffer.data();
+        auto* b = (cell_t*) buffer.data();
 
-        DC<f4> dc(98, 98, 14);
+        DC<cell_t> dc(200, 200, 200);
         dc.fill({0.f, 0.f, 0.f, 0.f});
         for (int i = 0; i < dc.getSize(); i++) {
             dc.localPartition[i] = b[i];
         }
         dc.setCpuMemoryInSync(true);
         dc.updateDevice();
-        printDC(dc);
 
-        DC<f4> dc2(98, 98, 14);
-        dc2.fill({0.f, 0.f, 0.f, 0.f});
-        DC<bool> difference(98, 98, 14);
-        CalcError calcError;
-        Or orFunctor;
-        printf("=== Executing stencil... ===\n");
-        f4 neutral{};
+        DC<cell_t> dc2(200, 200, 200);
 
         // Pointers for swapping.
-        DC<f4> *dcp1 = &dc;
-        DC<f4> *dcp2 = &dc2;
+        DC<cell_t> *dcp1 = &dc;
+        DC<cell_t> *dcp2 = &dc2;
 
-        double time = MPI_Wtime();
+        Collision collision;
 
-        for (int i = 0; i < 1; i++) {
-            int iterations = 0;
-            dcp1->mapStencil<updateU>(*dcp2, 1, neutral);
-            // printDC(*dcp1);
-            printf("\n");
-            // printDC(*dcp2);
+        for (int i = 0; i < 10; i++) {
+
+            double time = MPI_Wtime();
+
+            dcp1->mapInPlace(collision);
+            dcp1->mapStencil<stream>(*dcp2, 1, {});
+
+            double totalTime = MPI_Wtime() - time;
+
+            printf("Time: %f\n", totalTime);
+
             std::swap(dcp1, dcp2);
-            printf("\nmapStencil updateU: \n");
-
-            // do {
-            for (int j = 0; j < 5; j++) {
-                dcp1->mapStencil<updatePSingleIteration>(*dcp2, 1, neutral);
-                // printf("\nmapStencil updatePSingleIteration: \n");
-                // printDC(*dcp2);
-                difference.zip(*dcp2, *dcp1, calcError);
-                // printf("\ndifference: \n");
-                // printDC(difference);
-                std::swap(dcp1, dcp2);
-                iterations++;
-                difference.fold(orFunctor, true);
-                // } while (difference.fold(orFunctor, true));
-            }
-
-            dcp1->mapStencil<updateUFromP>(*dcp2, 1, neutral);
-            std::swap(dcp1, dcp2);
-
-            if (iterations > 1) {
-                printf("iterations: %i\n", iterations);
-            }
         }
 
-        double totalTime = MPI_Wtime() - time;
-
-        printf("Time: %f\n", totalTime);
-
-        printDC(*dcp1);
-
-        const std::string outputFile = "output.dat";
-        std::ofstream outfile(outputFile, std::ios_base::binary);
+        //const std::string outputFile = "output.dat";
+        //std::ofstream outfile(outputFile, std::ios_base::binary);
 
         dcp1->updateHost();
 
-
-        outfile.write((char*) dcp1->localPartition, dcp1->getSize() * sizeof(f4));
+        //outfile.write((char*) dcp1->localPartition, dcp1->getSize() * sizeof(cell_t));
     }
 }
 
@@ -236,6 +219,7 @@ int main(int argc, char** argv){
   msl::setNumRuns(1);
   msl::initSkeletons(argc, argv);
   msl::Muesli::cpu_fraction = 0;
+  msl::Muesli::num_gpus = 1;
   int dim = 0;
   if (msl::isRootProcess()) {
       printf("%d; %d; %d; %d; %.2f\n", dim, msl::Muesli::num_total_procs,
