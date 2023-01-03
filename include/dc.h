@@ -313,7 +313,6 @@ public:
     void initGPUs();
 
     void initPLCubes(int stencilSize, T neutralValue) {
-        printf("%i, %i, %i\n", this->ncol, this->nrow, this->depth);
         plCubes = std::vector<PLCube<T>>();
         plCubes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
