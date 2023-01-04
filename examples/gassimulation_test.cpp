@@ -74,7 +74,7 @@ namespace msl::gassimulation {
 
     MSL_MANAGED float deltaT = 0.001f;
 
-    MSL_MANAGED float tau = 0.0007;
+    MSL_MANAGED float tau = 0.00065;
     MSL_MANAGED float cellwidth = .01f;
 
     MSL_CONSTANT const array<vec3f, Q> offsets {
@@ -145,43 +145,38 @@ namespace msl::gassimulation {
             }
         }
 
+        // Streaming.
         for (int i = 1; i < Q; i++) {
             int sx = x + (int) offsets[i].x;
             int sy = y + (int) offsets[i].y;
             int sz = z + (int) offsets[i].z;
             cell[i] = plCube(sx, sy, sz)[i];
         }
-        return cell;
-    }
 
-    class Collision : public Functor<cell_t, cell_t> {
-    public:
-        MSL_USERFUNC cell_t operator() (cell_t cell) const override {
-            float p = 0;
-            float c = cellwidth;
-            auto* parts = (floatparts*) &cell[0];
-            if (parts->exponent == 255) {
-                if (parts->mantissa & FLAG_OBSTACLE) {
-                    cell_t cell2 = cell;
-                    for (size_t i = 1; i < Q; i++) {
-                        cell[i] = cell2[opposite[i]];
-                    }
+        // Collision.
+        float p = 0;
+        float c = cellwidth;
+        if (parts->exponent == 255) {
+            if (parts->mantissa & FLAG_OBSTACLE) {
+                cell_t cell2 = cell;
+                for (size_t i = 1; i < Q; i++) {
+                    cell[i] = cell2[opposite[i]];
                 }
-                return cell;
-            }
-            vec3f vp {0, 0, 0};
-            for (size_t i = 0; i < Q; i++) {
-                p += cell[i];
-                vp += offsets[i] * c * cell[i];
-            }
-            vec3f v = p == 0 ? vp : vp * (1 / p);
-
-            for (size_t i = 0; i < Q; i++) {
-                cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
             }
             return cell;
         }
-    };
+        vec3f vp {0, 0, 0};
+        for (size_t i = 0; i < Q; i++) {
+            p += cell[i];
+            vp += offsets[i] * c * cell[i];
+        }
+        vec3f v = p == 0 ? vp : vp * (1 / p);
+
+        for (size_t i = 0; i < Q; i++) {
+            cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
+        }
+        return cell;
+    }
 
     class Initialize : public Functor4<int, int, int, cell_t, cell_t> {
     public:
@@ -251,13 +246,10 @@ namespace msl::gassimulation {
         DC<cell_t> *dcp1 = &dc;
         DC<cell_t> *dcp2 = &dc2;
 
-        Collision collision;
-
         for (int i = 0; i < iterations; i++) {
 
             double time = MPI_Wtime();
 
-            dcp1->mapInPlace(collision);
             dcp1->mapStencil<stream>(*dcp2, 1, {});
 
             double totalTime = MPI_Wtime() - time;
@@ -281,9 +273,9 @@ void exitWithUsage() {
     exit(-1);
 }
 
-int getIntArg(char* s) {
+int getIntArg(char* s, bool allowZero = false) {
     int i = std::atoi(s);
-    if (i <= 0) {
+    if (i < 0 || (i == 0 && !allowZero)) {
         exitWithUsage();
     }
     return i;
@@ -311,7 +303,7 @@ int main(int argc, char** argv){
                 gpus = getIntArg(argv[i]);
                 break;
             case 'n':
-                iterations = getIntArg(argv[i]);
+                iterations = getIntArg(argv[i], true);
                 break;
             case 'i':
                 importFile = std::string(argv[i]);
