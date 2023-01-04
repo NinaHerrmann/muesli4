@@ -40,6 +40,9 @@
 #include "array.h"
 #include "vec3.h"
 
+const int FLAG_OBSTACLE = 1 << 1;
+const int FLAG_KEEP_VELOCITY = 1 << 2;
+
 #ifdef __CUDACC__
 #define MSL_MANAGED __managed__
 #define MSL_CONSTANT __constant__
@@ -137,7 +140,9 @@ namespace msl::gassimulation {
         auto* parts = (floatparts*) &cell[0];
 
         if (parts->exponent == 255) {
-            return cell;
+            if (parts->mantissa & FLAG_KEEP_VELOCITY) {
+                return cell;
+            }
         }
 
         for (int i = 1; i < Q; i++) {
@@ -156,9 +161,10 @@ namespace msl::gassimulation {
             float c = cellwidth;
             auto* parts = (floatparts*) &cell[0];
             if (parts->exponent == 255) {
-                if ((parts->mantissa & 1) != 0) {
+                if (parts->mantissa & FLAG_OBSTACLE) {
+                    cell_t cell2 = cell;
                     for (size_t i = 1; i < Q; i++) {
-                        cell[i] = cell[opposite[i]];
+                        cell[i] = cell2[opposite[i]];
                     }
                 }
                 return cell;
@@ -179,22 +185,20 @@ namespace msl::gassimulation {
 
     class Initialize : public Functor4<int, int, int, cell_t, cell_t> {
     public:
-        MSL_USERFUNC cell_t operator()(int x, int y, int z, cell_t _) const override {
-            cell_t c;
+        MSL_USERFUNC cell_t operator()(int x, int y, int z, cell_t c) const override {
             for (int i = 0; i < Q; i++) {
-                float f = feq(i, 0.1f, {.001f, 0, 0});
-                c[i] = f;
+                c[i] = feq(i, 0.1f, {.001f, 0, 0});
             }
 
-            if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.y - 2 ||
+            if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.z - 2 || // x == 50 && (y >= 40 && y <= 45 || y >= 55 && y <= 60)) {
                 std::pow(x - 50, 2) + std::pow(y - 50, 2) + std::pow(z - 8, 2) <= 225) {
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
                 parts->exponent = 255;
-                if (x <= 1 || x >= size.x - 2 || y <= 1 || y >= size.y - 2) {
-                    parts->mantissa = 1 << 22 | 0b10;
+                if (x <= 1 || x >= size.x - 2 || y <= 1 || y >= size.y - 2 || z <= 1 || z >= size.z - 2) {
+                    parts->mantissa = 1 << 22 | FLAG_KEEP_VELOCITY;
                 } else {
-                    parts->mantissa = 1 << 22 | 0b01;
+                    parts->mantissa = 1 << 22 | FLAG_OBSTACLE;
                 }
             }
             return c;
@@ -208,7 +212,17 @@ namespace msl::gassimulation {
 
         if (importFile.empty()) {
             Initialize initialize;
-            dc.mapIndexInPlace(initialize);
+            for (int x = 0; x < size.x; x++) {
+                for (int y = 0; y < size.y; y++) {
+                    for (int z = 0; z < size.z; z++) {
+                        // Generate on CPU, because GPU generates slightly different floats?
+                        int index = (z * size.y + y) * size.x + x;
+                        dc.localPartition[index] = initialize(x, y, z, dc.localPartition[index]);
+                    }
+                }
+            }
+            dc.setCpuMemoryInSync(true);
+            dc.updateDevice();
         } else {
             std::ifstream infile(importFile, std::ios_base::binary);
 
