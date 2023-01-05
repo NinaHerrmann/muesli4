@@ -252,9 +252,11 @@ namespace msl::gassimulation {
 
             dcp1->mapStencil<stream>(*dcp2, 1, {});
 
-            double totalTime = MPI_Wtime() - time;
+            double endTime = MPI_Wtime();
+            double onlyKernelTime = endTime - Muesli::start_time;
+            double totalTime = endTime - time;
 
-            printf("Time: %f\n", totalTime);
+            std::cout << totalTime << " / " << onlyKernelTime << std::endl;
 
             std::swap(dcp1, dcp2);
         }

@@ -341,14 +341,14 @@ public:
         }
         for(int i = 1; i < this->ng; i++) {
             size_t bottomPaddingSize = plCubes[i - 1].getBottomPaddingElements() * sizeof(T);
-            gpuErrchk(cudaMemcpy(
-                    plCubes[i - 1].bottomPadding, plCubes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice
+            gpuErrchk(cudaMemcpyAsync(
+                    plCubes[i - 1].bottomPadding, plCubes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice, Muesli::streams[i - 1]
             ));
 
             size_t topPaddingSize = plCubes[i].getTopPaddingElements() * sizeof(T);
-            gpuErrchk(cudaMemcpy(
+            gpuErrchk(cudaMemcpyAsync(
                     plCubes[i].topPadding, plCubes[i - 1].data + (this->plans[i - 1].size - plCubes[i].getTopPaddingElements()), topPaddingSize,
-                    cudaMemcpyDeviceToDevice
+                    cudaMemcpyDeviceToDevice, Muesli::streams[i]
             ));
         }
         msl::syncStreams();
