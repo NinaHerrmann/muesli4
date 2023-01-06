@@ -389,10 +389,10 @@ void msl::DC<T>::mapIndexInPlace(MapIndexFunctor &f) {
     for (int i = 0; i <this->ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(8, 8, 8);
-        int dimrow = ceil(this->plans[i].gpuRows / 8.0);
         int dimcol = ceil(this->plans[i].gpuCols / 8.0);
+        int dimrow = ceil(this->plans[i].gpuRows / 8.0);
         int dimdepth = ceil(this->plans[i].gpuDepth / 8.0);
-        dim3 dimGrid(dimrow, dimcol, dimdepth);
+        dim3 dimGrid(dimcol, dimrow, dimdepth);
         detail::mapIndexKernelDC<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].gpuRows, this->plans[i].gpuCols,
                 this->plans[i].gpuDepth, this->plans[i].firstRow, this->plans[i].firstCol, this->plans[i].firstDepth, f);
