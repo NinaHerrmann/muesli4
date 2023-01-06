@@ -185,8 +185,9 @@ namespace msl::gassimulation {
                 c[i] = feq(i, 0.1f, {.001f, 0, 0});
             }
 
-            if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.z - 2 || // x == 50 && (y >= 40 && y <= 45 || y >= 55 && y <= 60)) {
+            if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.z - 2 ||
                 std::pow(x - 50, 2) + std::pow(y - 50, 2) + std::pow(z - 8, 2) <= 225) {
+                // x == 50 && (y >= 40 && y <= 45 || y >= 55 && y <= 60)) {
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
                 parts->exponent = 255;
@@ -207,17 +208,7 @@ namespace msl::gassimulation {
 
         if (importFile.empty()) {
             Initialize initialize;
-            for (int x = 0; x < size.x; x++) {
-                for (int y = 0; y < size.y; y++) {
-                    for (int z = 0; z < size.z; z++) {
-                        // Generate on CPU, because GPU generates slightly different floats?
-                        int index = (z * size.y + y) * size.x + x;
-                        dc.localPartition[index] = initialize(x, y, z, dc.localPartition[index]);
-                    }
-                }
-            }
-            dc.setCpuMemoryInSync(true);
-            dc.updateDevice();
+            dc.mapIndexInPlace(initialize);
         } else {
             std::ifstream infile(importFile, std::ios_base::binary);
 
