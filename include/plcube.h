@@ -96,7 +96,7 @@ namespace msl {
 #endif
         }
 
-        MSL_USERFUNC T operator() (int x, int y, int z) const {
+        MSL_USERFUNC const T& operator() (int x, int y, int z) const {
             if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
                 return neutralValue;
             }

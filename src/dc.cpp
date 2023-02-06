@@ -573,11 +573,11 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
     this->updateDevice();
     syncPLCubes(stencilSize, neutralValue);
     msl::syncStreams();
-    Muesli::start_time = MPI_Wtime(); // TODO Only for performance testing.
+    Muesli::start_time = MPI_Wtime(); // For performance testing.
     for (int i = 0; i < this->ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
-        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
         PLCube<T> cube = this->plCubes[i];
         detail::mapStencilKernelDC<T, f><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, cube, result.plans[i].size);
     }
