@@ -35,6 +35,7 @@
 #include "muesli.h"
 #include "dc.h"
 #include "functors.h"
+#include "da.h"
 
 typedef struct {
     float x;
@@ -49,27 +50,6 @@ namespace msl::dc_map_stencil {
 
     inline int index(int x, int y, int z, int w, int h, int d) {
         return (y) * w + x + (w * h) * z;
-    }
-
-    void printDC(DC<f4> &dc) {
-        dc.updateHost();
-        for (int y = 0; y < 5; y++) {
-            for (int x = 0; x < 5; x++) {
-                f4 f = dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())];
-                printf("(%f, %f, %f, %f), ", f.x, f.y, f.z, f.w);
-            }
-            printf("\n");
-        }
-    }
-
-    void printDC(DC<float> &dc) {
-        dc.updateHost();
-        for (int y = 0; y < 5; y++) {
-            for (int x = 0; x < 5; x++) {
-                printf("%f, ", dc.localPartition[index(x, y, 1, dc.getCols(), dc.getRows(), dc.getDepth())]);
-            }
-            printf("\n");
-        }
     }
 
     void printDC(DC<int> &dc) {
@@ -118,7 +98,28 @@ namespace msl::dc_map_stencil {
         }
     };
 
+    class Sum : public Functor2<int, int, int> {
+    public:
+        MSL_USERFUNC int operator() (int x, int y) const override  {
+            return x + y;
+        }
+    };
+
+    class Product : public Functor2<int, int, int> {
+    public: MSL_USERFUNC int operator() (int x, int y) const override {
+            return x * y;
+        }
+    };
+
     void dc_test(int dim) {
+        Sum sum;
+        Product product;
+
+        DA<int> da1(4, 3);
+        DA<int> da2(4);
+        da1.mapIndex(sum, da2);
+        da1.zipInPlace(da2, product);
+
         Op op;
         DC<int> dc(100, 100, 16);
         DC<int> dc2(100, 100, 16);

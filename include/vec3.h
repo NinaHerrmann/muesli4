@@ -1,8 +1,6 @@
 #ifndef GASSIMULATION_VEC3_H
 #define GASSIMULATION_VEC3_H
 
-#include "muesli.h"
-
 template<typename T>
 struct vec3 {
 

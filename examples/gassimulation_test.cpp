@@ -40,8 +40,8 @@
 #include "array.h"
 #include "vec3.h"
 
-const int FLAG_OBSTACLE = 1 << 1;
-const int FLAG_KEEP_VELOCITY = 1 << 2;
+const int FLAG_OBSTACLE = 1 << 0;
+const int FLAG_KEEP_VELOCITY = 1 << 1;
 
 #ifdef __CUDACC__
 #define MSL_MANAGED __managed__
@@ -72,10 +72,10 @@ namespace msl::gassimulation {
 
     MSL_MANAGED vec3<int> size;
 
-    MSL_MANAGED float deltaT = 0.001f;
+    MSL_MANAGED float deltaT = 1.f;
 
-    MSL_MANAGED float tau = 0.00065;
-    MSL_MANAGED float cellwidth = .01f;
+    MSL_MANAGED float tau = 0.65;
+    MSL_MANAGED float cellwidth = 1.0f;
 
     MSL_CONSTANT const array<vec3f, Q> offsets {
         0, 0, 0,   // 0
@@ -134,7 +134,7 @@ namespace msl::gassimulation {
         return wi * p * (1 + (1 / (c * c)) * (3 * dot + (9 / (2 * c * c)) * dot * dot - (3.f / 2) * (v * v)));
     }
 
-    MSL_USERFUNC cell_t stream(const PLCube<cell_t> &plCube, int x, int y, int z) {
+    MSL_USERFUNC cell_t update(const PLCube<cell_t> &plCube, int x, int y, int z) {
         cell_t cell = plCube(x, y, z);
 
         auto* parts = (floatparts*) &cell[0];
@@ -154,8 +154,6 @@ namespace msl::gassimulation {
         }
 
         // Collision.
-        float p = 0;
-        float c = cellwidth;
         if (parts->exponent == 255) {
             if (parts->mantissa & FLAG_OBSTACLE) {
                 cell_t cell2 = cell;
@@ -165,10 +163,11 @@ namespace msl::gassimulation {
             }
             return cell;
         }
+        float p = 0;
         vec3f vp {0, 0, 0};
         for (size_t i = 0; i < Q; i++) {
             p += cell[i];
-            vp += offsets[i] * c * cell[i];
+            vp += offsets[i] * cellwidth * cell[i];
         }
         vec3f v = p == 0 ? vp : vp * (1 / p);
 
@@ -182,12 +181,11 @@ namespace msl::gassimulation {
     public:
         MSL_USERFUNC cell_t operator()(int x, int y, int z, cell_t c) const override {
             for (int i = 0; i < Q; i++) {
-                c[i] = feq(i, 0.1f, {.001f, 0, 0});
+                c[i] = feq(i, 1.f, {.1f, 0, 0});
             }
 
             if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.z - 2 ||
                 std::pow(x - 50, 2) + std::pow(y - 50, 2) + std::pow(z - 8, 2) <= 225) {
-                // x == 50 && (y >= 40 && y <= 45 || y >= 55 && y <= 60)) {
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
                 parts->exponent = 255;
@@ -241,7 +239,7 @@ namespace msl::gassimulation {
 
             double time = MPI_Wtime();
 
-            dcp1->mapStencil<stream>(*dcp2, 1, {});
+            dcp1->mapStencil<update>(*dcp2, 1, {});
 
             double endTime = MPI_Wtime();
             double onlyKernelTime = endTime - Muesli::start_time;

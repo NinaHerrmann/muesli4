@@ -1,9 +1,6 @@
 #ifndef GASSIMULATION_ARRAY_H
 #define GASSIMULATION_ARRAY_H
 
-#include "muesli.h"
-#include <cstdio>
-
 template<typename T, unsigned int N>
 struct array {
     T data[N];
