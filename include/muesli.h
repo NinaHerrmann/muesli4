@@ -32,7 +32,9 @@
 
 #pragma once
 
+#ifdef MPI_VERSION
 #include <mpi.h>
+#endif
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -155,7 +157,7 @@ public:
   static int num_threads;       // number of CPU threads
   static int num_runs;          // number of runs, for benchmarking
   static int num_gpus;          // number of GPUs
-  static int reps;          // Repitions of map stencil
+  static int reps;          // Repetitions of map stencil
   static double cpu_fraction;   // fraction of each DA partition handled by CPU
                                 // cores (rather than GPUs)
   static int max_gpus;          // maximum number of GPUs of each process
@@ -175,6 +177,7 @@ public:
 
 static const int ANY_TAG = MPI_ANY_TAG;
 static const int MYTAG = 1;   // used for ordinary messages containing data
+static const int MYADULTTAG = 18;   // used for ordinary messages containing data
 static const int STOPTAG = 2; // used to stop the following process
 static const int TERMINATION_TEST = 3;
 static const int RANDOM_DISTRIBUTION = 1;

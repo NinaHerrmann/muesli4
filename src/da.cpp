@@ -40,14 +40,12 @@ msl::DA<T>::DA(){}
 template<typename T>
 msl::DA<T>::DA(int size)
         : DS<T>(size) {
-
 }
 
 // constructor creates a DA, initialized with v
 template<typename T>
 msl::DA<T>::DA(int size, const T &v)
         : DS<T>(size, v) {
-
 }
 
 

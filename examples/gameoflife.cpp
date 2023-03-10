@@ -49,20 +49,6 @@ namespace msl {
                         + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
                         + input->get(rowIndex, colIndex-1)+ input->get(rowIndex, colIndex+1);
 
-                //printf("%d;%d;%d\n", rowIndex, colIndex, sum);
-                /*int live_status = input->get(rowIndex, colIndex);
-
-                int future_live_status = 0;
-                // If the cell is alive and has 2-3 neighbours it survives
-                if (live_status == 1 && (sum == 2 || sum == 3 )) {
-                    future_live_status = 1;
-                }
-                // If the cell is dead and has 3 neighbours it gets alive
-                if (live_status == 0 && sum == 3) {
-                    future_live_status = 1;
-                }
-*/
-
                 return sum;
             }
         };
@@ -113,7 +99,7 @@ namespace msl {
             for (int i = 0; i < n * m; i++) {
                 data1.set(i, 1);//data1.set(i, rand() % 2);
             }
-            data1.download();
+            data1.updateHost();
             double end = MPI_Wtime();
             if (msl::isRootProcess()) {
                 if (file) {
@@ -128,23 +114,23 @@ namespace msl {
             while (iterations_used < 1) {
                 if (iterations_used % 50 == 0) {
                     data1.mapStencilMM(data2, GoL, dead_nvf);
-                    data2.download();
+                    data2.updateHost();
                     data2.show("data2");
                 } else {
                     if (iterations_used % 2 == 0) {
                         data1.mapStencilMM(data2, GoL, dead_nvf);
-                        data2.download();
+                        data2.updateHost();
                         data2.show("data2");
                     } else {
                         data2.mapStencilMM(data1, GoL, dead_nvf);
-                        data1.download();
+                        data1.updateHost();
                         data1.show("data1");
                     }
                 }
                 iterations_used++;
             }
 
-            data1.download();
+            data1.updateHost();
             end = MPI_Wtime();
             if (msl::isRootProcess()) {
                 if (file) {

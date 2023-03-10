@@ -34,7 +34,7 @@
 
 template <class T> struct SharedMemory {
 #ifdef __CUDACC__
-  __device__ inline operator T *() {
+    __device__ inline operator T *() {
     extern __shared__ int __smem[];
     return (T *)__smem;
   }
@@ -50,7 +50,7 @@ template <class T> struct SharedMemory {
 // access compile errors
 template <> struct SharedMemory<double> {
 #ifdef __CUDACC__
-  __device__ inline operator double *() {
+    __device__ inline operator double *() {
     extern __shared__ double __smem_d[];
     return (double *)__smem_d;
   }

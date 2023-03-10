@@ -55,7 +55,7 @@ namespace msl {
 //
             MSL_USERFUNC
             float operator()(
-                    int rowIndex, int colIndex, SMMatrix<float> *input, int ncol, int nrow) const {
+                    int rowIndex, int colIndex, PLMatrix<float> *input, int ncol, int nrow) const {
                 float sum = 0;
 
                 sum += input->get(rowIndex+1, colIndex);
@@ -132,7 +132,7 @@ namespace msl {
             while (global_diff > EPSILON && num_iter < 1) {
                 if (num_iter % 50 == 0) {
                     test_m.mapStencilMM(test2_m, jacobi, neutral_value_functor);
-                    differences = test_m.zip(test2_m, difference_functor);
+                    test_m.zip(test2_m, differences, difference_functor);
                     global_diff = differences.fold(max_functor, true);
                 } else {
                     if (num_iter % 2 == 0) {
@@ -143,16 +143,9 @@ namespace msl {
                 }
                 num_iter++;
             }
-            //printf("\nStencil %.3fs; InPlace %.3f; Zip %.3f; Fold %.3f; Move %.3f; \n", tstencil * 1000, tinplace* 1000, tzip* 1000, tfold* 1000, tmove* 1000);
 
-            test2_m.download();
+            test2_m.updateHost();
             test2_m.show("test_m");
-            /*test_m.download();
-            test_m.show("test_m");*/
-            /*test2_m.download();
-            test2_m.show("test2_m");
-            differences.download();
-            differences.show("othermatrix");*/
             if (msl::isRootProcess()) {
                 printf("R:%d;%.2f;", num_iter, global_diff);
 

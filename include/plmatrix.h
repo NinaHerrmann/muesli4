@@ -132,17 +132,9 @@ namespace msl {
          * @param col The global col index.
          */
         MSL_USERFUNC
-        T get(int row, int col, int * s) {
+        T get(int row, int col) {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
-            if(shared_mem) {
-                size_t g_row = blockIdx.x * blockDim.x + threadIdx.x;
-                int previous_rows = (reps*tile_width * (g_row / tile_width));
-                int smallrow = row - previous_rows;
-                int smallcol = col % tile_width;
-                int local_read_index = smoffset + ((smallrow) * new_tile_width) + (smallcol);
-                return s[local_read_index];
-            } else {
                 if (padding_size + ((row) * (cols+kw)) + col + stencil_size >= 0 && padding_size + ((row) * (cols+kw)) + col + stencil_size < ((cols+kw)*(rows+kw))){
                     //printf("return current data");
                     return current_data[padding_size + ((row) * (cols+kw)) + col + stencil_size];
@@ -151,9 +143,6 @@ namespace msl {
                     return 255;
                 }
                 // TODO If GPU first GPU top nvf
-
-            }
-
 #else
             // CPU version: read from main memory.
 	  // bounds check
@@ -165,6 +154,7 @@ namespace msl {
     }
 #endif
         }
+
         MSL_USERFUNC
         void printcurrentData(int row){
             for (int i = 0; i < row * cols; i++){

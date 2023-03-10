@@ -18,9 +18,9 @@ endmacro()
 
 ####################################################################################
 
-set_and_check(MUESLI_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include/muesli-4.1/include,")
+set_and_check(MUESLI_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include/muesli-4.1/include")
 
-set_and_check(MUESLI_INCLUDE_DETAIL_DIR "${PACKAGE_PREFIX_DIR}/include/muesli-4.1/include,/detail")
+set_and_check(MUESLI_INCLUDE_DETAIL_DIR "${PACKAGE_PREFIX_DIR}/include/muesli-4.1/include/detail")
 
 set(MUESLI_INCLUDE_DIRS ${MUESLI_INCLUDE_DIR} ${MUESLI_INCLUDE_DETAIL_DIR})
 

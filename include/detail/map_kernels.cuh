@@ -35,7 +35,7 @@
 #include "exec_plan.h"
 #include "functors.h"
 #include "plcube.h"
-// #include "plmatrix.h"
+#include "plmatrix.h"
 
 // #include "plarray.h"
 
@@ -139,19 +139,21 @@ template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
                                  PLMatrix<T> *input,
                                  F func, int tile_width, int tile_height, NeutralValueFunctor nv);
-template <typename T, typename R, typename F>
-__global__ void mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, int firstRow,  PLMatrix<T> *dm, T * current_data,
-                                 F func, int tile_width, int reps, int kw);
+
+
+*/
 template <typename T, typename R, typename F>
 __global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
-                                 F func, int i);
+                                            F func, int i);
+template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss);
+template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);
+template <typename T> __global__ void printGPU(T *destination, int size);
+template <typename T, typename R, typename F>
+__global__ void mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, int firstRow,  PLMatrix<T> *dm, T * current_data,
+                                   F func, int tile_width, int reps, int kw);
 template <typename T, typename R, typename F>
 __global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
-                                        F func, int i, int rep, int tile_width);
-
-template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss);
-template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);*/
-
+                                        F func, int i, int reps, int tile_width);
     } // namespace detail
 } // namespace msl
 

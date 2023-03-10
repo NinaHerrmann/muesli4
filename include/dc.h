@@ -37,6 +37,7 @@
 #ifndef MUESLI_DC_H
 #define MUESLI_DC_H
 #include <type_traits>
+#include <cstring>
 
 #include "muesli.h"
 #include "detail/exception.h"
@@ -314,6 +315,8 @@ public:
 
     void initPLCubes(int stencilSize, T neutralValue) {
         plCubes = std::vector<PLCube<T>>();
+#ifdef __CUDACC__
+
         plCubes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
             plCubes.push_back(PLCube<T>(
@@ -326,6 +329,27 @@ public:
                     this->plans[i].d_Data
             ));
         }
+
+#else
+     int slicePerProcess = this->depth / msl::Muesli::num_total_procs;
+     int slicethisProcess = slicePerProcess * msl::Muesli::proc_id;
+
+     plCubes.push_back(PLCube<T>(
+                this->ncol, this->nrow, this->depth,
+                {0, 0, slicethisProcess},
+                {this->ncol-1, this->nrow-1, (slicethisProcess + slicePerProcess)-1},
+                0,
+                stencilSize,
+                neutralValue,
+                this->localPartition
+        ));
+#endif
+        if (msl::Muesli::num_total_procs > 1) {
+            size_t topPaddingElements = stencilSize * this->ncol * this->nrow * sizeof(T);
+            nodeBottomPadding = new T[topPaddingElements];
+            nodeTopPadding = new T[topPaddingElements];
+        }
+
         supportedStencilSize = stencilSize;
     }
 
@@ -334,12 +358,16 @@ public:
     }
 
     void syncPLCubes(int stencilSize, T neutralValue) {
+        if (stencilSize > supportedStencilSize) {
+            freePLCubes();
+            initPLCubes(stencilSize, neutralValue);
+        }
 #ifdef __CUDACC__
         if (stencilSize > supportedStencilSize) {
             freePLCubes();
             initPLCubes(stencilSize, neutralValue);
         }
-        for(int i = 1; i < this->ng; i++) {
+        for (int i = 1; i < this->ng; i++) {
             size_t bottomPaddingSize = plCubes[i - 1].getBottomPaddingElements() * sizeof(T);
             gpuErrchk(cudaMemcpyAsync(
                     plCubes[i - 1].bottomPadding, plCubes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice, Muesli::streams[i - 1]
@@ -354,13 +382,124 @@ public:
         msl::syncStreams();
 #endif
     }
+    void updateNodePaddingGPU(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        int topPaddingElements = topPaddingSize / sizeof(T);
+
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            gpuErrchk(cudaMemcpyAsync(
+                    this->localPartition + (this->nLocal - topPaddingElements),
+                    plCubes[lastgpu].data + (this->plans[lastgpu].size - topPaddingElements),
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            gpuErrchk(cudaMemcpyAsync(
+                    this->localPartition,
+                    plCubes[firstgpu].data,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#endif
+    }
+    void updateGPUPaddingNode(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            gpuErrchk(cudaMemcpyAsync(
+                    plCubes[lastgpu].bottomPadding,
+                    nodeBottomPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            gpuErrchk(cudaMemcpyAsync(
+                    plCubes[firstgpu].topPadding,
+                    nodeTopPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#else
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            memcpy(plCubes[0].bottomPadding, nodeBottomPadding, topPaddingSize);
+        }
+        if (msl::Muesli::proc_id > 0) {
+            memcpy(plCubes[0].topPadding, nodeTopPadding, topPaddingSize);
+        }
+#endif
+    }
+    void syncPLCubesMPI(int stencilSize) {
+        if (msl::Muesli::num_total_procs <= 1) {
+            //printf("Only one process no need to sync MPI\n");
+            return;
+        }
+        size_t topPaddingElements = stencilSize * this->ncol * this->nrow;
+        size_t topPaddingSize = stencilSize * this->ncol * this->nrow * sizeof(T);
+
+        // Update from GPU
+        updateNodePaddingGPU(topPaddingSize);
+        MPI_Status statstart;
+        MPI_Request reqstart;
+        MPI_Status statbottom;
+        MPI_Request reqbottom;
+
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            // Send ending parts. NON BLOCKING
+            MSL_ISend(Muesli::proc_id + 1,
+                      this->localPartition + this->nLocal - topPaddingElements,
+                      reqstart, topPaddingElements,
+                      msl::MYTAG);
+        }
+
+        if (msl::Muesli::proc_id > 0) {
+            // SEND STARTING PARTS NON BLOCKING
+            MSL_ISend(Muesli::proc_id - 1,
+                      this->localPartition,
+                      reqbottom, topPaddingElements,
+                      msl::MYADULTTAG);
+            // Receive upper parts BLOCKING
+            MSL_Recv(Muesli::proc_id - 1,
+                     nodeTopPadding,
+                     statstart, topPaddingElements,
+                     msl::MYTAG);
+        }
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            MSL_Recv(Muesli::proc_id + 1,
+                     nodeBottomPadding,
+                     statbottom, topPaddingElements,
+                     msl::MYADULTTAG);
+        }
+
+        // Update to GPU
+        updateGPUPaddingNode(topPaddingSize);
+    }
 
     void prettyPrint() {
+#ifdef __CUDACC__
         this->updateHost();
+        // Does not work for sequential or host
         for (int z = 0; z < this->depth; z++) {
             for (int y = 0; y < this->nrow; y++) {
                 for (int x = 0; x < this->ncol; x++) {
                     printf("%02f ", this->plans[0].h_Data[(z * (this->nrow) + y) * this->ncol + x]);
+                }
+                printf("\n");
+            }
+            printf("\n");
+        }
+#endif
+        // Does not work for sequential or host
+        for (int z = 0; z < this->depth; z++) {
+            for (int y = 0; y < this->nrow; y++) {
+                for (int x = 0; x < this->ncol; x++) {
+                    printf("%02f ", this->localPartition[(z * (this->nrow) + y) * this->ncol + x]);
                 }
                 printf("\n");
             }
@@ -431,6 +570,8 @@ private:
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete{};
 
+  // Padding to save data calculated from other cpu.
+  T * nodeTopPadding, * nodeBottomPadding;
 
   int supportedStencilSize = -1;
 

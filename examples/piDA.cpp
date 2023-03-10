@@ -35,8 +35,7 @@
 #include "muesli.h"
 #include "da.h"
 
-namespace msl {
-namespace test {
+namespace msl::test {
 
 class Count: public Functor2<int,int,int>{
 private: 
@@ -71,13 +70,14 @@ public: MSL_USERFUNC int operator() (int x, int y) const {return x+y;}
 void compute_pi(int n, int throws){
   DA<int> process(n,throws);
   Count counter;
-  DA<int> result = process.mapIndex(counter);
+  DA<int> result(n,throws);
+  result.mapIndex(counter, process);
   Sum add;
   double pi = 4.0 * result.fold(add,true) / (n*throws); 
   printf("pi: %lf\n",pi);
   return;
 };
-}} // close namespaces
+} // close namespaces
   
 int main(int argc, char** argv){  // #processes, #throws, #mpi_nodes
   msl::initSkeletons(argc, argv);

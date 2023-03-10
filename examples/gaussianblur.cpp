@@ -132,7 +132,7 @@ namespace msl {
             }
 
             MSL_USERFUNC
-            int operator() (int row, int col, PLMatrix<int> *input, int * s) const
+            int operator() (int row, int col, PLMatrix<int> *input, int ncol, int nrow) const
             {
                 int offset = kw/2;
                 float weight = 1.0f;
@@ -143,7 +143,7 @@ namespace msl {
                 float sum = 0;
                 for (int r = 0; r < kw; ++r) {
                     for (int c = 0; c < kw; ++c) {
-                        sum += input->get(row+r-offset, col+c-offset, s) *
+                        sum += input->get(row+r-offset, col+c-offset) *
                                 EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
 
                     }
@@ -176,7 +176,6 @@ namespace msl {
                 gs_image.setLocalPartition(input_image_int);
 
             }
-            cudaDeviceSynchronize();
             double end_init = MPI_Wtime();
             if (msl::isRootProcess()) {
                 if (output) {
@@ -188,10 +187,7 @@ namespace msl {
                 }
             }
             //double start = MPI_Wtime();
-            cudaEvent_t start, stop;
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-            cudaEventRecord(start);
+
             Gaussian g(kw);
             g.setStencilSize(kw/2);
             g.setTileWidth(tile_width);
@@ -205,9 +201,6 @@ namespace msl {
             float milliseconds = 0;
 
             //double end = MPI_Wtime();
-            cudaEventRecord(stop);
-            cudaEventSynchronize(stop);
-            cudaEventElapsedTime(&milliseconds, start, stop);
 
             if (msl::isRootProcess()) {
                 if (output) {
@@ -218,7 +211,7 @@ namespace msl {
                     outputFile.close();
                 }
             }
-            gs_image_result.download();
+            gs_image_result.updateHost();
             int *b = new int[rows*cols];
             b = gs_image_result.gather();
             //double end_end = MPI_Wtime();

@@ -36,6 +36,7 @@
 
 #include "muesli.h"
 #include "dc.h"
+#include "da.h"
 #include "functors.h"
 #include "array.h"
 #include "vec3.h"
@@ -139,10 +140,8 @@ namespace msl::gassimulation {
 
         auto* parts = (floatparts*) &cell[0];
 
-        if (parts->exponent == 255) {
-            if (parts->mantissa & FLAG_KEEP_VELOCITY) {
-                return cell;
-            }
+        if (parts->exponent == 255 && parts->mantissa & FLAG_KEEP_VELOCITY) {
+            return cell;
         }
 
         // Streaming.
@@ -154,7 +153,7 @@ namespace msl::gassimulation {
         }
 
         // Collision.
-        if (parts->exponent == 255) {
+        if (parts->exponent == 255 && parts->mantissa & FLAG_OBSTACLE) {
             if (parts->mantissa & FLAG_OBSTACLE) {
                 cell_t cell2 = cell;
                 for (size_t i = 1; i < Q; i++) {
@@ -201,6 +200,7 @@ namespace msl::gassimulation {
 
     void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile) {
         size = dimension;
+        DA<int> process(5,5);
 
         DC<cell_t> dc(size.x, size.y, size.z);
 
@@ -214,11 +214,13 @@ namespace msl::gassimulation {
                                      std::istreambuf_iterator<char>());
 
             if (buffer.size() != size.x * size.y * size.z * sizeof(cell_t)) {
-                std::cerr << "Inputfile is " << buffer.size() << " bytes big, but needs to be " << size.x * size.y * size.z * sizeof(cell_t) << " to match the given dimensions!" << std::endl;
+                std::cerr << "Inputfile is " << buffer.size() << " bytes big, but needs to be "
+                          << size.x * size.y * size.z * sizeof(cell_t) << " to match the given dimensions!"
+                          << std::endl;
                 exit(-1);
             }
 
-            auto* b = (cell_t*) buffer.data();
+            auto *b = (cell_t *) buffer.data();
 
             infile.close();
 
@@ -234,20 +236,20 @@ namespace msl::gassimulation {
         // Pointers for swapping.
         DC<cell_t> *dcp1 = &dc;
         DC<cell_t> *dcp2 = &dc2;
+        double totaltime = 0.0;
+        double totalkerneltime = 0.0;
+        double time = MPI_Wtime();
 
         for (int i = 0; i < iterations; i++) {
-
-            double time = MPI_Wtime();
-
             dcp1->mapStencil<update>(*dcp2, 1, {});
-
-            double endTime = MPI_Wtime();
-            double onlyKernelTime = endTime - Muesli::start_time;
-            double totalTime = endTime - time;
-
-            std::cout << totalTime << " / " << onlyKernelTime << std::endl;
-
             std::swap(dcp1, dcp2);
+        }
+        double endTime = MPI_Wtime();
+
+        totaltime += time-endTime;
+
+        if (msl::isRootProcess()) {
+            std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";" << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totaltime << ";" << totalkerneltime << std::endl;
         }
 
         if (!exportFile.empty()) {
@@ -301,6 +303,9 @@ int main(int argc, char** argv){
                 break;
             case 'e':
                 exportFile = std::string(argv[i]);
+                break;
+            case 't':
+                msl::setNumThreads(getIntArg(argv[i]));
                 break;
             default:
                 exitWithUsage();

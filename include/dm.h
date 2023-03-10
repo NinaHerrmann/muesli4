@@ -298,12 +298,12 @@ public:
     /**
      * \brief Manually download the local partition from GPU memory.
      */
-    void downloadupperpart(int paddingsize);
+    void updateDeviceupperpart(int paddingsize);
 
     /**
      * \brief Manually download the local partition from GPU memory.
      */
-    void downloadlowerpart(int paddingsize);
+    void updateDevicelowerpart(int paddingsize);
 
     /**
      * \brief Prints the distributed array to standard output. Optionally, the

@@ -1,3 +1,6 @@
+#include "../include/detail/map_kernels.cuh"
+#include "../include/plmatrix.h"
+
 /*
  * map_kernels.cpp
  *
@@ -103,39 +106,41 @@ __global__ void msl::detail::mapInPlaceKernelDC(T *inout, int gpuRows, int gpuCo
     }
 }
 
-/*
+
 template <typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm, F func, int i) {
+msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl, F func, int i) {
 
     size_t thread = threadIdx.x + blockIdx.x * blockDim.x;
 
     int y = thread /plan.gpuCols;
     int x = thread % plan.gpuCols;
 
-    dm->readToGlobalMemory();
+    pl->readToGlobalMemory();
 
     if ((y) < plan.gpuRows) {
         if (x < plan.gpuCols) {
-            out[thread] = func(y, x, dm, plan.gpuCols, plan.gpuRows);
+            out[thread] = func(y, x, pl, plan.gpuCols, plan.gpuRows);
         }
     }
 }
 template <typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm, F func, int i, int reps, int tile_width) {
+msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl, F func, int i, int reps, int tile_width) {
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
     __shared__ int *s;
-    dm->readToGlobalMemory();
+    pl->readToGlobalMemory();
     for (int j = 0; j < reps; j++) {
         if (global_row + (j * tile_width) < plan.gpuRows && y < plan.gpuCols) {
-            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, dm, s);
+            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
         }
     }
 }
+/*
+
 template <typename T, typename R, typename F, typename NeutralValueFunctor>
 __global__ void
 msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
@@ -156,7 +161,7 @@ msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
       }
     }
   }
-}
+}*/
 template <typename T, typename R, typename F>
 __global__ void
 msl::detail::mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, int firstRow, PLMatrix<T> *pl, T * current_data,
@@ -187,11 +192,9 @@ msl::detail::mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, i
     __syncthreads();
     for (int j = 0; j < reps; j++) {
         if (global_row + (j * tile_width) < gpuRows && y < gpuCols) {
-            out[(global_row + (j * tile_width)) * gpuCols + y] = func(global_row + firstRow + (tile_width*j), y + firstCol, pl, s);
+            out[(global_row + (j * tile_width)) * gpuCols + y] = func(global_row + firstRow + (tile_width*j), y + firstCol, pl, 0, 0);
         }
     }
-
-
 }
 
 template <typename T>
@@ -209,5 +212,5 @@ __global__ void msl::detail::fillcore(T *destination, T *source, int paddingoffs
     // x is the row (ungaro4k smaller one)
     destination[paddingoffset + ss + (x * (gpuCols+(2*ss)) + y)] = source[(x * gpuCols) + y];
 
-}*/
+}
 
