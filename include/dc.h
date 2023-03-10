@@ -340,6 +340,11 @@ public:
                 this->localPartition
         ));
 #endif
+        if (msl::Muesli::num_total_procs > 1) {
+            size_t topPaddingElements = stencilSize * this->ncol * this->nrow * sizeof(T);
+            nodeBottomPadding = new T[topPaddingElements];
+            nodeTopPadding = new T[topPaddingElements];
+        }
 
         supportedStencilSize = stencilSize;
     }
@@ -372,6 +377,96 @@ public:
         }
         msl::syncStreams();
 #endif
+    }
+    void updateNodePaddingGPU(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        int topPaddingElements = topPaddingSize / sizeof(T);
+
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            gpuErrchk(cudaMemcpyAsync(
+                    this->localPartition + (this->nLocal - topPaddingElements),
+                    plCubes[lastgpu].data + (this->plans[lastgpu].size - topPaddingElements),
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            gpuErrchk(cudaMemcpyAsync(
+                    this->localPartition,
+                    plCubes[firstgpu].data,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#endif
+    }
+    void updateGPUPaddingNode(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            gpuErrchk(cudaMemcpyAsync(
+                    plCubes[lastgpu].bottomPadding,
+                    nodeBottomPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            gpuErrchk(cudaMemcpyAsync(
+                    plCubes[firstgpu].topPadding,
+                    nodeTopPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#endif
+    }
+    void syncPLCubesMPI(int stencilSize) {
+        if (msl::Muesli::num_total_procs <= 1) {
+            return;
+        }
+        size_t topPaddingElements = stencilSize * this->ncol * this->nrow;
+        size_t topPaddingSize = stencilSize * this->ncol * this->nrow * sizeof(T);
+
+        // Update from GPU
+        updateNodePaddingGPU(topPaddingSize);
+        MPI_Status statstart;
+        MPI_Request reqstart;
+        MPI_Status statbottom;
+        MPI_Request reqbottom;
+
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            // Send ending parts. NON BLOCKING
+            MSL_ISend(Muesli::proc_id + 1,
+                      this->localPartition + this->nLocal - topPaddingElements,
+                      reqstart, topPaddingElements,
+                      msl::MYTAG);
+        }
+
+        if (msl::Muesli::proc_id > 0) {
+            // SEND STARTING PARTS NON BLOCKING
+            MSL_ISend(Muesli::proc_id - 1,
+                      this->localPartition,
+                      reqbottom, topPaddingElements,
+                      msl::MYADULTTAG);
+            // Receive upper parts BLOCKING
+            MSL_Recv(Muesli::proc_id - 1,
+                     nodeTopPadding,
+                     statstart, topPaddingElements,
+                     msl::MYTAG);
+        }
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            MSL_Recv(Muesli::proc_id + 1,
+                     nodeBottomPadding,
+                     statbottom, topPaddingElements,
+                     msl::MYADULTTAG);
+        }
+
+        // Update to GPU
+        updateGPUPaddingNode(topPaddingSize);
     }
 
     void prettyPrint() {
@@ -463,6 +558,8 @@ private:
   // the nodes. The map stencil functor needs this type of distribution
   bool rowComplete{};
 
+  // Padding to save data calculated from other cpu.
+  T * nodeTopPadding, * nodeBottomPadding;
 
   int supportedStencilSize = -1;
 

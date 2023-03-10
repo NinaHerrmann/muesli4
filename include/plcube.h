@@ -93,6 +93,12 @@ namespace msl {
             cudaSetDevice(device);
             cudaMalloc(&topPadding, (dataStartIndex - topPaddingStartIndex) * sizeof(T));
             cudaMalloc(&bottomPadding, (bottomPaddingEndIndex - dataEndIndex) * sizeof(T));
+#else
+            if (msl::Muesli::num_total_procs > 1) {
+                size_t topPaddingElements = stencilSize * height * width * sizeof(T);
+                bottomPadding = new T[topPaddingElements];
+                topPadding = new T[topPaddingElements];
+            }
 #endif
         }
 

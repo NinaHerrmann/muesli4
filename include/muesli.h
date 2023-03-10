@@ -175,6 +175,7 @@ public:
 
 static const int ANY_TAG = MPI_ANY_TAG;
 static const int MYTAG = 1;   // used for ordinary messages containing data
+static const int MYADULTTAG = 18;   // used for ordinary messages containing data
 static const int STOPTAG = 2; // used to stop the following process
 static const int TERMINATION_TEST = 3;
 static const int RANDOM_DISTRIBUTION = 1;
