@@ -583,6 +583,20 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
     }
     msl::syncStreams();
     result.setCpuMemoryInSync(false);
+#else
+    syncPLCubes(stencilSize, neutralValue);
+    PLCube<T> cube = this->plCubes[0];
+#ifdef _OPENMP
+    int n_thread = 10;
+#pragma omp parallel for num_threads(n_thread)
+#endif
+    for (int k = 0; k < this->n; k++) {
+        int l = (k + this->firstIndex) / (ncol*nrow);
+        int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
+        int i = (k + this->firstIndex) % ncol;
+        this->localPartition[k] = f(cube, i, j, l);
+    }
 #endif
 }
+
 

@@ -314,6 +314,8 @@ public:
 
     void initPLCubes(int stencilSize, T neutralValue) {
         plCubes = std::vector<PLCube<T>>();
+#ifdef __CUDACC__
+
         plCubes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
             plCubes.push_back(PLCube<T>(
@@ -326,6 +328,19 @@ public:
                     this->plans[i].d_Data
             ));
         }
+#else
+        int i = 0;
+        plCubes.push_back(PLCube<T>(
+                this->ncol, this->nrow, this->depth,
+                {0,0,0},
+                {this->ncol, this->nrow, this->depth},
+                i,
+                stencilSize,
+                neutralValue,
+                this->localPartition
+        ));
+#endif
+
         supportedStencilSize = stencilSize;
     }
 
@@ -334,6 +349,10 @@ public:
     }
 
     void syncPLCubes(int stencilSize, T neutralValue) {
+        if (stencilSize > supportedStencilSize) {
+            freePLCubes();
+            initPLCubes(stencilSize, neutralValue);
+        }
 #ifdef __CUDACC__
         if (stencilSize > supportedStencilSize) {
             freePLCubes();
@@ -356,11 +375,24 @@ public:
     }
 
     void prettyPrint() {
+#ifdef __CUDACC__
         this->updateHost();
+        // Does not work for sequential or host
         for (int z = 0; z < this->depth; z++) {
             for (int y = 0; y < this->nrow; y++) {
                 for (int x = 0; x < this->ncol; x++) {
                     printf("%02f ", this->plans[0].h_Data[(z * (this->nrow) + y) * this->ncol + x]);
+                }
+                printf("\n");
+            }
+            printf("\n");
+        }
+#endif
+        // Does not work for sequential or host
+        for (int z = 0; z < this->depth; z++) {
+            for (int y = 0; y < this->nrow; y++) {
+                for (int x = 0; x < this->ncol; x++) {
+                    printf("%02f ", this->localPartition[(z * (this->nrow) + y) * this->ncol + x]);
                 }
                 printf("\n");
             }
