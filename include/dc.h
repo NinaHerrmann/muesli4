@@ -37,6 +37,7 @@
 #ifndef MUESLI_DC_H
 #define MUESLI_DC_H
 #include <type_traits>
+#include <cstring>
 
 #include "muesli.h"
 #include "detail/exception.h"
