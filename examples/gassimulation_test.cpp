@@ -302,6 +302,9 @@ int main(int argc, char** argv){
             case 'e':
                 exportFile = std::string(argv[i]);
                 break;
+            case 't':
+                msl::setNumThreads(getIntArg(argv[i]));
+                break;
             default:
                 exitWithUsage();
         }
@@ -312,6 +315,7 @@ int main(int argc, char** argv){
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
     msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile);
+    printf("%d\n", msl::Muesli::num_threads);
     msl::terminateSkeletons();
     return EXIT_SUCCESS;
 }

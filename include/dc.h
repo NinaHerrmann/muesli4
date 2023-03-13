@@ -331,16 +331,14 @@ public:
         }
 
 #else
-        int i = 0;
-        // change {0,0,0} && {this->ncol, this->nrow, this->depth}, to global indices
+     int slicePerProcess = this->depth / msl::Muesli::num_total_procs;
+     int slicethisProcess = slicePerProcess * msl::Muesli::proc_id;
 
-        int slicePerProcess = this->depth / msl::Muesli::num_total_procs;
-        int slicethisProcess = slicePerProcess * msl::Muesli::proc_id;
-        plCubes.push_back(PLCube<T>(
+     plCubes.push_back(PLCube<T>(
                 this->ncol, this->nrow, this->depth,
                 {0, 0, slicethisProcess},
                 {this->ncol-1, this->nrow-1, (slicethisProcess + slicePerProcess)-1},
-                i,
+                0,
                 stencilSize,
                 neutralValue,
                 this->localPartition
