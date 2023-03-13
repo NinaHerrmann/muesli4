@@ -151,6 +151,7 @@ __global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatr
 
 template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss);
 template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss);*/
+        template <typename T> __global__ void printGPU(T *destination, int size);
 
     } // namespace detail
 } // namespace msl

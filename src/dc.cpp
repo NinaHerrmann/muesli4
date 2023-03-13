@@ -587,16 +587,18 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
     result.setCpuMemoryInSync(false);
 #else
     syncPLCubes(stencilSize, neutralValue);
+    syncPLCubesMPI(stencilSize);
     Muesli::start_time = MPI_Wtime(); // For performance testing.
-    const PLCube<T> &cube = this->plCubes[0];
+    const PLCube<T> cube = this->plCubes[0];
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
+    // DO we need local index?
     for (int k = 0; k < this->nLocal; k++) {
         int l = (k + this->firstIndex) / (ncol*nrow);
         int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
         int i = (k + this->firstIndex) % ncol;
-        this->localPartition[k] = f(cube, i, j, l);
+        result.localPartition[k] = f(cube, i, j, l);
     }
 #endif
 }

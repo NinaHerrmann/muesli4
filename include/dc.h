@@ -329,12 +329,17 @@ public:
                     this->plans[i].d_Data
             ));
         }
+
 #else
         int i = 0;
+        // change {0,0,0} && {this->ncol, this->nrow, this->depth}, to global indices
+
+        int slicePerProcess = this->depth / msl::Muesli::num_total_procs;
+        int slicethisProcess = slicePerProcess * msl::Muesli::proc_id;
         plCubes.push_back(PLCube<T>(
                 this->ncol, this->nrow, this->depth,
-                {0,0,0},
-                {this->ncol, this->nrow, this->depth},
+                {0, 0, slicethisProcess},
+                {this->ncol-1, this->nrow-1, (slicethisProcess + slicePerProcess)-1},
                 i,
                 stencilSize,
                 neutralValue,
@@ -423,10 +428,18 @@ public:
                     cudaMemcpyDefault, Muesli::streams[firstgpu]
             ));
         }
+#else
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            memcpy(plCubes[0].bottomPadding, nodeBottomPadding, topPaddingSize);
+        }
+        if (msl::Muesli::proc_id > 0) {
+            memcpy(plCubes[0].topPadding, nodeTopPadding, topPaddingSize);
+        }
 #endif
     }
     void syncPLCubesMPI(int stencilSize) {
         if (msl::Muesli::num_total_procs <= 1) {
+            printf("Only one process no need to sync MPI\n");
             return;
         }
         size_t topPaddingElements = stencilSize * this->ncol * this->nrow;
