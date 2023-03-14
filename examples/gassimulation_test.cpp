@@ -234,7 +234,8 @@ namespace msl::gassimulation {
         // Pointers for swapping.
         DC<cell_t> *dcp1 = &dc;
         DC<cell_t> *dcp2 = &dc2;
-
+        double totaltime = 0.0;
+        double totalkerneltime = 0.0;
         for (int i = 0; i < iterations; i++) {
 
             double time = MPI_Wtime();
@@ -244,10 +245,14 @@ namespace msl::gassimulation {
             double endTime = MPI_Wtime();
             double onlyKernelTime = endTime - Muesli::start_time;
             double totalTime = endTime - time;
-
-            std::cout << totalTime << " / " << onlyKernelTime << std::endl;
+            totaltime += totalTime;
+            totalkerneltime += onlyKernelTime;
+            //std::cout << totalTime << " / " << onlyKernelTime << std::endl;
 
             std::swap(dcp1, dcp2);
+        }
+        if (msl::isRootProcess()) {
+            std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";" << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totaltime << ";" << totalkerneltime << std::endl;
         }
 
         if (!exportFile.empty()) {
@@ -315,7 +320,6 @@ int main(int argc, char** argv){
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
     msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile);
-    printf("%d\n", msl::Muesli::num_threads);
     msl::terminateSkeletons();
     return EXIT_SUCCESS;
 }
