@@ -573,9 +573,8 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
     this->updateDevice();
     syncPLCubes(stencilSize, neutralValue);
     msl::syncStreams();
-    Muesli::start_time = MPI_Wtime(); // For performance testing.
     syncPLCubesMPI(stencilSize);
-
+    Muesli::start_time = MPI_Wtime(); // For performance testing.
     for (int i = 0; i < this->ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
