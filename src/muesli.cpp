@@ -99,7 +99,7 @@ void msl::initSkeletons(int argc, char **argv, bool debug) {
   Muesli::num_runs = DEFAULT_NUM_RUNS;
   Muesli::num_local_procs = Muesli::num_total_procs;
   Muesli::proc_entrance = 0;
-  setThreadsPerBlock(512);    // default for one dimensional thread blocks
+  setThreadsPerBlock(1024);    // default for one dimensional thread blocks
   setThreadsPerBlock(16, 16); // default for two dimensional thread blocks
   Muesli::start_time = MPI_Wtime();
 }
