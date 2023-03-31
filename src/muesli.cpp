@@ -209,7 +209,7 @@ void msl::syncStreams() {
   }
 #endif
 }
-#ifdef __CUDACC__
+/*#ifdef __CUDACC__
 void msl::printDevProps() {
     int nDevices;
     cudaGetDeviceCount(&nDevices);
@@ -229,7 +229,7 @@ void msl::printDevProps() {
     }
 }
 #endif
-
+*/
 void msl::startTiming() {
   Muesli::use_timer = 1;
   MPI_Barrier(MPI_COMM_WORLD);

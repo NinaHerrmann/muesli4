@@ -437,7 +437,7 @@ public:
     }
     void syncPLCubesMPI(int stencilSize) {
         if (msl::Muesli::num_total_procs <= 1) {
-            printf("Only one process no need to sync MPI\n");
+            //printf("Only one process no need to sync MPI\n");
             return;
         }
         size_t topPaddingElements = stencilSize * this->ncol * this->nrow;

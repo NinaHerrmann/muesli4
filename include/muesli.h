@@ -208,7 +208,7 @@ void printv(const char *format, ...);
 /**
  * \brief Wrapper for printing device properties
  */
-void printDevProps();
+//void printDevProps();
 #endif
 /**
  * \brief Sets the number of CPU threads.
