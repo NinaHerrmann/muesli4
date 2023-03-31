@@ -79,10 +79,11 @@ template<typename T>
 msl::DS<T>::DS(int elements, const T &v)
 : n(elements) {
     init();
-    localPartition = new T[nLocal];
 
 #ifdef __CUDACC__
     (cudaMallocHost(&localPartition, nLocal * sizeof(T)));
+#else
+    localPartition = new T[nLocal];
 #endif
 
 #ifdef _OPENMP
