@@ -133,6 +133,9 @@ int main(int argc, char** argv){
             case 'r':
                 stencilradius = getIntArg(argv[i], true);
                 break;
+            case 't':
+                msl::setNumThreads(getIntArg(argv[i]));
+                break;
             default:
                 exitWithUsage();
         }
