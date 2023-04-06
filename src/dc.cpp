@@ -574,7 +574,9 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
     syncPLCubes(stencilSize, neutralValue);
     msl::syncStreams();
     syncPLCubesMPI(stencilSize);
-    Muesli::start_time = MPI_Wtime(); // For performance testing.
+    if (msl::isRootProcess()){
+            Muesli::start_time = MPI_Wtime(); // For performance testing.
+    }
     for (int i = 0; i < this->ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
@@ -587,7 +589,9 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
 #else
     syncPLCubes(stencilSize, neutralValue);
     syncPLCubesMPI(stencilSize);
-    Muesli::start_time = MPI_Wtime(); // For performance testing.
+    if (msl::isRootProcess()){
+        Muesli::start_time = MPI_Wtime(); // For performance testing.
+    }
     const PLCube<T> cube = this->plCubes[0];
 #ifdef _OPENMP
 #pragma omp parallel for
