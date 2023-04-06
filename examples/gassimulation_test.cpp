@@ -139,10 +139,8 @@ namespace msl::gassimulation {
 
         auto* parts = (floatparts*) &cell[0];
 
-        if (parts->exponent == 255) {
-            if (parts->mantissa & FLAG_KEEP_VELOCITY) {
-                return cell;
-            }
+        if (parts->exponent == 255 && parts->mantissa & FLAG_KEEP_VELOCITY) {
+            return cell;
         }
 
         // Streaming.
@@ -154,7 +152,7 @@ namespace msl::gassimulation {
         }
 
         // Collision.
-        if (parts->exponent == 255) {
+        if (parts->exponent == 255 && parts->mantissa & FLAG_OBSTACLE) {
             if (parts->mantissa & FLAG_OBSTACLE) {
                 cell_t cell2 = cell;
                 for (size_t i = 1; i < Q; i++) {
@@ -214,11 +212,13 @@ namespace msl::gassimulation {
                                      std::istreambuf_iterator<char>());
 
             if (buffer.size() != size.x * size.y * size.z * sizeof(cell_t)) {
-                std::cerr << "Inputfile is " << buffer.size() << " bytes big, but needs to be " << size.x * size.y * size.z * sizeof(cell_t) << " to match the given dimensions!" << std::endl;
+                std::cerr << "Inputfile is " << buffer.size() << " bytes big, but needs to be "
+                          << size.x * size.y * size.z * sizeof(cell_t) << " to match the given dimensions!"
+                          << std::endl;
                 exit(-1);
             }
 
-            auto* b = (cell_t*) buffer.data();
+            auto *b = (cell_t *) buffer.data();
 
             infile.close();
 
