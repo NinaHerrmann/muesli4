@@ -74,21 +74,31 @@ namespace msl::dc_map_stencil_blur {
         // Pointers for swapping.
         DC<float> *dcp1 = &dc;
         DC<float> *dcp2 = &dc2;
-        double time = MPI_Wtime();
         double onlyKernelTime = 0.0;
+        double time, endTime;
+        if (msl::isRootProcess()) {
+            time = MPI_Wtime();
+        }
+
 
         for (int i = 0; i < iterations; i++) {
             dcp1->mapStencil<update<stencilradius>>(*dcp2, stencilradius, 0);
-            double endTimex = MPI_Wtime();
 
-            onlyKernelTime += endTimex - Muesli::start_time;
+            if (msl::isRootProcess()) {
+                double endTimex = MPI_Wtime();
+                onlyKernelTime += endTimex - Muesli::start_time;
+            }
 
             std::swap(dcp1, dcp2);
         }
-        double endTime = MPI_Wtime();
-        double totalTime = endTime - time;
+        if (msl::isRootProcess()) {
+            endTime = MPI_Wtime();
+            double totalTime = endTime - time;
 
-        std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";" << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totalTime << " ; " << onlyKernelTime << std::endl;
+            std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";"
+                      << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totalTime << " ; "
+                      << onlyKernelTime << std::endl;
+        }
     }
 }
 
