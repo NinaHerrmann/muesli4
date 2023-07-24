@@ -49,7 +49,10 @@ msl::DC<T>::DC()
 template<typename T>
 msl::DC<T>::DC(int row, int col, int depth) : ncol(col), nrow(row), depth(depth), DS<T>(row*col*depth) {
     firstRow = this->firstIndex / ncol;
-
+    if (depth % (msl::Muesli::num_total_procs*msl::Muesli::num_gpus) != 0){
+        throws(detail::InvalidCube());
+        exit(0);
+    }
 #ifdef __CUDACC__
     initGPUs();
 #endif

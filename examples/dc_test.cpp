@@ -115,7 +115,6 @@ namespace msl::test {
 
             runtimes[0] += MPI_Wtime() - t;
             t = MPI_Wtime();
-
         }
 
 

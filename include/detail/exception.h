@@ -337,6 +337,14 @@ class DeviceOutOfMemory: public Exception
             return "Device is out of Memory";
         }
     };
+class InvalidCube: public Exception
+    {
+    public:
+        std::string tostring() const
+        {
+            return "Cube z-Dimension must be a multiple of the number of processes and gpus started.";
+        }
+    };
 inline std::ostream&
 operator<<(std::ostream& os, const Exception& e)
 {
