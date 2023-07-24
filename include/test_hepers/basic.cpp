@@ -52,8 +52,8 @@ void arg_helper(int argc, char** argv, int &dim, int &nGPUs, int &reps, bool &CH
 
     argc >= 2 ? dim = std::stoi(argv[1]) : dim = 4;
     argc >= 3 ? nGPUs = std::stoi(argv[2]) : nGPUs = 0;
-    argc >= 4 ? msl::Muesli::cpu_fraction = std::strtod(argv[3], nullptr) : msl::Muesli::cpu_fraction = 1;
-    argc >= 5 ? CHECK = to_bool(argv[4]) : CHECK = false;
+    argc >= 4 ? msl::Muesli::cpu_fraction = std::strtod(argv[3], nullptr) : msl::Muesli::cpu_fraction = 0.0;
+    argc >= 5 ? CHECK = to_bool(argv[4]) : CHECK = true;
     argc >= 6 ? reps = std::stoi(argv[5]) : reps = 1;
     argc >= 7 ? skeletons = argv[6] : skeletons = "all";
     if (msl::isRootProcess()){

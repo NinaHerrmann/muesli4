@@ -114,11 +114,9 @@ namespace msl::test {
         DM<int> b(dim, dim, 5);
 
         if (check_str_inside(skeletons, "Initfill,")) {
-
             t = MPI_Wtime();
             runtimes[1] += MPI_Wtime() - t;
             int *constResult = b.gather();
-
             if (CHECK && msl::isRootProcess()) {
                 check_array_value_equal("Initfill", elements, constResult, 5);
             }
@@ -145,7 +143,7 @@ namespace msl::test {
             rotate.rotateCols(-2);
             if (CHECK) {
                 printf("Rotate -2 \n");
-                rotate.show();
+                //rotate.show();
             }
         }
 
@@ -197,7 +195,7 @@ namespace msl::test {
             for (int i = 0; i < reps; i++) {
                 b.mapIndex(sum3, a);
             }
-            muesliResults = b.gather();
+            muesliResults = a.gather();
             runtimes[4] += MPI_Wtime() - t;
 
             for (int j = 0; j < elements; j++) {

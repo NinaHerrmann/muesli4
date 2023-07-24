@@ -224,9 +224,6 @@ if (BUILD_CPU)
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 endif (BUILD_CPU)
 
-## this does not work for CUDA at the moment --> no CUDA interface libraries in cmake
-#if (BUILD_GPU)
-#endif (BUILD_GPU)
 
 ####################################################################################################
 # add install option

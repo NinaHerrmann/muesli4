@@ -278,6 +278,18 @@ namespace msl {
 
         template<typename FoldFunctor>
         T fold(FoldFunctor &f, bool final_fold_on_cpu);
+        /**
+         * \brief fold skeleton for CPU
+         *
+         * @param f The fold functor
+         * @tparam T Element type of the ds to zip with.
+         * @tparam fold Functor type.
+         * @return the result of combining all elements of the arra by the binary,
+         * associative and commutativ operation f
+         */
+
+        template<typename FoldFunctor>
+        T foldCPU(FoldFunctor &f, bool final_fold_on_cpu);
 
         //
         // SKELETONS / COMMUNICATION

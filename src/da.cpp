@@ -247,7 +247,6 @@ template<typename T2, typename ZipIndexFunctor>
 void msl::DA<T>::zipIndexInPlace(msl::DA<T2> &b, ZipIndexFunctor &f) {
     // zip on GPUs
     this->updateDevice();
-
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
       cudaSetDevice(i);

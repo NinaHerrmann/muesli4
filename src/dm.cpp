@@ -38,24 +38,11 @@
 
 template<typename T>
 msl::DM<T>::DM():                  // distributed array (resides on GPUs until deleted!)
-      n(0),                        // number of elements of distributed matrix
       ncol(0),                     // number of columns of distributed matrix
       nrow(0),                     // number of rows of distributed matrix
-      nLocal(0),                   // number of local elements on a node    
-      np(0),                       // number of (MPI-) nodes (= Muesli::num_local_procs)
-      id(0),                       // id of local node among all nodes (= Muesli::proc_id)
-      localPartition(0),           // local partition of the DM
-      cpuMemoryInSync(false),      // is GPU memory in sync with CPU?
-      firstIndex(0),               // first global index of the DM in the local partition
+      nlocalRows(0),                 // first golbal row index of the DM on the local partition
       firstRow(0),                 // first golbal row index of the DM on the local partition
-      plans(0),                    // GPU execution plans
-      dist(Distribution::DIST),    // distribution of DM: DIST (distributed) or COPY (for now: always DIST)
-      gpuCopyDistributed(0),       // is GPU copy distributed? (for now: always "false")
-// new: for combined usage of CPU and GPUs on every MPI-node
-      ng(0),                       // number of GPUs per node (= Muesli::num_gpus)
-      nGPU(0),                     // number of elements per GPU (all the same!)
-      nCPU(0),                     // number of elements on CPU = nLocal - ng*nGPU
-      indexGPU(0)                  // number of elements on CPU = nLocal - ng*nGPU
+      rowComplete(0)       // is GPU copy distributed? (for now: always "false")
 {}
 
 
@@ -212,8 +199,22 @@ void msl::DM<T>::DMinit() {
 template<typename T>
 void msl::DM<T>::initGPUs() {
 #ifdef __CUDACC__
+    int gpuBase = this->indexGPU;
+
     for (int i = 0; i < this->ng; i++) {
         cudaSetDevice(i);
+        this->plans[i].size = this->nGPU;
+        this->plans[i].nLocal = this->plans[i].size;
+        this->plans[i].bytes = this->plans[i].size * sizeof(T);
+        this->plans[i].first = gpuBase + this->firstIndex;
+        this->plans[i].h_Data = this->localPartition + gpuBase;
+        size_t total; size_t free;
+        cuMemGetInfo(&free, &total);
+        if (this->plans[i].bytes > free) {
+            throws(detail::DeviceOutOfMemory());
+            exit(0);
+        }
+        gpuBase += this->plans[i].size;
         this->plans[i].firstRow = this->plans[i].first / ncol;
         this->plans[i].firstCol = this->plans[i].first % ncol;
         this->plans[i].lastRow = (this->plans[i].first + this->plans[i].nLocal- 1) / ncol;
@@ -381,283 +382,91 @@ template<typename T>
 template<typename MapIndexFunctor>
 void msl::DM<T>::mapIndex(MapIndexFunctor &f, DM<T> &b) {
     this->updateDevice() ;
-#ifdef __CUDACC__
+    #ifdef __CUDACC__
 
-<<<<<<< HEAD
-  T2* bPartition = b.getLocalPartition();
-  #pragma omp parallel for
-  for (int k = 0; k < nCPU; k++) {
-    localPartition[k] = f(localPartition[k], bPartition[k]);
-  }
-
-  // check for errors during gpu computation
-  msl::syncStreams();
-  cpuMemoryInSync = false;
-}
-
-template <typename T>
-template <typename T2, typename ZipFunctor>
-msl::DM<T>
-msl::DM<T>::zip(DM<T2> &b,
-                ZipFunctor &f) { // should have result type DA<R>; debug
-  DM<T> result(nrow, ncol);
-  // zip on GPUs
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+    //  int colGPU = (ncol * (1 - Muesli::cpu_fraction)) / ng;  // is not used, HK
+    for (int i = 0; i < this->ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
-    dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-    detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, b.getExecPlans()[i].d_Data,
-        result.getExecPlans()[i].d_Data, plans[i].size, f);
-  }
-  // zip on CPU cores
-  T2* bPartition = b.getLocalPartition();
-  #pragma omp parallel for
-  for (int k = 0; k < nCPU; k++) {
-    result.setLocal(k, f(localPartition[k], bPartition[k]));
-  }
-  // check for errors during gpu computation
-  msl::syncStreams();
-  result.setCpuMemoryInSync(false);
-  return result;
+    dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
+    detail::mapIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        this->plans[i].d_Data, b.getExecPlans()[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f, ncol);
+    }
+    #endif
+    // all necessary calculations are performed otherwise some are skipped.
+    T* bPartition = b.getLocalPartition();
+#pragma omp parallel for
+    for (int k = 0; k < this->nCPU; k++) {
+        int i = (k + this->firstIndex) / ncol;
+        int j = (k + this->firstIndex) % ncol;
+        this->localPartition[k] = f(i, j, bPartition[k]);
+    }
+    // check for errors during gpu computation
+    msl::syncStreams();
+    this->cpuMemoryInSync = false;
 }
 
-template <typename T>
-template <typename T2, typename ZipIndexFunctor>
-void msl::DM<T>::zipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f) {
-  // zip on GPUs
-  for (int i = 0; i < ng; i++) {
-    cudaSetDevice(i);
-    dim3 dimBlock(Muesli::threads_per_block);
-    dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-    detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data,
-        plans[i].nLocal, plans[i].first, f, ncol);
-  }
 
-  T2* bPartition = b.getLocalPartition();
-  #pragma omp parallel for
-  for (int k = 0; k < nCPU; k++){
-      int i = (k + firstIndex) / ncol;
-      int j = (k + firstIndex) % ncol;
-      localPartition[k] = f(i, j, localPartition[k], bPartition[k]);
-  }
-  // check for errors during gpu computation
-  msl::syncStreams();
-  cpuMemoryInSync = false;
-}
-
-template <typename T>
-template <typename T2, typename ZipIndexFunctor>
-msl::DM<T> msl::DM<T>::zipIndex(DM<T2> &b, ZipIndexFunctor &f) {
-  DM<T> result(nrow, ncol);
-  // zip on GPUs
-  for (int i = 0; i < ng; i++) {
-    cudaSetDevice(i);
-    dim3 dimBlock(Muesli::threads_per_block);
-    dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-    detail::zipIndexKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, b.getExecPlans()[i].d_Data,
-        result.getExecPlans()[i].d_Data, plans[i].nLocal, plans[i].first, f,
-        ncol);
-  }
-  // zip on CPU cores
-  T2* bPartition = b.getLocalPartition();
-  #pragma omp parallel for
-  for (int k = 0; k < nCPU; k++){
-      int i = (k + firstIndex) / ncol;
-      int j = (k + firstIndex) % ncol;
-      result.setLocal(k, f(i, j, localPartition[k], bPartition[k]));
-  }
-  // check for errors during gpu computation
-  msl::syncStreams();
-  result.setCpuMemoryInSync(false);
-  return result;
-}
-
+/*
 template <typename T>
 template <typename T2, typename T3, typename ZipFunctor>
 void msl::DM<T>::zipInPlace3(DM<T2> &b, DM<T3> &c, ZipFunctor &f) {
   // zip on GPU
-  for (int i = 0; i < ng; i++) {
+  for (int i = 0; i < this->ng; i++) {
     cudaSetDevice(i);
     dim3 dimBlock(Muesli::threads_per_block);
-    dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
+    dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
     auto bplans = b.getExecPlans();
     auto cplans = c.getExecPlans();
     detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-        plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, plans[i].d_Data,
-        plans[i].nLocal, f);
+        this->plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, this->plans[i].d_Data,
+        this->plans[i].nLocal, f);
   }
 
   T2 *bPartition = b.getLocalPartition();
   T3 *cPartition = c.getLocalPartition();
 #pragma omp parallel for
-  for (int k = 0; k < nCPU; k++) {
-    localPartition[k] = f(localPartition[k], bPartition[k], cPartition[k]);
+
+  for (int k = 0; k < this->nCPU; k++) {
+    this->localPartition[k] = f(this->localPartition[k], bPartition[k], cPartition[k]);
   }
 
   // check for errors during gpu computation
   msl::syncStreams();
-  cpuMemoryInSync = false;
+  this->cpuMemoryInSync = false;
 }
+*/
 
-// template <typename T>
-// template <typename T2, typename T3, typename T4, typename ZipFunctor>
-// void msl::DM<T>::zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipFunctor
-// &f) {
-//   // zip on GPU
-//   for (int i = 0; i < ng; i++) {
-//     cudaSetDevice(i);
-//     dim3 dimBlock(Muesli::threads_per_block);
-//     dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-//     auto bplans = b.getExecPlans();
-//     auto cplans = c.getExecPlans();
-//     auto dplans = d.getExecPlans();
-//     detail::zipKernelAAM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-//         plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data,
-//         d.plans[i].d_Data, plans[i].d_Data, plans[i].nLocal, plans[i].first,
-//         bplans[i].first, f, ncol);
-//   }
-
-//   T2 *bPartition = b.getLocalPartition();
-//   T3 *cPartition = c.getLocalPartition();
-//   T4 *dPartition = d.getLocalPartition();
-//   int bfirst = b.getFirstIndex();
-// #pragma omp parallel for
-//   for (int k = 0; k < nCPU; k++) {
-//     int i = ((k + firstIndex) / ncol) - bfirst;
-//     //    printf("k=%d, i=%d, firstIndex=%d, ncol=%d, localPartition[k]=%d,
-//     //            bPartition[i]=%d, cPartition[i]=%d, dPartition[k]=%d,
-//     //            bfirst=%d\n", k, i, firstIndex, ncol, localPartition[k],
-//     //            bPartition[i], cPartition[i], dPartition[k], bfirst); //
-//     debug localPartition[k] =
-//         f(localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
-//   }
-
-//   // check for errors during gpu computation
-//   msl::syncStreams();
-//   cpuMemoryInSync = false;
-// }
-
-// *********** fold *********************************************
-template <typename T>
-template <typename FoldFunctor>
-T msl::DM<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
-  if (!cpuMemoryInSync) {
-    download();
-  }
-  std::vector<int> blocks(Muesli::num_gpus);
-  std::vector<int> threads(Muesli::num_gpus);
-  T *gpu_results = new T[Muesli::num_gpus];
-  int maxThreads = 1024; // preliminary
-  int maxBlocks = 1024;  // preliminary
-  for (int i = 0; i < Muesli::num_gpus; i++) {
-    threads[i] = maxThreads;
-    gpu_results[i] = 0;
-  }
-  T *local_results = new T[np];
-  T **d_odata = new T *[Muesli::num_gpus];
-  upload();
-
-  //
-  // Step 1: local fold
-  //
-
-  // prearrangement: calculate threads, blocks, etc.; allocate device memory
-  for (int i = 0; i < Muesli::num_gpus; i++) {
+/*template <typename T>
+template <typename T2, typename T3, typename T4, typename ZipFunctor>
+void msl::DM<T>::zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f){
+  // zip on GPU
+  for (int i = 0; i < this->ng; i++) {
     cudaSetDevice(i);
-    threads[i] = (plans[i].size < maxThreads)
-                     ? detail::nextPow2((plans[i].size + 1) / 2)
-                     : maxThreads;
-    blocks[i] = plans[i].size / threads[i];
-    if (blocks[i] > maxBlocks) {
-      blocks[i] = maxBlocks;
-    }
-    CUDA_CHECK_RETURN(cudaMalloc((void **)&d_odata[i], blocks[i] * sizeof(T)));
+    dim3 dimBlock(Muesli::threads_per_block);
+    dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
+    auto bplans = b.getExecPlans();
+    auto cplans = c.getExecPlans();
+    auto dplans = d.getExecPlans();
+    detail::zipKernelAAM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        this->plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, d.plans[i].d_Data, this->plans[i].d_Data,
+		this->plans[i].nLocal, this->plans[i].first, bplans[i].first, f, ncol);
   }
 
-  // fold on gpus: step 1
-  for (int i = 0; i < Muesli::num_gpus; i++) {
-    cudaSetDevice(i);
-    detail::reduce<T, FoldFunctor>(plans[i].size, plans[i].d_Data, d_odata[i],
-                                   threads[i], blocks[i], f, Muesli::streams[i],
-                                   i);
+  T2* bPartition = b.getLocalPartition(); 
+  T3* cPartition = c.getLocalPartition();
+  T4* dPartition = d.getLocalPartition();
+  int bfirst = b.getFirstIndex();
+  #pragma omp parallel for
+  for (int k = 0; k < this->nCPU; k++) {
+    int i = ((k + this->firstIndex) / ncol) - bfirst;
+      this->localPartition[k] = f(this->localPartition[k], bPartition[i], cPartition[i], dPartition[k]);
   }
 
-  // fold local elements on CPU (overlap with GPU computations)
-  // TODO: openmp has parallel reduce operators.
-  T cpu_result = localPartition[0];
-  for (int k = 1; k < nCPU; k++) {
-    cpu_result = f(cpu_result, localPartition[k]);
-  }
-
+  // check for errors during gpu computation
   msl::syncStreams();
-
-  // fold on gpus: step 2
-  for (int i = 0; i < Muesli::num_gpus; i++) {
-    if (blocks[i] > 1) {
-      cudaSetDevice(i);
-      int threads = (detail::nextPow2(blocks[i]) == blocks[i])
-                        ? blocks[i]
-                        : detail::nextPow2(blocks[i]) / 2;
-      detail::reduce<T, FoldFunctor>(blocks[i], d_odata[i], d_odata[i], threads,
-                                     1, f, Muesli::streams[i], i);
-    }
-  }
-  msl::syncStreams();
-
-  // copy final sum from device to host
-  for (int i = 0; i < Muesli::num_gpus; i++) {
-    cudaSetDevice(i);
-    CUDA_CHECK_RETURN(cudaMemcpyAsync(&gpu_results[i], d_odata[i], sizeof(T),
-                                      cudaMemcpyDeviceToHost,
-                                      Muesli::streams[i]));
-  }
-  // printf("%d. Cpu Result %d\n"
-  // "1.1 Gpu Result %d\n"
-  //  "1.2 GpuResult %d \n", id, cpu_result, gpu_results[0], gpu_results[1]);
-  msl::syncStreams();
-
-  //
-  // Step 2: global fold
-  //
-
-  T final_result, result;
-  if (final_fold_on_cpu) {
-    // calculate local result for all GPUs and CPU
-    T tmp = cpu_result;
-=======
-    // map on GPUs
->>>>>>> 96d3ef4 (2D Stencils)
-    for (int i = 0; i < Muesli::num_gpus; i++) {
-        cudaSetDevice(i);
-        dim3 dimBlock(Muesli::threads_per_block);
-        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
-        detail::mapIndexKernelDM<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                b.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
-                        this->plans[i].first, f, ncol);
-    }
-#endif
-    if (this->nCPU > 0) {
-        //T2 *bPartition = b.getLocalPartition();
-        long elementsCPU = this->nCPU;
-        long firstIndexCPU = this->firstIndex;
-#ifdef _OPENMP
-#pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, b) default(none)
-#endif
-        for (int k = 0; k < elementsCPU; k++) {
-            int j = (k + firstIndexCPU) / ncol;
-            int i = (k + firstIndexCPU) % ncol;
-            this->localPartition[k] = f(i, j, b.localPartition[k]);
-        }
-    }
-
-    // check for errors during gpu computation
-    msl::syncStreams();
-    this->setCpuMemoryInSync(false);
-}
-
+    this->cpuMemoryInSync = false;
+}*/
 // ************************************ zip *************************************
 
 template<typename T>
@@ -773,29 +582,7 @@ void msl::DM<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
     printf("mapStencilInPlace\n");
     throws(detail::NotYetImplementedException());
 }
-/*template<typename T>
-void msl::DM<T>::matchloadall(int paddingsize) {
-#ifdef __CUDACC__
-    int gpu = Muesli::num_gpus - 1;
-    cudaSetDevice(gpu);
 
-    // updateDevice data from device
-    (cudaMemcpyAsync(plans[gpu].h_Data + (plans[gpu].this->nLocal- paddingsize), plans[gpu].d_Data + (plans[gpu].nLocal-paddingsize),
-                     paddingsize * sizeof(T), cudaMemcpyDeviceToHost,
-                     Muesli::streams[gpu]));
-
-    // wait until updateDevice is finished
-#endif
-}
-template<typename T>
-void msl::DM<T>::updatecenter(T * destination, T* source) {
-#ifdef __CUDACC__
-    int gpu = Muesli::num_gpus - 1;
-    cudaSetDevice(gpu);
-
-    // wait until updateDevice is finished
-#endif
-}*/
 
 #ifdef __CUDACC__
 

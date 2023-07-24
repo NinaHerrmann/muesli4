@@ -32,12 +32,12 @@
  */
 
 #pragma once
+#include <type_traits>
 #include "ds.h"
+#include "da.h"
 
 #ifndef MUESLI_DM_H
 #define MUESLI_DM_H
-
-#include <type_traits>
 
 #include "muesli.h"
 #include "detail/exception.h"
@@ -213,6 +213,30 @@ public:
      */
     template<typename T2, typename ZipIndexFunctor>
     void zipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
+
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename ZipIndexFunctor>
+    void zipInPlace3(DM<T2> &b, DM<T3> &c, ZipIndexFunctor &f);
+
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename T4, typename ZipIndexFunctor>
+    void zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipIndexFunctor &f);
 
     /**
      * \brief Replaces each element a[i] of the distributed array with f(i, a[i],

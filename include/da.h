@@ -37,6 +37,9 @@
 #include <type_traits>
 #include "ds.h"
 
+#ifndef MUESLI_DA_H
+#define MUESLI_DA_H
+
 #include "muesli.h"
 #include "exception.h"
 #include "functors.h"
@@ -246,7 +249,4 @@ namespace msl {
 } // namespace msl
 
 #include "../src/da.cpp"
-
-
-
-
+#endif
