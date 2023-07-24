@@ -341,29 +341,6 @@ inline void msl::DM<T>::permutePartition(Functor& f) {
 //  permutePartition(curry(f));
 //}
 
-<<<<<<< HEAD
-template<typename T>
-void msl::DM<T>::freeDevice() {
-#ifdef __CUDACC__
-    if (!cpuMemoryInSync) {
-        for (int i = 0; i < ng; i++) {
-            if(plans[i].d_Data == 0) {
-            continue;
-            }
-            cudaFree(plans[i].d_Data);
-            plans[i].d_Data = 0;
-        }
-        cpuMemoryInSync = true;
-    }
-#endif
-}
-template<typename T>
-void msl::DM<T>::printTime() {
-    printf("\n%.2f;%.2f;%.2f;%.2f;%.2f;%.2f; %.2f;",
-            t5, t4, t0, t1, t2, t3, t0+t4+t1+t2+t3+t5);
-}
-=======
->>>>>>> abaab58 (changed dm to inherit from ds)
 
 //*********************************** Maps ********************************
 
