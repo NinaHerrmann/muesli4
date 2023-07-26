@@ -48,8 +48,18 @@ namespace msl {
                 sum += input->get(rowIndex-1, colIndex) + input->get(rowIndex-1, colIndex-1)+ input->get(rowIndex-1, colIndex+1)
                         + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
                         + input->get(rowIndex, colIndex-1)+ input->get(rowIndex, colIndex+1);
+                int live_status = input->get(rowIndex, colIndex);
 
-                return sum;
+                int future_live_status = 0;
+                // If the cell is alive and has 2-3 neighbours it survives
+                if (live_status == 1 && (sum == 2 || sum == 3 )) {
+                    future_live_status = 1;
+                }
+                // If the cell is dead and has 3 neighbours it gets alive
+                if (live_status == 0 && sum == 3) {
+                    future_live_status = 1;
+                }
+                return future_live_status;
             }
         };
 
@@ -97,7 +107,7 @@ namespace msl {
 
             //int num_iter = 0;
             for (int i = 0; i < n * m; i++) {
-                data1.set(i, 1);//data1.set(i, rand() % 2);
+                data1.set(i, rand() % 2);//data1.set(i, rand() % 2);
             }
             data1.updateHost();
             double end = MPI_Wtime();
@@ -114,23 +124,21 @@ namespace msl {
             while (iterations_used < 1) {
                 if (iterations_used % 50 == 0) {
                     data1.mapStencilMM(data2, GoL, dead_nvf);
-                    data2.updateHost();
-                    data2.show("data2");
                 } else {
                     if (iterations_used % 2 == 0) {
                         data1.mapStencilMM(data2, GoL, dead_nvf);
-                        data2.updateHost();
-                        data2.show("data2");
                     } else {
                         data2.mapStencilMM(data1, GoL, dead_nvf);
-                        data1.updateHost();
-                        data1.show("data1");
                     }
                 }
                 iterations_used++;
             }
-
             data1.updateHost();
+            data2.updateHost();
+
+            //data2.show();
+            //data1.show();
+
             end = MPI_Wtime();
             if (msl::isRootProcess()) {
                 if (file) {
@@ -147,8 +155,8 @@ namespace msl {
 } // namespace msl
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
-    int n = 500;
-    int m = 500;
+    int n = 100;
+    int m = 100;
     int stencil_radius = 1;
     int nGPUs = 1;
     int nRuns = 1;
@@ -156,6 +164,7 @@ int main(int argc, char **argv) {
     int tile_width = msl::DEFAULT_TILE_WIDTH;
     msl::Muesli::cpu_fraction = 0.25;
     //bool warmup = false;
+    msl::setDebug(true);
 
     char *file = nullptr;
 

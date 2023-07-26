@@ -442,7 +442,7 @@ namespace msl {
          *
          * @param index the index.
          */
-        T& operator[](int index);
+        T operator[](int index);
 
         /**
          * \brief Returns the GPU execution plans that store information about size,

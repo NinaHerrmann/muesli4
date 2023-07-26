@@ -302,6 +302,7 @@ set(EXAMPLE_SRCS
         ${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
         ${PROJECT_SOURCE_DIR}/examples/gassimulation_test.cpp
         ${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
         ${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
         ${PROJECT_SOURCE_DIR}/examples/meanblur2.cpp
         ${PROJECT_SOURCE_DIR}/examples/piDA.cpp

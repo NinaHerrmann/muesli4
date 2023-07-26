@@ -58,7 +58,7 @@ msl::detail::mapKernel3D(T *in, R *out, F func, int gpuRows, int gpuCols, int gp
 
 template<typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernelDM(T *in, R *out, size_t size,
-                                            size_t first, F func, int nCols) {
+                                              size_t first, F func, int nCols) {
     size_t k = blockIdx.x * blockDim.x + threadIdx.x;
     int i = (k + first) / nCols;
     int j = (k + first) % nCols;
@@ -70,7 +70,7 @@ __global__ void msl::detail::mapIndexKernelDM(T *in, R *out, size_t size,
 
 template<typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernelDA(T *in, R *out, size_t size,
-                                            size_t first, F func) {
+                                              size_t first, F func) {
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (x < size) {
@@ -107,13 +107,13 @@ __global__ void msl::detail::mapInPlaceKernelDC(T *inout, int gpuRows, int gpuCo
 }
 
 
-template <typename T, typename R, typename F>
+template<typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl, F func, int i) {
+msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> *pl, F func, int i) {
 
     size_t thread = threadIdx.x + blockIdx.x * blockDim.x;
 
-    int y = thread /plan.gpuCols;
+    int y = thread / plan.gpuCols;
     int x = thread % plan.gpuCols;
 
     pl->readToGlobalMemory();
@@ -124,93 +124,82 @@ msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *
         }
     }
 }
-template <typename T, typename R, typename F>
+
+template<typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *pl, F func, int i, int reps, int tile_width) {
+msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> *pl, F func, int i, int reps,
+                                     int tile_width) {
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
-    __shared__ int *s;
+    int global_row = (reps * tile_width * (x / tile_width)) + (threadIdx.x);
     pl->readToGlobalMemory();
     for (int j = 0; j < reps; j++) {
         if (global_row + (j * tile_width) < plan.gpuRows && y < plan.gpuCols) {
-            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(global_row + plan.firstRow + (tile_width*j), y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
+            out[(global_row + (j * tile_width)) * plan.gpuCols + y] = func(
+                    global_row + plan.firstRow + (tile_width * j),
+                    y + plan.firstCol, pl, plan.gpuCols, plan.gpuRows);
         }
     }
 }
-/*
 
-template <typename T, typename R, typename F, typename NeutralValueFunctor>
+template<typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
-                              PLMatrix<T> *input, F func,
-                              int tile_width, int tile_height, NeutralValueFunctor nv) {
-
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  input->readToSharedMem(y + plan.firstRow, x, tile_width, tile_height,
-                         plan.gpuRows, plan.gpuCols);
-  if (y < plan.gpuRows) {
-    if (x < plan.gpuCols) {
-
-      if (!((y == 0 && x < plan.firstCol) ||
-            (y == (plan.gpuRows - 1) && x > plan.lastCol))) {
-        out[y * plan.gpuCols + x - plan.firstCol] =
-            func(y + plan.firstRow, x, *input);
-      }
-    }
-  }
-}*/
-template <typename T, typename R, typename F>
-__global__ void
-msl::detail::mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, int firstRow, PLMatrix<T> *pl, T * current_data,
+msl::detail::mapStencilMMKernel(R *out, int gpuRows, int gpuCols, int firstCol, int firstRow, PLMatrix <T> *pl,
+                                T *current_data,
                                 F func, int tile_width, int reps, int kw) {
     extern __shared__ int s[];
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int new_tile_width = tile_width + kw;
-    int inside_elements = tile_width * tile_width;
     // wie viele bloecke hatten wir schon? ((blockIdx.x * blockDim.x + threadIdx.x) / reps)
-    int global_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x);
-    int g_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
-    int global_col = blockIdx.y * blockDim.y + threadIdx.y;
-    const int newsize = new_tile_width * ((reps*tile_width)+kw);
-    const int iterations = (newsize/(inside_elements)) + 1;
+    int global_row = (reps * tile_width * (x / tile_width)) + (threadIdx.x);
+    /*int g_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
+        int global_col = blockIdx.y * blockDim.y + threadIdx.y;
+        int new_tile_width = tile_width + kw;
 
-    for (int rr = 0; rr <= iterations; ++rr) {
-        int local_index = (rr * (inside_elements)) + (threadIdx.x) * tile_width + ( threadIdx.y);
-        int row = local_index / new_tile_width;
-        int firstcol = global_col -  threadIdx.y;
-        int g_col = firstcol + ((local_index) % new_tile_width);
-        int readfrom = (((g_row-threadIdx.x) + row) * (gpuCols+kw)) + g_col;
-        if (local_index < newsize) {
-            s[local_index] = current_data[readfrom];
+        int inside_elements = tile_width * tile_width;
+        const int newsize = new_tile_width * ((reps*tile_width)+kw);
+
+        const int iterations = (newsize/(inside_elements)) + 1;
+
+        for (int rr = 0; rr <= iterations; ++rr) {
+            int local_index = (rr * (inside_elements)) + (threadIdx.x) * tile_width + ( threadIdx.y);
+            int row = local_index / new_tile_width;
+            int firstcol = global_col -  threadIdx.y;
+            int g_col = firstcol + ((local_index) % new_tile_width);
+            int readfrom = (((g_row-threadIdx.x) + row) * (gpuCols+kw)) + g_col;
+            if (local_index < newsize) {
+                s[local_index] = current_data[readfrom];
+            }
         }
-    }
-    __syncthreads();
+        __syncthreads();*/
     for (int j = 0; j < reps; j++) {
         if (global_row + (j * tile_width) < gpuRows && y < gpuCols) {
-            out[(global_row + (j * tile_width)) * gpuCols + y] = func(global_row + firstRow + (tile_width*j), y + firstCol, pl, 0, 0);
+            out[(global_row + (j * tile_width)) * gpuCols + y] = func(global_row + firstRow + (tile_width * j),
+                                                                      y + firstCol, pl, 0, 0);
         }
     }
 }
 
-template <typename T>
-__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss) {
+template<typename T>
+__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss, T neutral_value) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    for (int i = 0; i<ss; i++){
-        A[(paddingoffset + (x * gpuCols))+i] = 0;
-        A[(paddingoffset + (x * gpuCols))-i+1] = 0;
+    for (int i = 0; i < ss; i++) {
+        A[(paddingoffset + (x * gpuCols)) + i] = neutral_value;
+        A[(paddingoffset + (x * gpuCols)) - i + 1] = neutral_value;
     }
 }
-template <typename T>
-__global__ void msl::detail::fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss) {
+
+template<typename T>
+__global__ void
+msl::detail::fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     // x is the row (ungaro4k smaller one)
-    destination[paddingoffset + ss + (x * (gpuCols+(2*ss)) + y)] = source[(x * gpuCols) + y];
+    if (x * y < ss + rows * cols) {
+        destination[paddingoffset + ss + (x * (gpuCols + (2 * ss)) + y)] = source[(x * gpuCols) + y];
+    }
 
 }
 

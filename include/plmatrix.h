@@ -136,11 +136,10 @@ namespace msl {
 #ifdef __CUDA_ARCH__
 // GPU version: read from shared memory.
                 if (padding_size + ((row) * (cols+kw)) + col + stencil_size >= 0 && padding_size + ((row) * (cols+kw)) + col + stencil_size < ((cols+kw)*(rows+kw))){
-                    //printf("return current data");
+
                     return current_data[padding_size + ((row) * (cols+kw)) + col + stencil_size];
                 } else {// SHOULD not happen
-                    printf("Take%d;%d;", padding_size,((row) * (cols+kw)) + col + stencil_size);
-                    return 255;
+                    return neutral_value;
                 }
                 // TODO If GPU first GPU top nvf
 #else

@@ -256,8 +256,13 @@ T *msl::DS<T>::getLocalPartition() {
 
 template<typename T>
 void msl::DS<T>::setLocalPartition(T *elements) {
-    localPartition = elements;
-    initGPUs();
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int k = 0; k < n; k++) {
+        localPartition[k] = elements[k];
+    }
     updateDevice();
 }
 
@@ -358,7 +363,7 @@ T msl::DS<T>::getLocal(int localIndex) {
 }
 
 template<typename T>
-T &msl::DS<T>::operator[](int index) {
+T msl::DS<T>::operator[](int index) {
     return get(index);
 }
 
@@ -386,7 +391,6 @@ void msl::DS<T>::set(int globalIndex, const T &v) {
     } else {
         printf("Set global - ");
         throws(detail::NotYetImplementedException());
-
         // TODO: Set global
     }
 }
@@ -405,7 +409,8 @@ void msl::DS<T>::updateDevice() {
             cudaSetDevice(i);
             // upload data to host
             (cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data,
-                                              plans[i].bytes, cudaMemcpyHostToDevice,
+                                              plans[i].bytes,
+                                              cudaMemcpyHostToDevice,
                                               Muesli::streams[i]));
         }
 

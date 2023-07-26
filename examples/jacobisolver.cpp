@@ -145,11 +145,6 @@ namespace msl {
             }
 
             test2_m.updateHost();
-            test2_m.show("test_m");
-            if (msl::isRootProcess()) {
-                printf("R:%d;%.2f;", num_iter, global_diff);
-
-            }
             return 0;
         }
 

@@ -640,6 +640,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     int padding_size = (stencil_size * ncol) + (2 * stencil_size);
     int col_size = (stencil_size * ncol);
     int kw = 2 * stencil_size;
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
     if (!this->plinitMM) {
         // TODO bigger stencils than 1
         this->padding_stencil = new T[(padding_size) * 4];
@@ -650,12 +652,13 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             cudaSetDevice(i);
             (cudaMalloc(&d_dm[i], padding_size * 4 * sizeof(T)));
             (cudaMalloc(&this->all_data[i], ((this->plans[i].gpuRows+kw) * (this->plans[i].gpuCols+kw)) * sizeof(T)));
-            //printf("\nSize: %d\n\n", ((padding_size * 4) + (this->plans[0].gpuRows * this->plans[0].gpuCols)));
         }
     }
     int rowoffset = this->plans[0].gpuCols + (2*stencil_size);
     int coloffset = this->plans[0].gpuRows + (2*stencil_size);
     // Fill first and last GPU in total with NVF
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
     if (!this->plinitMM) {
         for (int j = 0; j < Muesli::num_gpus; j++) {
 
@@ -682,15 +685,28 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 dim3 fillthreads(Muesli::threads_per_block);
                 dim3 fillblocks((coloffset) / fillthreads.x);
                 // int paddingoffset, int gpuRows, int ss
-                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset, this->plans[j].gpuCols, stencil_size);
+                if (Muesli::debug) {
+                    gpuErrchk(cudaPeekAtLastError());
+                    gpuErrchk(cudaDeviceSynchronize());
+                }
+                T neutral_value = neutral_value_functor(0,0);
+                if (fillblocks.x == 0) {
+                    fillblocks = 1;
+                }
+                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset, this->plans[j].gpuCols, stencil_size, neutral_value);
+                if (Muesli::debug) {
+                    gpuErrchk(cudaPeekAtLastError());
+                    gpuErrchk(cudaDeviceSynchronize());
+                }
             }
         }
     }
-
-
+    if (Muesli::debug) {
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+    }
     MPI_Status stat;
     MPI_Request req;
-
     if (msl::Muesli::num_total_procs > 1) {
         // updateDevice the data from the GPU which needs to be send to other process
         updateDeviceupperpart(col_size);
@@ -744,6 +760,10 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                     neutral_value_functor((-nrow - stencil_size) + i, stencil_size + col_size + i);
         }
     }
+    if (Muesli::debug) {
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+    }
     // overall rows and column, gpu rows and columns
     msl::PLMatrix<T> plm(nrow, ncol, this->plans[0].gpuRows, this->plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
 
@@ -752,10 +772,12 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
     float milliseconds = 0.0;
     // NVF Values only need to be copied once
-
+    if (Muesli::debug) {
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+    }
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-
         // TODO adjust to process (copy gotten stencil)
         // If it is the first GPU copy first part from received paddingstencil
         if (i == 0) {
@@ -784,21 +806,23 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             this->padding_stencil[k + 3 * padding_size] =
                     neutral_value_functor(k, nrow + 1);
         }
-
         cudaMemcpyAsync(d_dm[i] + (2 * padding_size), this->padding_stencil + (2 * padding_size),
                         2 * padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
         cudaMemcpyAsync(this->all_data[i], this->padding_stencil,
                         padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
         cudaMemcpyAsync(this->all_data[i]+((this->plans[i].gpuRows+stencil_size)*(this->plans[i].gpuCols+kw)), this->padding_stencil + padding_size,
                         padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[i]);
-       dim3 fillthreads(tile_width, tile_width);
+
+        dim3 fillthreads(tile_width, tile_width);
        dim3 fillblocks((this->plans[i].gpuRows + fillthreads.x - 1) / fillthreads.x, (this->plans[i].gpuCols + fillthreads.y - 1) / fillthreads.y);
        // int paddingoffset, int gpuRows, int ss
        if (Muesli::debug) {
            gpuErrchk(cudaPeekAtLastError());
            gpuErrchk(cudaDeviceSynchronize());
        }
-       detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(this->all_data[i], this->plans[i].d_Data, stencil_size * (this->plans[i].gpuCols + (2*stencil_size)), this->plans[i].gpuCols, stencil_size);
+       detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(this->all_data[i], this->plans[i].d_Data,
+                                                                           stencil_size * (this->plans[i].gpuCols + (2*stencil_size)),
+                                                                           this->plans[i].gpuCols, stencil_size, nrow, ncol);
         if (Muesli::debug) {
             gpuErrchk(cudaPeekAtLastError());
             gpuErrchk(cudaDeviceSynchronize());
@@ -840,7 +864,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             }
             // cudaDeviceProp prop;
             // cudaGetDeviceProperties(&prop, i);
-            // 68 for Palma. -> each SM can start one block TODO for opt.
             // int sms = prop.multiProcessorCount;
             // float smpp = prop.sharedMemPerBlock;
             // We assume that this is an even number
@@ -855,6 +878,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
             dim3 dimGrid(((this->plans[i].gpuRows))/divisor/dimBlock.x,
                          (this->plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             smem_size = ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T);
+
             //printf("\n %d %d; %d %d \n\n", dimBlock.x, dimBlock.y, dimGrid.x, dimGrid.y);
             //printf("Rows %d Cols %d %d %d %d %d \n", this->plans[i].gpuRows, this->plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
@@ -865,6 +889,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
         }
         if (!f.getSharedMemory()){
             //dim3 dimBlock(Muesli::threads_per_block);
@@ -873,6 +899,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
             divisor = Muesli::reps;
 
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
             dim3 dimGrid(((this->plans[i].gpuRows))/divisor,
                          (this->plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             detail::mapStencilGlobalMem_rep<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
@@ -881,6 +909,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
         }
         cudaDeviceSynchronize();
     }

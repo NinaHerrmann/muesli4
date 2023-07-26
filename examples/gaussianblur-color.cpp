@@ -9,8 +9,10 @@
 #include "muesli.h"
 #include <iostream>
 
+#include "array.h"
+#include "vec3.h"
 #define EPSILON 0.03
-#define MAX_ITER 1
+#define MAX_ITER 50
 #ifdef __CUDACC__
 #define POW(a, b)      powf(a, b)
 #define EXP(a)      exp(a)
@@ -19,16 +21,26 @@
 #define EXP(a)      std::exp(a)
 #endif
 int rows, cols;
-int* input_image_int;
-char* input_image_char;
-bool ascii = false;
+array<int, 3>* input_image_int;
+bool ascii = true;
+typedef struct {
+    int green;
+    int blue;
+    int red;
+} colorpoint;
 
+typedef array<int, 3> arraycolorpoint;
+
+std::ostream& operator<< (std::ostream& os, const arraycolorpoint f) {
+    os << "(" << f[0] << ", " << f[1] << ", " << f[2] << ")";
+    return os;
+}
 namespace msl {
 
     namespace jacobi {
 
 
-        int readPGM(const std::string& filename, int& rows, int& cols, int& max_color)
+        int readPNG(const std::string& filename, int& rows, int& cols, int& max_color)
         {
             std::ifstream ifs(filename, std::ios::binary);
             if (!ifs) {
@@ -38,11 +50,8 @@ namespace msl {
             // Read magic number.
             std::string magic;
             getline(ifs, magic);
-            if (magic.compare("P5")) { // P5 is magic number for pgm binary format.
-                if (magic.compare("P2")) { // P2 is magic number for pgm ascii format.
-                    std::cout << "Error: Image not in PGM format!" << std::endl;
-                    return 1;
-                }
+            if (magic.compare("P3")) { // P5 is magic number for pgm binary format.
+                std::cout << "Image in PPM format \xE2\x9C\x93" << std::endl;
                 ascii = true;
             }
 
@@ -62,19 +71,23 @@ namespace msl {
             }
             // Read image.
             if (ascii) {
-                input_image_int = new int[rows*cols];
+                input_image_int = new array<int, 3>[rows * cols];
                 int i = 0;
+                int j = 0;
+                arraycolorpoint anarraycolorpoint = {0,0,0};
                 while (getline(ifs, inputLine)) {
-                    std::stringstream(inputLine) >> input_image_int[i++];
+                    std::stringstream(inputLine) >> anarraycolorpoint[j++];
+                    if (j == 3) {
+                        j = 0;
+                        input_image_int[i++] = anarraycolorpoint;
+                        anarraycolorpoint = {0,0,0};
+                    }
                 }
-            } else {
-                input_image_char = new char[rows*cols];
-                ifs.read(input_image_char, rows*cols);
             }
             return 0;
         }
 
-        int writePGM(const std::string& filename, int * out_image, int rows, int cols, int max_color)
+        int writePPM(const std::string& filename, arraycolorpoint* out_image, int rows, int cols, int max_color)
         {
             std::ofstream ofs(filename, std::ios::binary);
             if (!ofs) {
@@ -87,13 +100,16 @@ namespace msl {
                 img[i] = new int[cols];
 
             // Write image header
-            ofs << "P5\n" << cols << " " << rows << " " << std::endl << max_color << std::endl;
+            ofs << "P3\n" << cols << " " << rows << " " << std::endl << max_color << std::endl;
 
             // Write image
             for (int x = 0; x < rows; x++) {
                 for (int y = 0; y < cols; y++) {
-                    unsigned char intensity = static_cast<unsigned char> (out_image[x*cols + y]);
-                    ofs << intensity;
+                    arraycolorpoint apoint = out_image[x * cols + y];
+                    for (int j = 0; j < 3; j++) {
+                        unsigned char intensity = static_cast<unsigned char>(apoint[j]);
+                        ofs << apoint[j] << std::endl;
+                    }
                 }
             }
 
@@ -105,19 +121,19 @@ namespace msl {
             return 0;
         }
 
-        class GoLNeutralValueFunctor : public Functor2<int, int, int> {
+        class GoLNeutralValueFunctor : public Functor2<int, int, array<int, 3>> {
         public:
-            GoLNeutralValueFunctor(int default_neutral)
+            GoLNeutralValueFunctor(array<int, 3> default_neutral)
                     : default_neutral(default_neutral) {}
 
             MSL_USERFUNC
-            int operator()(int x, int y) const {
+            array<int, 3> operator()(int x, int y) const {
                 // All Border are not populated.
                 return default_neutral;
             }
 
         private:
-            int default_neutral = 0;
+            array<int, 3> default_neutral = {0,0,0} ;
         };
 
 /**
@@ -133,22 +149,27 @@ namespace msl {
             }
 
             MSL_USERFUNC
-            int operator() (int row, int col, PLMatrix<int> *input, int ncol, int nrow) const
+            array<int,3> operator() (int row, int col, PLMatrix<arraycolorpoint> *input, int ncol, int nrow) const
             {
                 int offset = kw/2;
                 float weight = 1.0f;
                 float sigma = 1;
                 float mean = (float)kw/2;
                 // Convolution
-                float sum = 0;
+                array<float, 3> sum = {0.0, 0.0, 0.0};
                 for (int r = 0; r < kw; ++r) {
                     for (int c = 0; c < kw; ++c) {
-                        sum += input->get(row+r-offset, col+c-offset) *
+                        sum[0] += input->get(row+r-offset, col+c-offset)[0] *
+                                EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
+                        sum[1] += input->get(row+r-offset, col+c-offset)[1] *
+                                                        EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
+                        sum[2] += input->get(row+r-offset, col+c-offset)[2] *
                                 EXP(-0.5 * (POW((r-mean)/sigma, 2.0) + POW((c-mean)/sigma,2.0))) / (2 * M_PI * sigma * sigma);
 
                     }
                 }
-                return (int)sum/weight;
+                array<int, 3> result = {(int)(sum[0]/weight), (int)(sum[1]/weight), (int)(sum[2]/weight)};
+                return result;
             }
 
         private:
@@ -161,28 +182,17 @@ namespace msl {
             double start_init = MPI_Wtime();
 
             // Read image
-            readPGM(in_file, rows, cols, max_color);
-            DM<int> gs_image(rows, cols, 0, true);
-            DM<int> gs_image_result(rows, cols, 0, true);
+            readPNG(in_file, rows, cols, max_color);
+            array<int, 3> emptycolorpoint = {0,0,0};
+            printf("Nrows %d ncol %d\n", rows, cols);
+            DM<arraycolorpoint> gs_image(rows, cols, emptycolorpoint);
+            DM<arraycolorpoint> gs_image_result(rows, cols, emptycolorpoint);
             if (ascii) {
                 for (int i = 0; i < rows*cols; i++) {
                     gs_image.set(i,input_image_int[i]);
                 }
-            } else {
-                input_image_int = new int[rows*cols];
-                for (int i = 0; i < rows*cols; i++) {
-                    input_image_int[i] = ((int)input_image_char[i]);
-                    if ((int)input_image_char[i] < 0) {
-                        std::cout << "string:    " << input_image_char[i] << std::endl;
-                        printf("W-%d;", (int) input_image_char[i]);
-                    }
-                }
-                for (int i = 0; i < rows*cols; i++) {
-                    gs_image.set(i,input_image_int[i]);
-                }
-                gs_image.updateDevice();
-                printf("In File %d \n\n", gs_image.get(0));
             }
+            //gs_image.show();
 
             double end_init = MPI_Wtime();
             if (msl::isRootProcess()) {
@@ -195,10 +205,10 @@ namespace msl {
             }
             //double start = MPI_Wtime();
 
-            Gaussian g(kw);
+            Gaussian g(5);
             g.setStencilSize(kw/2);
             g.setSharedMemory(false);
-            GoLNeutralValueFunctor dead_nvf(0);
+            GoLNeutralValueFunctor dead_nvf({0,0,0});
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
                 gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
@@ -217,17 +227,16 @@ namespace msl {
                 }
             }
             gs_image.updateHost();
-            int *b;
-            b = gs_image_result.gather();
-            //double end_end = MPI_Wtime();
+
+            arraycolorpoint *b;
+            b = gs_image.gather();
 	        if (msl::isRootProcess()) {
                 if (output) {
 		            std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (milliseconds/1000) << ";\n";
-                    //printf("%.2f;", milliseconds/1000);
                     outputFile.close();
-                    writePGM(out_file, b, rows, cols, max_color);
+                    writePPM(out_file, b, rows, cols, max_color);
                 }
             }
 	        return milliseconds;
@@ -236,11 +245,7 @@ namespace msl {
     } // namespace jacobi
 } // namespace msl
 
-int init(int row, int col)
-{
-    if (ascii) return input_image_int[row*cols+col];
-    else return input_image_char[row*cols+col];
-}
+
 int main(int argc, char **argv) {
     //std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
 
@@ -286,10 +291,10 @@ int main(int argc, char **argv) {
         ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "Data/4096x3072pexels-sapir.pgm";
+        in_file = "Data/PokemonTT.ppm";
         //in_file = "lena.pgm";
         std::stringstream oo;
-        oo << "Data/Sapir_" << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "_" << shared <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.pgm";
+        oo << "Data/PTT_" << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "_" << shared <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.ppm";
         out_file = oo.str();
     }
     output = true;
