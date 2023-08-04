@@ -190,6 +190,47 @@ public:
     * @brief TODO Non-inplace variant of the mapStencil skeleton.
     *
     * @tparam R type of the resulting matrix
+    * @tparam MapStencilFunctor
+    * @tparam NeutralValueFunctor
+    * @param result the dm to save the result
+    * @param f
+    * @param neutral_value_functor
+    * @return void
+    */
+    template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
+    void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+
+    /**
+    * @brief Methods to generalize MapStencil Code snippets.
+    *
+    * @tparam MapStencilFunctor
+    * @param int stencil_size
+    * @param int padding_size
+    * @param int kw
+    * @param f MapStencilFunctor
+    * @param int rowoffset
+    * @param int coloffset
+    * @return void
+    */
+    template<typename MapStencilFunctor>
+    void initializeConstantsStencil(int &stencil_size, int &padding_size, int &col_size, int &kw, MapStencilFunctor &f,
+                                                    int &rowoffset, int &coloffset);
+    /**
+    * @brief Methods to communicate borders between nodes.
+    *
+    * @tparam MapStencilFunctor
+    * @param int stencil_size
+    * @param int padding_size
+    * @param int kw
+    * @param int rowoffset
+    * @param int coloffset
+    * @return void
+    */
+    void communicateNodeBorders(int col_size, int stencil_size, int padding_size);
+/**
+    * @brief TODO Non-inplace variant of the mapStencil skeleton.
+    *
+    * @tparam R type of the resulting matrix
     * @tparam the dm to save the result
     * @tparam MapStencilFunctor
     * @tparam NeutralValueFunctor
@@ -197,8 +238,8 @@ public:
     * @param neutral_value_functor
     * @return DM<R>
     */
-    template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
-    void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+    template<typename T2, typename MapStencilFunctor>
+    void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_value);
 
     // SKELETONS / COMPUTATION / ZIP
 

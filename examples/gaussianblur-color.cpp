@@ -35,13 +35,9 @@ std::ostream& operator<< (std::ostream& os, const arraycolorpoint f) {
     os << "(" << f[0] << ", " << f[1] << ", " << f[2] << ")";
     return os;
 }
-namespace msl {
+namespace msl::gaussiancolor {
 
-    namespace jacobi {
-
-
-        int readPNG(const std::string& filename, int& rows, int& cols, int& max_color)
-        {
+        int readPPM(const std::string& filename, int& rows, int& cols, int& max_color) {
             std::ifstream ifs(filename, std::ios::binary);
             if (!ifs) {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
@@ -87,8 +83,7 @@ namespace msl {
             return 0;
         }
 
-        int writePPM(const std::string& filename, arraycolorpoint* out_image, int rows, int cols, int max_color)
-        {
+        int writePPM(const std::string& filename, arraycolorpoint* out_image, int rows, int cols, int max_color) {
             std::ofstream ofs(filename, std::ios::binary);
             if (!ofs) {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
@@ -121,20 +116,6 @@ namespace msl {
             return 0;
         }
 
-        class GoLNeutralValueFunctor : public Functor2<int, int, array<int, 3>> {
-        public:
-            GoLNeutralValueFunctor(array<int, 3> default_neutral)
-                    : default_neutral(default_neutral) {}
-
-            MSL_USERFUNC
-            array<int, 3> operator()(int x, int y) const {
-                // All Border are not populated.
-                return default_neutral;
-            }
-
-        private:
-            array<int, 3> default_neutral = {0,0,0} ;
-        };
 
 /**
  * @brief Averages the top, bottom, left and right neighbours of a specific
@@ -142,7 +123,7 @@ namespace msl {
  *
  */
         class Gaussian
-                : public DMMapStencilFunctor<int, int, GoLNeutralValueFunctor> {
+                : public DMMapStencilFunctor<int, int> {
         public:
             Gaussian(int getkw): DMMapStencilFunctor() {
                 kw = getkw;
@@ -182,7 +163,7 @@ namespace msl {
             double start_init = MPI_Wtime();
 
             // Read image
-            readPNG(in_file, rows, cols, max_color);
+            readPPM(in_file, rows, cols, max_color);
             array<int, 3> emptycolorpoint = {0,0,0};
             printf("Nrows %d ncol %d\n", rows, cols);
             DM<arraycolorpoint> gs_image(rows, cols, emptycolorpoint);
@@ -192,7 +173,6 @@ namespace msl {
                     gs_image.set(i,input_image_int[i]);
                 }
             }
-            //gs_image.show();
 
             double end_init = MPI_Wtime();
             if (msl::isRootProcess()) {
@@ -203,20 +183,16 @@ namespace msl {
                     outputFile.close();
                 }
             }
-            //double start = MPI_Wtime();
 
             Gaussian g(5);
             g.setStencilSize(kw/2);
             g.setSharedMemory(false);
-            GoLNeutralValueFunctor dead_nvf({0,0,0});
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
-                gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
-                gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
+                gs_image.mapStencilMM(gs_image_result, g, {0,0,0});
+                gs_image_result.mapStencilMM(gs_image, g, {0,0,0});
             }
             float milliseconds = 0;
-
-            //double end = MPI_Wtime();
 
             if (msl::isRootProcess()) {
                 if (output) {
@@ -241,13 +217,10 @@ namespace msl {
             }
 	        return milliseconds;
         }
-
-    } // namespace jacobi
 } // namespace msl
 
 
 int main(int argc, char **argv) {
-    //std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
 
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
@@ -309,7 +282,7 @@ int main(int argc, char **argv) {
     printf("%d;%d;%d;", tile_width,kw,reps);
     float miliseconds = 0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        miliseconds = msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
+        miliseconds = msl::gaussiancolor::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
     }
     printf("%.2f;", (miliseconds/1000/msl::Muesli::num_runs));
 
@@ -319,8 +292,6 @@ int main(int argc, char **argv) {
         outputFile << "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" +
         std::to_string(iterations_used) + ";\n";
         outputFile.close();
-    } else {
-        msl::stopTiming();
     }
     msl::terminateSkeletons();
 

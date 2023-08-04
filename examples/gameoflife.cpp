@@ -10,40 +10,19 @@
 
 #define EPSILON 0.03
 #define MAX_ITER 1000
-namespace msl {
+namespace msl::gameoflife {
 
-    namespace jacobi {
-
-        class GoLNeutralValueFunctor : public Functor2<int, int, int> {
-        public:
-            GoLNeutralValueFunctor(int default_neutral)
-                    : default_neutral(default_neutral) {}
-
-            MSL_USERFUNC
-            int operator()(int x, int y) const {
-                // All Border are not populated.
-                return default_neutral;
-            }
-
-        private:
-            int default_neutral = 0;
-        };
-
-/**
- * @brief Averages the top, bottom, left and right neighbours of a specific
- * element
- *
- */
+        /**
+         * @brief https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life
+         */
         class GoLFunctor
-                : public DMMapStencilFunctor<int, int, GoLNeutralValueFunctor> {
+                : public DMMapStencilFunctor<int, int> {
         public:
             GoLFunctor() : DMMapStencilFunctor(){}
-//
             MSL_USERFUNC
             int operator()(
                     int rowIndex, int colIndex, PLMatrix<int> *input, int ncol, int nrow) const {
                 int sum = 0;
-                // top broder must be 100;
 
                 sum += input->get(rowIndex-1, colIndex) + input->get(rowIndex-1, colIndex-1)+ input->get(rowIndex-1, colIndex+1)
                         + input->get(rowIndex+1, colIndex)+ input->get(rowIndex+1, colIndex-1)+ input->get(rowIndex+1, colIndex+1)
@@ -90,7 +69,6 @@ namespace msl {
 
         int run(int n, int m, int stencil_radius, int tile_width, int iterations, int iterations_used, char *file) {
             double start = MPI_Wtime();
-            GoLNeutralValueFunctor dead_nvf(0);
             Max max_functor;
 
             // mapStencil
@@ -120,24 +98,16 @@ namespace msl {
                 }
             }
             start = MPI_Wtime();
-            //data1.show("start");
-            while (iterations_used < 1) {
-                if (iterations_used % 50 == 0) {
-                    data1.mapStencilMM(data2, GoL, dead_nvf);
+            while (iterations_used < iterations) {
+                if (iterations_used % 2 == 0) {
+                    data1.mapStencilMM(data2, GoL, 0);
                 } else {
-                    if (iterations_used % 2 == 0) {
-                        data1.mapStencilMM(data2, GoL, dead_nvf);
-                    } else {
-                        data2.mapStencilMM(data1, GoL, dead_nvf);
-                    }
+                    data2.mapStencilMM(data1, GoL, 0);
                 }
                 iterations_used++;
             }
             data1.updateHost();
             data2.updateHost();
-
-            //data2.show();
-            //data1.show();
 
             end = MPI_Wtime();
             if (msl::isRootProcess()) {
@@ -151,8 +121,7 @@ namespace msl {
             return 0;
         }
 
-    } // namespace jacobi
-} // namespace msl
+    } // namespace msl
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
     int n = 100;
@@ -187,27 +156,18 @@ int main(int argc, char **argv) {
     msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
 
-    if (msl::isRootProcess()) {
-//        printf("%d; %d; %.2f; %d", n, nGPUs, msl::Muesli::cpu_fraction, msl::Muesli::num_runs);
-        //printf("Config:\tSize:%d; #GPU:%d; CPU perc:%.2f;", n, nGPUs, msl::Muesli::cpu_fraction);
-    }
     int iterations_used=0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        msl::jacobi::run(n, m, stencil_radius, tile_width, iterations, iterations_used, file);
-        //msl::splitTime(r);
+        msl::gameoflife::run(n, m, stencil_radius, tile_width, iterations, iterations_used, file);
     }
 
     if (file) {
-       // std::string id = "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" + std::to_string(iterations_used) +
-                         ";" + std::to_string(msl::Muesli::cpu_fraction * 100) + ";";
         std::ofstream outputFile;
         outputFile.open(file, std::ios_base::app);
         outputFile << "" + std::to_string(n) + ";" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" +
         std::to_string(iterations) << ";" << "\n";
         outputFile.close();
-       // msl::printTimeToFile(id.c_str(), file);
     } else {
-        //msl::stopTiming();
     }
     msl::terminateSkeletons();
     return 0;

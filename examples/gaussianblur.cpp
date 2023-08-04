@@ -23,13 +23,9 @@ int* input_image_int;
 char* input_image_char;
 bool ascii = false;
 
-namespace msl {
+namespace msl::gaussianblur {
 
-    namespace jacobi {
-
-
-        int readPGM(const std::string& filename, int& rows, int& cols, int& max_color)
-        {
+        int readPGM(const std::string& filename, int& rows, int& cols, int& max_color) {
             std::ifstream ifs(filename, std::ios::binary);
             if (!ifs) {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
@@ -74,8 +70,7 @@ namespace msl {
             return 0;
         }
 
-        int writePGM(const std::string& filename, int * out_image, int rows, int cols, int max_color)
-        {
+        int writePGM(const std::string& filename, int * out_image, int rows, int cols, int max_color) {
             std::ofstream ofs(filename, std::ios::binary);
             if (!ofs) {
                 std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
@@ -105,28 +100,11 @@ namespace msl {
             return 0;
         }
 
-        class GoLNeutralValueFunctor : public Functor2<int, int, int> {
-        public:
-            GoLNeutralValueFunctor(int default_neutral)
-                    : default_neutral(default_neutral) {}
-
-            MSL_USERFUNC
-            int operator()(int x, int y) const {
-                // All Border are not populated.
-                return default_neutral;
-            }
-
-        private:
-            int default_neutral = 0;
-        };
-
 /**
- * @brief Averages the top, bottom, left and right neighbours of a specific
- * element
- *
+ * @brief Averages the top, bottom, left and right borders of a specific element
  */
         class Gaussian
-                : public DMMapStencilFunctor<int, int, GoLNeutralValueFunctor> {
+                : public DMMapStencilFunctor<int, int> {
         public:
             Gaussian(int getkw): DMMapStencilFunctor() {
                 kw = getkw;
@@ -198,15 +176,13 @@ namespace msl {
             Gaussian g(kw);
             g.setStencilSize(kw/2);
             g.setSharedMemory(false);
-            GoLNeutralValueFunctor dead_nvf(0);
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
-                gs_image.mapStencilMM(gs_image_result, g, dead_nvf);
-                gs_image_result.mapStencilMM(gs_image, g, dead_nvf);
+                gs_image.mapStencilMM(gs_image_result, g, 0);
+                gs_image_result.mapStencilMM(gs_image, g, 0);
             }
             float milliseconds = 0;
 
-            //double end = MPI_Wtime();
 
             if (msl::isRootProcess()) {
                 if (output) {
@@ -219,13 +195,11 @@ namespace msl {
             gs_image.updateHost();
             int *b;
             b = gs_image_result.gather();
-            //double end_end = MPI_Wtime();
 	        if (msl::isRootProcess()) {
                 if (output) {
 		            std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
                     outputFile << "" << (milliseconds/1000) << ";\n";
-                    //printf("%.2f;", milliseconds/1000);
                     outputFile.close();
                     writePGM(out_file, b, rows, cols, max_color);
                 }
@@ -233,8 +207,7 @@ namespace msl {
 	        return milliseconds;
         }
 
-    } // namespace jacobi
-} // namespace msl
+    } // namespace msl
 
 int init(int row, int col)
 {
@@ -242,8 +215,6 @@ int init(int row, int col)
     else return input_image_char[row*cols+col];
 }
 int main(int argc, char **argv) {
-    //std::cout << "\n\n************* Starting the Gaussian Blur *************\n ";
-
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
     int nRuns = 1;
@@ -287,7 +258,6 @@ int main(int argc, char **argv) {
         out_file.insert(pos, ss.str());
     } else {
         in_file = "Data/4096x3072pexels-sapir.pgm";
-        //in_file = "lena.pgm";
         std::stringstream oo;
         oo << "Data/Sapir_" << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "_" << shared <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.pgm";
         out_file = oo.str();
@@ -301,10 +271,9 @@ int main(int argc, char **argv) {
     msl::setDebug(true);
     msl::setReps(reps);
     int iterations_used=0;
-    printf("%d;%d;%d;", tile_width,kw,reps);
     float miliseconds = 0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        miliseconds = msl::jacobi::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
+        miliseconds = msl::gaussianblur::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
     }
     printf("%.2f;", (miliseconds/1000/msl::Muesli::num_runs));
 
