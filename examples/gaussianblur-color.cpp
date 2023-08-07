@@ -158,14 +158,13 @@ namespace msl::gaussiancolor {
         };
 
 
-        float testGaussian(std::string in_file, std::string out_file, int kw, bool output, int tile_width, int iterations, int iterations_used, std::string file, bool shared_mem) {
+        float testGaussian(std::string in_file, const std::string& out_file, int kw, bool output, int iterations, const std::string& file) {
             int max_color;
             double start_init = MPI_Wtime();
 
             // Read image
             readPPM(in_file, rows, cols, max_color);
             array<int, 3> emptycolorpoint = {0,0,0};
-            printf("Nrows %d ncol %d\n", rows, cols);
             DM<arraycolorpoint> gs_image(rows, cols, emptycolorpoint);
             DM<arraycolorpoint> gs_image_result(rows, cols, emptycolorpoint);
             if (ascii) {
@@ -187,6 +186,7 @@ namespace msl::gaussiancolor {
             Gaussian g(5);
             g.setStencilSize(kw/2);
             g.setSharedMemory(false);
+
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
                 gs_image.mapStencilMM(gs_image_result, g, {0,0,0});
@@ -206,7 +206,8 @@ namespace msl::gaussiancolor {
 
             arraycolorpoint *b;
             b = gs_image.gather();
-	        if (msl::isRootProcess()) {
+
+            if (msl::isRootProcess()) {
                 if (output) {
 		            std::ofstream outputFile;
                     outputFile.open(file, std::ios_base::app);
@@ -220,8 +221,19 @@ namespace msl::gaussiancolor {
 } // namespace msl
 
 
-int main(int argc, char **argv) {
+void exitWithUsage() {
+    std::cerr << "Usage: ./gaussianblur [-g <nGPUs>] [-r <runs>] [-n <iterations>] [-i <importFiles>] [-t <number of threads>] [-k <radius of blur>]" << std::endl;
+    exit(-1);
+}
 
+int getIntArg(char* s, bool allowZero = false) {
+    int i = std::atoi(s);
+    if (i < 0 || (i == 0 && !allowZero)) {
+        exitWithUsage();
+    }
+    return i;
+}
+int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
     int nRuns = 1;
@@ -230,69 +242,69 @@ int main(int argc, char **argv) {
     msl::Muesli::cpu_fraction = 0.0;
     //bool warmup = false;
     bool output = true;
-    bool shared_mem = false;
     int kw = 10;
     int reps = 1;
-
-    std::string in_file, out_file, file, nextfile;
-    file = "result_lena.csv";
-
-    if (argc >= 7) {
-        nGPUs = atoi(argv[1]);
-        nRuns = atoi(argv[2]);
-        msl::Muesli::cpu_fraction = atof(argv[3]);
-        if (msl::Muesli::cpu_fraction > 1) {
-            msl::Muesli::cpu_fraction = 1;
+    msl::setReps(1);
+    std::string importFile, out_file, file, nextfile;
+    file = "result.csv";
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] != '-') {
+            exitWithUsage();
         }
-        tile_width = atoi(argv[4]);
-        iterations = atoi(argv[5]);
-        if (atoi(argv[6]) == 1) {
-            shared_mem = false;
-        }
-        kw = atoi(argv[7]);
-        if (argc >= 9) {
-            reps = atoi(argv[8]);
+        switch (argv[i++][1]) {
+            case 'g':
+                msl::setNumGpus(getIntArg(argv[i]));
+                break;
+            case 'r':
+                nRuns = getIntArg(argv[i], true);
+                break;
+            case 'n':
+                iterations = getIntArg(argv[i], true);
+                break;
+            case 'i':
+                importFile = std::string(argv[i]);
+                break;
+            case 't':
+                msl::setNumThreads(getIntArg(argv[i]));
+                break;
+            case 'k':
+                kw = getIntArg(argv[i]);
+                break;
+            default:
+                exitWithUsage();
         }
     }
-    std::string shared = shared_mem ? "SM" : "GM";
 
-    if (argc == 10) {
-        in_file = argv[9];
-        size_t pos = in_file.find(".");
-        out_file = in_file;
+    if (!importFile.empty()) {
+        importFile = argv[9];
+        size_t pos = importFile.find(".");
+        out_file = importFile;
         std::stringstream ss;
-        ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations << "_" << shared <<  "_" << tile_width << "_" << kw << "_gaussian";
+        ss << "_" << msl::Muesli::num_total_procs << "_" << nGPUs << "_" << iterations <<  "_" << tile_width << "_" << kw << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        in_file = "Data/PokemonTT.ppm";
-        //in_file = "lena.pgm";
+        importFile = "Data/4096x3072pexels.ppm";
         std::stringstream oo;
-        oo << "Data/PTT_" << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "_" << shared <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.ppm";
+        oo << "Data/P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations <<  "TW_" << tile_width << "R_" << reps << "KW_" << kw <<"_gaussian.ppm";
         out_file = oo.str();
     }
     output = true;
     std::stringstream ss;
     ss << file << "_" << iterations;
     nextfile = ss.str();
-    msl::setNumGpus(nGPUs);
     msl::setNumRuns(nRuns);
     msl::setDebug(true);
-    msl::setReps(reps);
-    int iterations_used=0;
-    printf("%d;%d;%d;", tile_width,kw,reps);
     float miliseconds = 0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
-        miliseconds = msl::gaussiancolor::testGaussian(in_file, out_file, kw, output, tile_width, iterations, iterations_used, nextfile, shared_mem);
+        miliseconds = msl::gaussiancolor::testGaussian(importFile, out_file, kw, output, iterations, nextfile);
     }
-    printf("%.2f;", (miliseconds/1000/msl::Muesli::num_runs));
+    printf("%.2f;", (miliseconds/1000/(float)msl::Muesli::num_runs));
 
-    if (output) {
-        std::ofstream outputFile;
-        outputFile.open(nextfile, std::ios_base::app);
-        outputFile << "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) +";" + std::to_string(iterations) + ";" +
-        std::to_string(iterations_used) + ";\n";
-        outputFile.close();
-    }
+    std::ofstream outputFile;
+    outputFile.open(nextfile, std::ios_base::app);
+    outputFile << "" + std::to_string(nGPUs) + ";" + std::to_string(tile_width) + ";" +
+        std::to_string(iterations) + ";" + ";\n";
+    outputFile.close();
     msl::terminateSkeletons();
 
     return 0;

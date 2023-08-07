@@ -145,7 +145,7 @@ __global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
 template <typename T, typename R, typename F>
 __global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
                                             F func, int i);
-template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss, T neutral_value);
+template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss, T neutral_value, int coloffset);
 template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols);
 template <typename T> __global__ void printGPU(T *destination, int size);
 template <typename T, typename R, typename F>
@@ -153,7 +153,7 @@ __global__ void mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol
                                    F func, int tile_width, int reps, int kw);
 template <typename T, typename R, typename F>
 __global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
-                                        F func, int i, int reps, int tile_width);
+                                        F func, int reps, int tile_width);
     } // namespace detail
 } // namespace msl
 

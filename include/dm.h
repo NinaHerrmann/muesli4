@@ -214,7 +214,7 @@ public:
     */
     template<typename MapStencilFunctor>
     void initializeConstantsStencil(int &stencil_size, int &padding_size, int &col_size, int &kw, MapStencilFunctor &f,
-                                                    int &rowoffset, int &coloffset);
+                                                    int &rowoffset, int &coloffset, std::vector<T *> d_dm);
     /**
     * @brief Methods to communicate borders between nodes.
     *
@@ -228,7 +228,7 @@ public:
     */
     void communicateNodeBorders(int col_size, int stencil_size, int padding_size);
 /**
-    * @brief TODO Non-inplace variant of the mapStencil skeleton.
+    * @brief TODO inplace variant of the mapStencil skeleton.
     *
     * @tparam R type of the resulting matrix
     * @tparam the dm to save the result

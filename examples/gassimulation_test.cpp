@@ -47,9 +47,13 @@ const int FLAG_KEEP_VELOCITY = 1 << 1;
 #ifdef __CUDACC__
 #define MSL_MANAGED __managed__
 #define MSL_CONSTANT __constant__
+#define POW(a, b)      powf(a, b)
+#define EXP(a)      exp(a)
 #else
 #define MSL_MANAGED
 #define MSL_CONSTANT
+#define POW(a, b)      std::pow(a, b)
+#define EXP(a)      std::exp(a)
 #endif
 
 typedef struct {
@@ -171,24 +175,39 @@ namespace msl::gassimulation {
         vec3f v = p == 0 ? vp : vp * (1 / p);
 
         for (size_t i = 0; i < Q; i++) {
+
             cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
         }
         return cell;
     }
 
     class Initialize : public Functor4<int, int, int, cell_t, cell_t> {
+
     public:
+        Initialize(int sizex, int sizey, int sizez) : Functor4(){
+            this->sizex = sizex;
+            this->sizey = sizey;
+            this->sizez = sizez;
+        }
+
         MSL_USERFUNC cell_t operator()(int x, int y, int z, cell_t c) const override {
             for (int i = 0; i < Q; i++) {
-                c[i] = feq(i, 1.f, {.1f, 0, 0});
+                // feq(size_t i, float p, const vec3f& v
+                float wi = wis[i];
+                float cw = cellwidth;
+                vec3f v = {.1f, 0, 0};
+                float dot = offsets[i] * cw * v;
+                c[i] = wi *  1.f * (1 + (1 / (cw * cw)) * (3 * dot + (9 / (2 * cw * cw)) * dot * dot - (3.f / 2) * (v * v)));
             }
 
-            if (x <= 1 || y <= 1 || z <= 1 || x >= size.x - 2 || y >= size.y - 2 || z >= size.z - 2 ||
-                std::pow(x - 50, 2) + std::pow(y - 50, 2) + std::pow(z - 8, 2) <= 225) {
+            if (x <= 1 || y <= 1 || z <= 1 || x >= sizex - 2 || y >= sizey - 2 || z >= sizez - 2
+                 || POW(x - 50, 2) + POW(y - 50, 2) + POW(z - 8, 2) <= 225) {
+                if (POW((int)x - 50, 2) + POW((int)y - 50, 2) + POW((int)z - 8, 2) <= 225) {printf("N;");}
+
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
                 parts->exponent = 255;
-                if (x <= 1 || x >= size.x - 2 || y <= 1 || y >= size.y - 2 || z <= 1 || z >= size.z - 2) {
+                if (x <= 1 || x >= sizex - 1 || y <= 1 || y >= sizey - 1 || z <= 1 || z >= sizez - 1) {
                     parts->mantissa = 1 << 22 | FLAG_KEEP_VELOCITY;
                 } else {
                     parts->mantissa = 1 << 22 | FLAG_OBSTACLE;
@@ -196,6 +215,10 @@ namespace msl::gassimulation {
             }
             return c;
         }
+    private:
+        int sizex, sizey, sizez;
+        const int FLAG_OBSTACLE = 1 << 0;
+        const int FLAG_KEEP_VELOCITY = 1 << 1;
     };
 
     void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile) {
@@ -205,7 +228,7 @@ namespace msl::gassimulation {
         DC<cell_t> dc(size.x, size.y, size.z);
 
         if (importFile.empty()) {
-            Initialize initialize;
+            Initialize initialize(size.x, size.y, size.z);
             dc.mapIndexInPlace(initialize);
         } else {
             std::ifstream infile(importFile, std::ios_base::binary);
@@ -240,23 +263,33 @@ namespace msl::gassimulation {
         double totalkerneltime = 0.0;
         double time = MPI_Wtime();
 
-        for (int i = 0; i < iterations; i++) {
+        for (int i = 0; i < iterations/2; i++) {
             dcp1->mapStencil<update>(*dcp2, 1, {});
-            std::swap(dcp1, dcp2);
+            dcp2->mapStencil<update>(*dcp1, 1, {});
         }
         double endTime = MPI_Wtime();
 
-        totaltime += time-endTime;
+        totaltime += endTime-time;
+        totaltime += endTime-time;
 
         if (msl::isRootProcess()) {
             std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";" << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totaltime << ";" << totalkerneltime << std::endl;
         }
-
+        dcp1->updateHost();
+        cell_t * gather = dcp1->gather();
+        //dcp1->show();
         if (!exportFile.empty()) {
-            dcp1->updateHost();
-            std::ofstream outfile(exportFile, std::ios_base::binary);
-            outfile.write((char*) dcp1->localPartition, dcp1->getSize() * sizeof(cell_t));
-            outfile.close();
+            FILE *file = fopen(exportFile.c_str(), "w"); // append file or create a file if it does not exist
+            for (int x = 0; x < size.x*size.y*size.z; x++) {
+                cell_t zelle = gather[x];
+                for(size_t j = 0; j < Q; j++) {
+                    fprintf(file, "%.4f;", zelle[j]); // write
+                }
+                fprintf(file, "\n"); // write
+            }
+            fprintf(file, "\n"); // write
+            fclose(file);        // close file
+            printf("File created. Located in the project folder.\n", "");
         }
     }
 }
@@ -313,6 +346,7 @@ int main(int argc, char** argv){
     }
 
     msl::setNumRuns(1);
+    msl::setDebug(false);
     msl::initSkeletons(argc, argv);
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;

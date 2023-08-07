@@ -127,7 +127,7 @@ msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> 
 
 template<typename T, typename R, typename F>
 __global__ void
-msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> *pl, F func, int i, int reps,
+msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> *pl, F func, int reps,
                                      int tile_width) {
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -183,11 +183,13 @@ msl::detail::mapStencilMMKernel(R *out, int gpuRows, int gpuCols, int firstCol, 
 }
 
 template<typename T>
-__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss, T neutral_value) {
+__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss, T neutral_value, int coloffset) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    for (int i = 0; i < ss; i++) {
-        A[(paddingoffset + (x * gpuCols)) + i] = neutral_value;
-        A[(paddingoffset + (x * gpuCols)) - i + 1] = neutral_value;
+    if (x < coloffset) {
+        for (int i = 0; i < ss; i++) {
+            A[(paddingoffset + (x * gpuCols)) + i] = neutral_value;
+            A[(paddingoffset + (x * gpuCols)) - i + 1] = neutral_value;
+        }
     }
 }
 
