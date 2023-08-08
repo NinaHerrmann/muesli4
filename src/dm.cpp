@@ -868,8 +868,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                          (this->plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             smem_size = ((divisor * tile_width) + kw) * (tile_width + kw) * sizeof(T);
 
-            //printf("\n %d %d; %d %d \n\n", dimBlock.x, dimBlock.y, dimGrid.x, dimGrid.y);
-            //printf("Rows %d Cols %d %d %d %d %d \n", this->plans[i].gpuRows, this->plans[i].gpuCols, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
             detail::mapStencilMMKernel<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
                     result.getExecPlans()[i].d_Data, this->plans[i].gpuRows, this->plans[i].gpuCols,
                     this->plans[i].firstCol, this->plans[i].firstRow, vplm[i],
@@ -987,9 +985,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
             // If it was not initialized we need to fill all corners --> end of bottom
             this->padding_stencil[padding_size + stencil_size + col_size + i] = neutral_value;
         }
-        // overall rows and column, gpu rows and columns
     }
-    printf("%d, %d, %d, %d, %d, %d, %d\n\n", nrow, ncol, this->plans[0].gpuRows, this->plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
     msl::PLMatrix<T> plm(nrow, ncol, this->plans[0].gpuRows, this->plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
 
     int tile_width = f.getTileWidth();
@@ -1018,7 +1014,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
         if (i == (Muesli::num_gpus - 1)) {
             cudaMemcpy(d_dm[i] + padding_size, this->padding_stencil + padding_size,
                        padding_size * sizeof(T), cudaMemcpyHostToDevice);
-
         } else {
             // If it is not the last GPU the bottom is always copied from the following GPU
             cudaMemcpy(d_dm[i] + padding_size + stencil_size, this->plans[i + 1].d_Data,
@@ -1153,33 +1148,31 @@ void msl::DM<T>::mapStencilMM(msl::DM<T2> &result, MapStencilFunctor &f, Neutral
 template<typename T>
 template<typename T2, typename MapStencilFunctor>
 void msl::DM<T>::mapStencilMM(msl::DM<T2> &result, MapStencilFunctor &f, T neutral_value) {
-int rowoffset, coloffset, stencil_size, padding_size, col_size, kw;
-    // Not necessary when default functor.
-    d_dm = std::vector<T *>(Muesli::num_gpus);
-
+    int rowoffset, coloffset, stencil_size, padding_size, col_size, kw;
+    if (!this->plinitMM) {
+        d_dm = std::vector<T *>(Muesli::num_gpus);
+    }
     this->initializeConstantsStencil(stencil_size, padding_size, col_size, kw, f, rowoffset, coloffset, d_dm);
 
     if (!this->plinitMM) {
-        for (int j = 0; j < Muesli::num_gpus; j++) {
-
-            // In case it is the last GPU and the last process take the nvf
-            if (j == (Muesli::num_gpus - 1) && Muesli::proc_id == (Muesli::num_local_procs - 1)) {
+        // In case it is the last GPU and the last process take the nvf
+        if (Muesli::proc_id == (Muesli::num_local_procs - 1)) {
 #pragma omp parallel for
-                for (int i = padding_size; i < padding_size * 2; i++) {
-                    int offset = (nlocalRows + stencil_size) * ncol + ((padding_size * 2) - i);
-                    this->padding_stencil[i] = neutral_value;
-                }
+            for (int i = padding_size; i < padding_size * 2; i++) {
+                int offset = (nlocalRows + stencil_size) * ncol + ((padding_size * 2) - i);
+                this->padding_stencil[i] = neutral_value;
             }
-            // In case it is the first GPU and the first process take the nvf
-            if (j == 0 && Muesli::proc_id == 0) {
+        }
+        // In case it is the first GPU and the first process take the nvf
+        if (Muesli::proc_id == 0) {
 #pragma omp parallel for
-                for (int i = 0; i < padding_size; i++) {
-                    this->padding_stencil[i] = neutral_value;
-                }
+            for (int i = 0; i < padding_size; i++) {
+                this->padding_stencil[i] = neutral_value;
             }
         }
     }
     this->communicateNodeBorders(col_size, stencil_size, padding_size);
+
 
     if (!this->plinitMM) {
         for (int i = 0; i < stencil_size; i++) {
@@ -1194,23 +1187,19 @@ int rowoffset, coloffset, stencil_size, padding_size, col_size, kw;
         }
     }
     // overall rows and column, gpu rows and columns
-    msl::PLMatrix<T> plm(nrow, ncol, this->plans[0].gpuRows, this->plans[0].gpuCols, stencil_size, f.getTileWidth(), Muesli::reps);
-
-    int tile_width = f.getTileWidth();
+    msl::PLMatrix<T> plm(nrow, ncol, nrow, ncol, stencil_size, 1, Muesli::reps);
 
     float milliseconds = 0.0;
-    if (this->nCPU != 0) {
-        if (Muesli::debug)
-            printf("Calculating %d Elements on the CPU ... \n", this->nCPU);
+    plm.setcurrentDataCPU(this->padding_stencil, this->localPartition, this->padding_stencil);
 
 #pragma omp parallel for
-        for (int i = 0; i < this->nCPU; i++) {
-            // TODO CPU PLM Matrix
-            //result.setLocal(i, f(i / ncol + firstRow, i % ncol, this->localPartition, nrow, ncol));
-        }
-    }}
+    for (int i = 0; i < this->nCPU; i++) {
+        // TODO CPU PLM Matrix
+        result.setLocal(i, f(i / ncol + firstRow, i % ncol, &plm, nrow, ncol));
+    }
+    printf("Print after stencil...\n\n");
+}
 #endif
-
 
 // **************************************************************************************************
 // ************************************ "Communication" *********************************************

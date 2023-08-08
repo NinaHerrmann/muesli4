@@ -134,9 +134,7 @@ namespace msl {
         MSL_USERFUNC
         T get(int row, int col) {
 #ifdef __CUDA_ARCH__
-// GPU version: read from shared memory.
                 if (padding_size + ((row) * (cols+kw)) + col + stencil_size >= 0 && padding_size + ((row) * (cols+kw)) + col + stencil_size < ((cols+kw)*(rows+kw))){
-
                     return current_data[padding_size + ((row) * (cols+kw)) + col + stencil_size];
                 } else {// SHOULD not happen
                     return neutral_value;
@@ -145,12 +143,19 @@ namespace msl {
 #else
             // CPU version: read from main memory.
 	  // bounds check
-    if ((col < 0) || (col >= m)) {
+        if (row > 0 && row < rows && col > 0 && col < cols) {
+          return current_data[((row) * col) + col];
+        }
+
+        return neutral_value;
+
+       /*         if ((col < 0) || (col >= m)) {
       // out of bounds -> return neutral value
       return neutral_value;
     } else { // in bounds -> return desired value
-      return current_data[(row-firstRow+stencil_size)*cols + col];
-    }
+        printf("Get %d ... \n", (row-firstRow+stencil_size)*cols + col);
+        return current_data[(row-firstRow+stencil_size)*cols + col];
+    }*/
 #endif
         }
 
@@ -223,6 +228,13 @@ namespace msl {
             return current_data;
         }
         MSL_USERFUNC
+        void setcurrentDataCPU(T* topdata, T* data, T* bottomdata){
+            memcpy(this->current_data, topdata, padding_size * sizeof(T));
+            memcpy(this->current_data + padding_size, data, rows*cols * sizeof(T));
+            memcpy(this->current_data + padding_size, bottomdata, padding_size * sizeof(T));
+        }
+
+        MSL_USERFUNC
         void printfcoutner(){
             printf("Coutner %d;", counter);
         }
@@ -230,7 +242,7 @@ namespace msl {
     private:
         std::vector<T*> ptrs_data;// ptrs_top, ptrs_bottom;
         typename std::vector<T*>::iterator it_data;// it_top, it_bottom;
-        T* current_data, *shared_data; //*data_bottom, *data_top;
+        T* current_data, *shared_data;//, *data_bottom, *data_top;
         int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, new_tile_width, inside_elements, reps,padding_size, kw, smoffset, init;
         T neutral_value;
         bool shared_mem;
