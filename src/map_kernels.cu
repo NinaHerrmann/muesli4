@@ -183,14 +183,14 @@ msl::detail::mapStencilMMKernel(R *out, int gpuRows, int gpuCols, int firstCol, 
 }
 
 template<typename T>
-__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss, T neutral_value, int coloffset) {
+__global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int ss, T neutral_value) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x < coloffset) {
+    //if (x < coloffset) {
         for (int i = 0; i < ss; i++) {
             A[(paddingoffset + (x * gpuCols)) + i] = neutral_value;
             A[(paddingoffset + (x * gpuCols)) - i + 1] = neutral_value;
         }
-    }
+    //}
 }
 
 template<typename T>

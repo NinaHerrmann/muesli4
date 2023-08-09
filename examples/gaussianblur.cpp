@@ -8,6 +8,7 @@
 #include "dm.h"
 #include "muesli.h"
 #include <iostream>
+#include <fstream>
 
 #define EPSILON 0.03
 #define MAX_ITER 1
@@ -88,7 +89,10 @@ namespace msl::gaussianblur {
         // Write image
         for (int x = 0; x < rows; x++) {
             for (int y = 0; y < cols; y++) {
+                // more efficient way (buffering? to write to file).
                 auto intensity = static_cast<unsigned char> (out_image[x * cols + y]);
+                // ofs.write(&out_image, sizeof(int));
+
                 ofs << out_image[x * cols + y] << std::endl;
             }
         }
@@ -180,6 +184,7 @@ namespace msl::gaussianblur {
             gs_image.mapStencilMM(gs_image_result, g, 0);
             gs_image_result.mapStencilMM(gs_image, g, 0);
         }
+        printf("Finished Stencil start writing ... This might take some time as it is sequential ... \n");
         double milliseconds = msl::stopTiming();
 
         if (msl::isRootProcess()) {

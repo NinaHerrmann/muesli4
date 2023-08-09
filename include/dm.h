@@ -142,7 +142,14 @@ public:
      * \brief Destructor.
      */
     ~DM();
-
+    /**
+     * \brief Sets the element at the given global index \em globalIndex to the
+     *        given value \em v, with 0 <= globalIndex < size.
+     *
+     * @param globalIndex The global index.
+     * @param v The new value.
+     */
+    void setPointer(const T * pointer);
 //#pragma endregion
 
     //

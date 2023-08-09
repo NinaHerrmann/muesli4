@@ -389,10 +389,20 @@ void msl::DS<T>::set(int globalIndex, const T &v) {
     if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
         setLocal(globalIndex - firstIndex, v);
     } else {
-        printf("Set global - ");
-        throws(detail::NotYetImplementedException());
+        //printf("Set global - ");
+        //throws(detail::NotYetImplementedException());
         // TODO: Set global
     }
+}
+template<typename T>
+void msl::DS<T>::set(const T * pointer) {
+    memcpy(localPartition, pointer, nLocal * sizeof(T));
+    printf("0 - %d; 1 - %d, 2 - %d\n", localPartition[0][0], localPartition[0][1], localPartition[0][2]);
+#ifdef __CUDACC__
+    updateDevice();
+    cudaDeviceSynchronize();
+#endif
+    cpuMemoryInSync = false;
 }
 
 template<typename T>

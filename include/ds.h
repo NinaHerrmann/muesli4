@@ -382,6 +382,14 @@ namespace msl {
          * @param v The new value.
          */
         void set(int globalIndex, const T &v);
+/**
+         * \brief Sets the element at the given global index \em globalIndex to the
+         *        given value \em v, with 0 <= globalIndex < size.
+         *
+         * @param globalIndex The global index.
+         * @param v The new value.
+         */
+        void set(const T * pointer);
 
         /**
          * \brief Returns the global size of the ds.

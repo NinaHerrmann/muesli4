@@ -158,7 +158,7 @@ namespace msl::gaussiancolor {
         };
 
 
-        float testGaussian(std::string in_file, const std::string& out_file, int kw, bool output, int iterations, const std::string& file) {
+        double testGaussian(std::string in_file, const std::string& out_file, int kw, bool output, int iterations, const std::string& file) {
             int max_color;
             double start_init = MPI_Wtime();
 
@@ -186,13 +186,14 @@ namespace msl::gaussiancolor {
             Gaussian g(5);
             g.setStencilSize(kw/2);
             g.setSharedMemory(false);
+            msl::startTiming();
 
             for (int run = 0; run < iterations; ++run) {
                 // Create distributed matrix to store the grey scale image.
                 gs_image.mapStencilMM(gs_image_result, g, {0,0,0});
                 gs_image_result.mapStencilMM(gs_image, g, {0,0,0});
             }
-            float milliseconds = 0;
+            double milliseconds = msl::stopTiming();
 
             if (msl::isRootProcess()) {
                 if (output) {
@@ -206,7 +207,6 @@ namespace msl::gaussiancolor {
 
             arraycolorpoint *b;
             b = gs_image.gather();
-
             if (msl::isRootProcess()) {
                 if (output) {
 		            std::ofstream outputFile;
@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
     int nGPUs = 1;
     int nRuns = 1;
-    int iterations = MAX_ITER;
+    int iterations = 1;
     int tile_width = msl::DEFAULT_TILE_WIDTH;
     msl::Muesli::cpu_fraction = 0.0;
     //bool warmup = false;
@@ -294,11 +294,11 @@ int main(int argc, char **argv) {
     nextfile = ss.str();
     msl::setNumRuns(nRuns);
     msl::setDebug(true);
-    float miliseconds = 0;
+    double miliseconds = 0;
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
         miliseconds = msl::gaussiancolor::testGaussian(importFile, out_file, kw, output, iterations, nextfile);
     }
-    printf("%.2f;", (miliseconds/1000/(float)msl::Muesli::num_runs));
+    printf("Milliseconds: %.4f;", (miliseconds/1000/(float)msl::Muesli::num_runs));
 
     std::ofstream outputFile;
     outputFile.open(nextfile, std::ios_base::app);
