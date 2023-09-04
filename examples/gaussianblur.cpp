@@ -35,12 +35,11 @@ namespace msl::gaussianblur {
         // Read magic number.
         std::string magic;
         getline(ifs, magic);
-        if (magic == "P5") { // P5 is magic number for pgm binary format.
-            if (magic == "P2") { // P2 is magic number for pgm ascii format.
-                std::cout << "Error: Image not in PGM format!" << std::endl;
-                return 1;
-            }
-            ascii = true;
+
+        if (!(magic == "P2")) {
+            // P5/ P2 are used for binary or ascii encoding of portable grey maps.
+            std::cout << "Error: Image not in P2 PGM format!" << std::endl;
+            exit(1);
         }
 
         // Skip comments
@@ -58,21 +57,15 @@ namespace msl::gaussianblur {
             std::cout << "\nmax_color: " << max_color << "\t cols: " << cols << "\t rows: " << rows << std::endl;
         }
         // Read image.
-        if (ascii) {
-            input_image_int = new int[rows * cols];
-            int i = 0;
-            while (getline(ifs, inputLine)) {
-                std::stringstream(inputLine) >> input_image_int[i++];
-            }
-        } else {
-            input_image_char = new char[rows * cols];
-            ifs.read(input_image_char, rows * cols);
+        input_image_int = new int[rows * cols];
+        int i = 0;
+        while (getline(ifs, inputLine)) {
+            std::stringstream(inputLine) >> input_image_int[i++];
         }
-
         return 0;
     }
 
-    int writePGM(const std::string &filename, const int *out_image, int rows, int cols, int max_color) {
+    int writePGM(const std::string &filename, int *out_image, int rows, int cols, int max_color) {
         std::ofstream ofs(filename, std::ios::binary);
         if (!ofs) {
             std::cout << "Error: Cannot open image file " << filename << "!" << std::endl;
@@ -86,16 +79,16 @@ namespace msl::gaussianblur {
         // Write image header
         ofs << "P2\n" << cols << " " << rows << " " << std::endl << max_color << std::endl;
 
+        msl::startTiming();
         // Write image
         for (int x = 0; x < rows; x++) {
             for (int y = 0; y < cols; y++) {
-                // more efficient way (buffering? to write to file).
-                auto intensity = static_cast<unsigned char> (out_image[x * cols + y]);
-                // ofs.write(&out_image, sizeof(int));
-
                 ofs << out_image[x * cols + y] << std::endl;
             }
         }
+        ofs.close();
+        double milliseconds = msl::stopTiming();
+        std::cout << std::endl << "Writing took: " << milliseconds << "!" << std::endl;
 
         if (ofs.fail()) {
             std::cout << "Cannot write file " << filename << "!" << std::endl;
@@ -128,7 +121,6 @@ namespace msl::gaussianblur {
                     sum += input->get(row + r - offset, col + c - offset) *
                            EXP(-0.5 * (POW((r - mean) / sigma, 2.0) + POW((c - mean) / sigma, 2.0))) /
                            (2 * M_PI * sigma * sigma);
-
                 }
             }
             return (int) (sum / weight);
@@ -142,37 +134,19 @@ namespace msl::gaussianblur {
     double testGaussian(const std::string &in_file, const std::string &out_file, int kw, int iterations,
                        const std::string &file) {
         int max_color;
-        double start_init = MPI_Wtime();
 
         // Read image
+        msl::startTiming();
         readPGM(in_file, rows, cols, max_color);
         DM<int> gs_image(rows, cols, 0, true);
         DM<int> gs_image_result(rows, cols, 0, true);
-        if (ascii) {
-            for (int i = 0; i < rows * cols; i++) {
-                gs_image.set(i, input_image_int[i]);
-            }
-        } else {
-            input_image_int = new int[rows * cols];
-            for (int i = 0; i < rows * cols; i++) {
-                input_image_int[i] = ((int) input_image_char[i]);
-                if ((int) input_image_char[i] < 0) {
-                    std::cout << "string:    " << input_image_char[i] << std::endl;
-                }
-            }
-            for (int i = 0; i < rows * cols; i++) {
-                gs_image.set(i, input_image_int[i]);
-            }
-            gs_image.updateDevice();
+#pragma omp parallel for default(none) shared(gs_image, rows, cols, input_image_int)
+        for (int i = 0; i < rows * cols; i++) {
+            gs_image.set(i, input_image_int[i]);
         }
 
-        double end_init = MPI_Wtime();
-        if (msl::isRootProcess()) {
-            std::ofstream outputFile;
-            outputFile.open(file, std::ios_base::app);
-            outputFile << "" << (end_init - start_init) << ";";
-            outputFile.close();
-        }
+        double readingmilliseconds = msl::stopTiming();
+        std::cout << std::endl << "Reading took: " << readingmilliseconds << std::endl;
 
         Gaussian g(kw);
         g.setStencilSize(kw / 2);
@@ -182,31 +156,20 @@ namespace msl::gaussianblur {
         for (int run = 0; run < iterations; ++run) {
             // Create distributed matrix to store the grey scale image.
             gs_image.mapStencilMM(gs_image_result, g, 0);
+            printf("-------------------------Got here !-------------------------\n");
             gs_image_result.mapStencilMM(gs_image, g, 0);
         }
-        printf("Finished Stencil start writing ... This might take some time as it is sequential ... \n");
-        double milliseconds = msl::stopTiming();
+        printf("Finished Stencil start writing ... \nThis might take some time as it is sequential ... \n\n");
+        double executionmilliseconds = msl::stopTiming();
 
-        if (msl::isRootProcess()) {
-            std::ofstream outputFile;
-            outputFile.open(file, std::ios_base::app);
-            outputFile << "" << (milliseconds / 1000) << ";";
-            outputFile.close();
-        }
         gs_image_result.updateHost();
         int *b;
         b = gs_image_result.gather();
         if (msl::isRootProcess()) {
-            std::ofstream outputFile;
-            outputFile.open(file, std::ios_base::app);
-            outputFile << "" << (milliseconds / 1000) << ";\n";
-            outputFile.close();
             writePGM(out_file, b, rows, cols, max_color);
-
         }
-        return milliseconds;
+        return executionmilliseconds;
     }
-
 } // namespace msl
 
 int init(int row, int col) {
@@ -248,7 +211,7 @@ int main(int argc, char **argv) {
         }
         switch (argv[i++][1]) {
             case 'g':
-                msl::setNumGpus(getIntArg(argv[i]));
+                msl::setNumGpus(getIntArg(argv[i], true));
                 break;
             case 'r':
                 nRuns = getIntArg(argv[i], true);
@@ -278,7 +241,7 @@ int main(int argc, char **argv) {
            << "_gaussian";
         out_file.insert(pos, ss.str());
     } else {
-        importFile = "Data/4096x3072pexels-sapir.pgm";
+        importFile = "Data/1280squareballoons.pgm";
         std::stringstream oo;
         oo << "Data/Sapir_" << "P_" << msl::Muesli::num_total_procs << "GPU_" << nGPUs << "I_" << iterations << "R_"
         << reps << "KW_" << kw << "_gaussian.pgm";
@@ -295,7 +258,7 @@ int main(int argc, char **argv) {
     for (int r = 0; r < msl::Muesli::num_runs; ++r) {
         milliseconds = msl::gaussianblur::testGaussian(importFile, out_file, kw, iterations, nextfile);
     }
-    printf("%.2f;", (milliseconds / 1000 / (float) msl::Muesli::num_runs));
+    printf("\nTotal Time for Execution %.4f;\n", (milliseconds / (float) msl::Muesli::num_runs));
 
     std::ofstream outputFile;
     outputFile.open(nextfile, std::ios_base::app);

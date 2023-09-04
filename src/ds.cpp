@@ -386,12 +386,9 @@ void msl::DS<T>::setLocal(int localIndex, const T &v) {
 
 template<typename T>
 void msl::DS<T>::set(int globalIndex, const T &v) {
+    // TODO highly inefficient - pointer per process?
     if ((globalIndex >= firstIndex) && (globalIndex < firstIndex + nLocal)) {
         setLocal(globalIndex - firstIndex, v);
-    } else {
-        //printf("Set global - ");
-        //throws(detail::NotYetImplementedException());
-        // TODO: Set global
     }
 }
 template<typename T>
@@ -688,7 +685,7 @@ msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
 #pragma omp parallel for
 #endif
     for (int k = 0; k < nCPU; k++) {
-        setLocal(k, f(cPartition[k], bPartition[k]));
+        this->localPartition[k] = f(cPartition[k], bPartition[k]);
     }
     // check for errors during gpu computation
     msl::syncStreams();

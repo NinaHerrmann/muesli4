@@ -168,9 +168,11 @@ namespace msl::gaussiancolor {
             DM<arraycolorpoint> gs_image(rows, cols, emptycolorpoint);
             DM<arraycolorpoint> gs_image_result(rows, cols, emptycolorpoint);
             if (ascii) {
+#pragma omp parallel for default(none) shared(gs_image, rows, cols, input_image_int)
                 for (int i = 0; i < rows*cols; i++) {
-                    gs_image.set(i,input_image_int[i]);
+                    gs_image.set(i, input_image_int[i]);
                 }
+                //gs_image.setPointer(input_image_int);
             }
 
             double end_init = MPI_Wtime();

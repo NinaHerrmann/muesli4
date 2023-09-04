@@ -34,7 +34,7 @@
 #include <iostream>
 
 template<typename T>
-msl::DA<T>::DA(){}
+msl::DA<T>::DA() {}
 
 // constructor creates a non-initialized DA
 template<typename T>
@@ -170,14 +170,21 @@ inline void msl::DA<T>::permutePartition(Functor &f) {
 template<typename T>
 template<typename MapIndexFunctor>
 void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
-   // this->updateDevice();
+    // this->updateDevice();
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
       cudaSetDevice(i);
+
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
+      printf("first %d \n", this->plans[i].first);
       detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
           this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
+
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     }
 #endif
     // calculate offsets for indices
@@ -197,7 +204,7 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
 
 template<typename T>
 template<typename MapIndexFunctor>
-void msl::DA<T>::mapIndex(MapIndexFunctor &f, DA<T> &b) {
+void msl::DA<T>::mapIndex(MapIndexFunctor &f, DA <T> &b) {
 
     this->updateDevice();
 
@@ -213,7 +220,7 @@ void msl::DA<T>::mapIndex(MapIndexFunctor &f, DA<T> &b) {
     }
 #endif
     // map on CPU cores
-    T * blocalPartition = b.getLocalPartition();
+    T *blocalPartition = b.getLocalPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -272,7 +279,8 @@ void msl::DA<T>::zipIndexInPlace(msl::DA<T2> &b, ZipIndexFunctor &f) {
 
 template<typename T>
 template<typename T2, typename ZipIndexFunctor>
-void msl::DA<T>::zipIndex(msl::DA<T2> &b, msl::DA<T2> &c, ZipIndexFunctor &f) {  // should be return type DA<R>; debug type error!
+void msl::DA<T>::zipIndex(msl::DA<T2> &b, msl::DA<T2> &c,
+                          ZipIndexFunctor &f) {  // should be return type DA<R>; debug type error!
     this->updateDevice();
 
     // zip on GPUs

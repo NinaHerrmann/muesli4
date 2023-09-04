@@ -575,7 +575,6 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
 #ifdef __CUDACC__
     this->updateDevice();
     syncPLCubes(stencilSize, neutralValue);
-    msl::syncStreams();
     syncPLCubesMPI(stencilSize);
 
     for (int i = 0; i < this->ng; i++) {
@@ -585,7 +584,6 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
         PLCube<T> cube = this->plCubes[i];
         detail::mapStencilKernelDC<T, f><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, cube, result.plans[i].size);
     }
-    msl::syncStreams();
     result.setCpuMemoryInSync(false);
 #else
     syncPLCubes(stencilSize, neutralValue);

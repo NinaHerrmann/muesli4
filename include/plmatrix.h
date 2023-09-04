@@ -65,9 +65,8 @@ namespace msl {
         /**
          * \brief Destructor.
          */
-        ~PLMatrix()
-        {
-        }
+        ~PLMatrix() override
+        = default;
 
         /**
          * \brief Adds another pointer to data residing in GPU or in CPU memory,
@@ -86,44 +85,13 @@ namespace msl {
          * \brief Updates the pointer to point to current data (that resides in one of
          *        the GPUs memory or in CPU memory, respectively.
          */
-        void update() {
+        void update() override {
             if (++it_data == ptrs_data.end()) {
                 it_data = ptrs_data.begin();
             }
             current_data = *it_data;
         }
 
-        /**
-         * \brief Returns the number of rows of the padded local matrix.
-         *
-         * @return The number of rows of the padded local matrix.
-         */
-        MSL_USERFUNC
-        int getRows() const
-        {
-            return rows;
-        }
-
-        /**
-         * \brief Returns the number of columns of the padded local matrix.
-         *
-         * @return The number of columns of the padded local matrix.
-         */
-        MSL_USERFUNC
-        int getCols() const
-        {
-            return cols;
-        }
-        /**
-       * \brief Returns the number of columns of the padded local matrix.
-       *
-       * @return The number of columns of the padded local matrix.
-       */
-        MSL_USERFUNC
-        int getStencil() const
-        {
-            return stencil_size;
-        }
 
         /**
          * \brief Returns the element at the given global indices (\em row, \em col).
@@ -141,12 +109,10 @@ namespace msl {
                 }
                 // TODO If GPU first GPU top nvf
 #else
-            // CPU version: read from main memory.
-	  // bounds check
-        if (row > 0 && row < rows && col > 0 && col < cols) {
-          return current_data[((row) * col) + col];
+        // CPU version: read from main memory.
+        if (col >= 0 && col <= cols) {
+            return current_data[((row+(kw/2)) * cols) + col];
         }
-
         return neutral_value;
 
        /*         if ((col < 0) || (col >= m)) {
@@ -159,25 +125,6 @@ namespace msl {
 #endif
         }
 
-        MSL_USERFUNC
-        void printcurrentData(int row){
-            for (int i = 0; i < row * cols; i++){
-                if(i%cols == 0){
-                    printf("\n");
-                }
-                printf("%d;", current_data[i]);
-            }
-        }
-
-        MSL_USERFUNC
-        void printSM(int size) const {
-#ifdef __CUDA_ARCH__
-            for (int i = 1; i < size; i++) {
-                if (i%new_tile_width==0){printf("\n%d:",i/new_tile_width);}
-                printf("%d;", shared_data[i]);
-            }
-#endif
-        }
 #ifdef __CUDACC__
         MSL_USERFUNC
         void readToGlobalMemory() {
@@ -189,7 +136,6 @@ namespace msl {
          */
         __device__
         void readToSM(int r, int c, int reps) {
-            //T *smem = SharedMemory<T>();
             extern __shared__ int s[];
             shared_data = SharedMemory<T>();
             int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -223,21 +169,12 @@ namespace msl {
         {
             firstRowGPU = fr;
         }
-        MSL_USERFUNC
-        T* getcurrentData(){
-            return current_data;
-        }
-        MSL_USERFUNC
-        void setcurrentDataCPU(T* topdata, T* data, T* bottomdata){
-            memcpy(this->current_data, topdata, padding_size * sizeof(T));
-            memcpy(this->current_data + padding_size, data, rows*cols * sizeof(T));
-            memcpy(this->current_data + padding_size, bottomdata, padding_size * sizeof(T));
-        }
 
         MSL_USERFUNC
-        void printfcoutner(){
-            printf("Coutner %d;", counter);
+        void setcurrentDataCPU(T* alldata){
+            this->current_data = alldata;
         }
+
 
     private:
         std::vector<T*> ptrs_data;// ptrs_top, ptrs_bottom;
@@ -245,8 +182,8 @@ namespace msl {
         T* current_data, *shared_data;//, *data_bottom, *data_top;
         int n, m, rows, cols, stencil_size, firstRow, firstRowGPU, tile_width, new_tile_width, inside_elements, reps,padding_size, kw, smoffset, init;
         T neutral_value;
-        bool shared_mem;
-        int counter;
+        bool shared_mem{};
+        int counter{};
     };
 
 }

@@ -369,12 +369,12 @@ public:
         }
         for (int i = 1; i < this->ng; i++) {
             size_t bottomPaddingSize = plCubes[i - 1].getBottomPaddingElements() * sizeof(T);
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     plCubes[i - 1].bottomPadding, plCubes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice, Muesli::streams[i - 1]
             ));
 
             size_t topPaddingSize = plCubes[i].getTopPaddingElements() * sizeof(T);
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     plCubes[i].topPadding, plCubes[i - 1].data + (this->plans[i - 1].size - plCubes[i].getTopPaddingElements()), topPaddingSize,
                     cudaMemcpyDeviceToDevice, Muesli::streams[i]
             ));
@@ -389,7 +389,7 @@ public:
         int topPaddingElements = topPaddingSize / sizeof(T);
 
         if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     this->localPartition + (this->nLocal - topPaddingElements),
                     plCubes[lastgpu].data + (this->plans[lastgpu].size - topPaddingElements),
                     topPaddingSize,
@@ -397,7 +397,7 @@ public:
             ));
         }
         if (msl::Muesli::proc_id > 0) {
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     this->localPartition,
                     plCubes[firstgpu].data,
                     topPaddingSize,
@@ -411,7 +411,7 @@ public:
         int lastgpu = this->ng - 1;
         int firstgpu = 0;
         if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     plCubes[lastgpu].bottomPadding,
                     nodeBottomPadding,
                     topPaddingSize,
@@ -419,7 +419,7 @@ public:
             ));
         }
         if (msl::Muesli::proc_id > 0) {
-            gpuErrchk(cudaMemcpyAsync(
+            (cudaMemcpyAsync(
                     plCubes[firstgpu].topPadding,
                     nodeTopPadding,
                     topPaddingSize,

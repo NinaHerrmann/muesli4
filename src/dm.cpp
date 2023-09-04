@@ -626,47 +626,7 @@ void msl::DM<T>::initializeConstantsStencil(int &stencil_size, int &padding_size
 
 template<typename T>
 void msl::DM<T>::communicateNodeBorders(int col_size, int stencil_size, int padding_size){
-    MPI_Status stat;
-    MPI_Request req;
-    if (msl::Muesli::num_total_procs > 1) {
-        // updateDevice the data from the GPU which needs to be send to other process
-#ifdef __CUDAACC__
-        updateDeviceupperpart(col_size);
-        updateDevicelowerpart(col_size);
-#endif
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            T *buffer =this->localPartition + (nlocalRows - stencil_size) * ncol;
-            MSL_ISend(Muesli::proc_id + 1, buffer, req, col_size, msl::MYTAG);
-        }
 
-        // Blocking receive.
-        // If it is not the first process receive the bottom of the previous process and copy it to the top.
-        if (Muesli::proc_id > 0) {
-            MSL_Recv(Muesli::proc_id - 1, this->padding_stencil + (stencil_size), stat, col_size,
-                     msl::MYTAG);
-        }
-        // Wait for completion.
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            MPI_Wait(&req, &stat);
-        }
-        // Bottom up (send first stencil_rows to predecessor):
-        // Non-blocking send.
-        // If it is not the first process send top.
-        if (Muesli::proc_id > 0) {
-            MSL_ISend(Muesli::proc_id - 1,this->localPartition, req, col_size,
-                      msl::MYTAG);
-        }
-        // Blocking receive.
-        // If it is not the last process receive the top of the following process and copy it to the bottom.
-        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
-            T *buffer = this->padding_stencil + padding_size + (stencil_size);
-            MSL_Recv(Muesli::proc_id + 1, buffer, stat, col_size, msl::MYTAG);
-        }
-        // Wait for completion.
-        if (Muesli::proc_id > 0) {
-            MPI_Wait(&req, &stat);
-        }
-    }
 }
 #ifdef __CUDACC__
 
@@ -724,8 +684,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     int padding_size = (stencil_size * ncol) + (2 * stencil_size);
     int col_size = (stencil_size * ncol);
     int kw = 2 * stencil_size;
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
     if (!this->plinitMM) {
         // TODO bigger stencils than 1
         this->padding_stencil = new T[(padding_size) * 4];
@@ -741,8 +699,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
     int rowoffset = this->plans[0].gpuCols + (2*stencil_size);
     int coloffset = this->plans[0].gpuRows + (2*stencil_size);
     // Fill first and last GPU in total with NVF
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
     if (!this->plinitMM) {
         for (int j = 0; j < Muesli::num_gpus; j++) {
 
@@ -764,8 +720,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                     this->padding_stencil[i] =
                             neutral_value_functor(i / ncol - stencil_size, i % ncol);
                 }
-                cudaMemcpyAsync(d_dm[j], this->padding_stencil,
-                                padding_size * sizeof(T), cudaMemcpyHostToDevice, Muesli::streams[j]);
+                cudaMemcpyAsync(d_dm[j], this->padding_stencil, padding_size * sizeof(T), cudaMemcpyHostToDevice,
+                                Muesli::streams[j]);
                 dim3 fillthreads(Muesli::threads_per_block);
                 dim3 fillblocks((coloffset) / fillthreads.x);
                 // int paddingoffset, int gpuRows, int ss
@@ -777,7 +733,9 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 if (fillblocks.x == 0) {
                     fillblocks = 1;
                 }
-                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset, this->plans[j].gpuCols, stencil_size, neutral_value);
+                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset,
+                                                                                     this->plans[j].gpuCols, stencil_size,
+                                                                                     neutral_value, padding_size);
                 if (Muesli::debug) {
                     gpuErrchk(cudaPeekAtLastError());
                     gpuErrchk(cudaDeviceSynchronize());
@@ -973,8 +931,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
-            gpuErrchk(cudaPeekAtLastError());
-            gpuErrchk(cudaDeviceSynchronize());
         }
         if (!f.getSharedMemory()){
             //dim3 dimBlock(Muesli::threads_per_block);
@@ -983,8 +939,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 
             divisor = Muesli::reps;
 
-            gpuErrchk(cudaPeekAtLastError());
-            gpuErrchk(cudaDeviceSynchronize());
             dim3 dimGrid(((this->plans[i].gpuRows))/divisor,
                          (this->plans[i].gpuCols + dimBlock.y - 1) / dimBlock.y);
             detail::mapStencilGlobalMem_rep<<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(
@@ -993,8 +947,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
                 gpuErrchk(cudaPeekAtLastError());
                 gpuErrchk(cudaDeviceSynchronize());
             }
-            gpuErrchk(cudaPeekAtLastError());
-            gpuErrchk(cudaDeviceSynchronize());
         }
         cudaDeviceSynchronize();
     }
@@ -1030,6 +982,8 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
     int padding_size = (stencil_size * ncol) + (2 * stencil_size);
     int col_size = (stencil_size * ncol);
     int kw = 2 * stencil_size;
+    int withpaddingsizeof = (this->plans[0].gpuRows+kw) * (this->plans[0].gpuCols+kw) * sizeof(T);
+
     if (!this->plinitMM) {
         // TODO bigger stencils than 1
         this->padding_stencil = new T[(padding_size) * 4];
@@ -1039,7 +993,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
             (cudaMalloc(&d_dm[i], padding_size * 4 * sizeof(T)));
-            (cudaMalloc(&this->all_data[i], ((this->plans[i].gpuRows+kw) * (this->plans[i].gpuCols+kw)) * sizeof(T)));
+            cudaMalloc(&this->all_data[i], (withpaddingsizeof));
         }
     }
     int rowoffset = this->plans[0].gpuCols + (2*stencil_size);
@@ -1076,7 +1030,10 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
                 if (fillblocks.x == 0) {
                     fillblocks = 1;
                 }
-                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset, this->plans[j].gpuCols, stencil_size, neutral_value);
+                printf("rowoffset %d; stencil_size %d; withpaddingsizeof %d \n\n", rowoffset, stencil_size, withpaddingsizeof);
+                detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset,
+                                                                                     this->plans[j].gpuCols, stencil_size,
+                                                                                     neutral_value, withpaddingsizeof);
                 if (Muesli::debug) {
                     gpuErrchk(cudaPeekAtLastError());
                     gpuErrchk(cudaDeviceSynchronize());
@@ -1307,8 +1264,24 @@ void msl::DM<T>::mapStencilMM(msl::DM<T2> &result, MapStencilFunctor &f, T neutr
     if (!this->plinitMM) {
         d_dm = std::vector<T *>(Muesli::num_gpus);
     }
-    this->initializeConstantsStencil(stencil_size, padding_size, col_size, kw, f, rowoffset, coloffset, d_dm);
+    if (!rowComplete) {
+        std::cout << "The matrix must be distributed between nodes in full rows to "
+                     "use the map stencil skeleton\n";
+        fail_exit();
+    }
 
+    // Obtain stencil size.
+    stencil_size = f.getStencilSize();
+
+    padding_size = (stencil_size * ncol) + (2 * stencil_size);
+    col_size = (stencil_size * ncol);
+    kw = 2 * stencil_size;
+    if (!this->plinitMM) {
+        // TODO bigger stencils than 1
+        this->padding_stencil = new T[(padding_size) * 4];
+    }
+    rowoffset = this->plans[0].gpuCols + (2*stencil_size);
+    coloffset = this->plans[0].gpuRows + (2*stencil_size);
     if (!this->plinitMM) {
         // In case it is the last GPU and the last process take the nvf
         if (Muesli::proc_id == (Muesli::num_local_procs - 1)) {
@@ -1326,8 +1299,47 @@ void msl::DM<T>::mapStencilMM(msl::DM<T2> &result, MapStencilFunctor &f, T neutr
             }
         }
     }
-    this->communicateNodeBorders(col_size, stencil_size, padding_size);
+MPI_Status stat;
+    MPI_Request req;
+    if (msl::Muesli::num_total_procs > 1) {
+        // updateDevice the data from the GPU which needs to be send to other process
+#ifdef __CUDAACC__
+        updateDeviceupperpart(col_size);
+        updateDevicelowerpart(col_size);
+#endif
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer =this->localPartition + (nlocalRows - stencil_size) * ncol;
+            MSL_ISend(Muesli::proc_id + 1, buffer, req, col_size, msl::MYTAG);
+        }
 
+        // Blocking receive.
+        // If it is not the first process receive the bottom of the previous process and copy it to the top.
+        if (Muesli::proc_id > 0) {
+            MSL_Recv(Muesli::proc_id - 1, this->padding_stencil + (stencil_size), stat, col_size,
+                     msl::MYTAG);
+        }
+        // Wait for completion.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            MPI_Wait(&req, &stat);
+        }
+        // Bottom up (send first stencil_rows to predecessor):
+        // Non-blocking send.
+        // If it is not the first process send top.
+        if (Muesli::proc_id > 0) {
+            MSL_ISend(Muesli::proc_id - 1,this->localPartition, req, col_size,
+                      msl::MYTAG);
+        }
+        // Blocking receive.
+        // If it is not the last process receive the top of the following process and copy it to the bottom.
+        if (Muesli::proc_id < Muesli::num_local_procs - 1) {
+            T *buffer = this->padding_stencil + padding_size + (stencil_size);
+            MSL_Recv(Muesli::proc_id + 1, buffer, stat, col_size, msl::MYTAG);
+        }
+        // Wait for completion.
+        if (Muesli::proc_id > 0) {
+            MPI_Wait(&req, &stat);
+        }
+    }
 
     if (!this->plinitMM) {
         for (int i = 0; i < stencil_size; i++) {
@@ -1342,10 +1354,16 @@ void msl::DM<T>::mapStencilMM(msl::DM<T2> &result, MapStencilFunctor &f, T neutr
         }
     }
     // overall rows and column, gpu rows and columns
+    printf("ncol %d nrow %d stencil_size %d \n", nrow, ncol, stencil_size);
     msl::PLMatrix<T> plm(nrow, ncol, nrow, ncol, stencil_size, 1, Muesli::reps);
 
     float milliseconds = 0.0;
-    plm.setcurrentDataCPU(this->padding_stencil, this->localPartition, this->padding_stencil);
+    size_t withpaddingsizeof = (nrow+kw) * (ncol+kw) * sizeof(T);
+    T * alldata = (T *) malloc(withpaddingsizeof);
+    memcpy(alldata,  this->padding_stencil, (stencil_size * ncol) * sizeof(T));
+    memcpy(alldata + (stencil_size * ncol), this->localPartition, nrow*ncol * sizeof(T));
+    memcpy(alldata + (stencil_size * ncol) + (nrow*ncol),  this->padding_stencil, (stencil_size * ncol) * sizeof(T));
+    plm.setcurrentDataCPU(alldata);
 
 #pragma omp parallel for
     for (int i = 0; i < this->nCPU; i++) {

@@ -83,25 +83,26 @@ namespace msl::gassimulation {
     MSL_MANAGED float cellwidth = 1.0f;
 
     MSL_CONSTANT const array<vec3f, Q> offsets {
-        0, 0, 0,   // 0
-        -1, 0, 0,  // 1
-        1, 0, 0,   // 2
-        0, -1, 0,  // 3
-        0, 1, 0,   // 4
-        0, 0, -1,  // 5
-        0, 0, 1,   // 6
-        -1, -1, 0, // 7
-        -1, 1, 0,  // 8
-        1, -1, 0,  // 9
-        1, 1, 0,   // 10
-        -1, 0, -1, // 11
-        -1, 0, 1,  // 12
-        1, 0, -1,  // 13
-        1, 0, 1,   // 14
-        0, -1, -1, // 15
-        0, -1, 1,  // 16
-        0, 1, -1,  // 17
-        0, 1, 1,   // 18
+            {{0, 0, 0},
+             {-1, 0, 0},
+             {1, 0, 0},
+             {0, -1, 0},
+             {0, 1, 0},
+             {0, 0, -1},
+             {0, 0, 1},
+             {-1, -1, 0},
+             {-1, 1, 0},
+             {1, -1, 0},
+             {1, 1, 0},
+             {-1, 0, -1},
+             {-1, 0, 1},
+             {1, 0, -1},
+             {1, 0, 1},
+             {0, -1, -1},
+             {0, -1, 1},
+             {0, 1, -1},
+             {0, 1, 1}
+            }
     };
 
     MSL_CONSTANT const array<unsigned char, Q> opposite = {
@@ -175,7 +176,6 @@ namespace msl::gassimulation {
         vec3f v = p == 0 ? vp : vp * (1 / p);
 
         for (size_t i = 0; i < Q; i++) {
-
             cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
         }
         return cell;
@@ -202,7 +202,6 @@ namespace msl::gassimulation {
 
             if (x <= 1 || y <= 1 || z <= 1 || x >= sizex - 2 || y >= sizey - 2 || z >= sizez - 2
                  || POW(x - 50, 2) + POW(y - 50, 2) + POW(z - 8, 2) <= 225) {
-                if (POW((int)x - 50, 2) + POW((int)y - 50, 2) + POW((int)z - 8, 2) <= 225) {printf("N;");}
 
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
@@ -221,11 +220,12 @@ namespace msl::gassimulation {
         const int FLAG_KEEP_VELOCITY = 1 << 1;
     };
 
-    void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile) {
+    void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile, const std::string &runtimeFile) {
         size = dimension;
-        DA<int> process(5,5);
 
         DC<cell_t> dc(size.x, size.y, size.z);
+
+        double start = MPI_Wtime();
 
         if (importFile.empty()) {
             Initialize initialize(size.x, size.y, size.z);
@@ -261,35 +261,45 @@ namespace msl::gassimulation {
         DC<cell_t> *dcp2 = &dc2;
         double totaltime = 0.0;
         double totalkerneltime = 0.0;
-        double time = MPI_Wtime();
+        double startkernel = MPI_Wtime();
 
-        for (int i = 0; i < iterations/2; i++) {
+        for (int i = 0; i < iterations; i++) {
             dcp1->mapStencil<update>(*dcp2, 1, {});
             dcp2->mapStencil<update>(*dcp1, 1, {});
         }
         double endTime = MPI_Wtime();
 
-        totaltime += endTime-time;
-        totaltime += endTime-time;
+        totalkerneltime += endTime-startkernel;
+        totaltime += endTime-start;
 
         if (msl::isRootProcess()) {
-            std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";" << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totaltime << ";" << totalkerneltime << std::endl;
+            std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";"
+                      << msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus << ";" << totaltime << ";"
+                      << totalkerneltime << std::endl;
+            if (!runtimeFile.empty()) {
+                FILE *file = fopen(runtimeFile.c_str(), "w"); // append file or create a file if it does not exist
+                fprintf(file, "%d;%d;%d;%d;%d;%.4f;%.4f \n", size.x, iterations , msl::Muesli::num_total_procs, msl::Muesli::num_threads ,
+                        msl::Muesli::num_gpus , totaltime, totalkerneltime); // write
+                fclose(file);        // close file
+            }
         }
         dcp1->updateHost();
         cell_t * gather = dcp1->gather();
         //dcp1->show();
-        if (!exportFile.empty()) {
-            FILE *file = fopen(exportFile.c_str(), "w"); // append file or create a file if it does not exist
-            for (int x = 0; x < size.x*size.y*size.z; x++) {
-                cell_t zelle = gather[x];
-                for(size_t j = 0; j < Q; j++) {
-                    fprintf(file, "%.4f;", zelle[j]); // write
+        if (msl::isRootProcess()) {
+            if (!exportFile.empty()) {
+                FILE *file = fopen(exportFile.c_str(), "w"); // append file or create a file if it does not exist
+                for (int x = 0; x < size.x * size.y * size.z; x++) {
+                    cell_t zelle = gather[x];
+                    for (size_t j = 0; j < Q; j++) {
+                        fprintf(file, "%.4f;", zelle[j]); // write
+                    }
+                    fprintf(file, "\n"); // write
                 }
                 fprintf(file, "\n"); // write
+                fclose(file);        // close file
+                printf("File created. Located in the project folder.\n", "");
             }
-            fprintf(file, "\n"); // write
-            fclose(file);        // close file
-            printf("File created. Located in the project folder.\n", "");
         }
     }
 }
@@ -311,7 +321,7 @@ int main(int argc, char** argv){
     vec3<int> size {100, 100, 100};
     int gpus = 1;
     int iterations = 1;
-    std::string importFile, exportFile;
+    std::string importFile, exportFile, runtimeFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
             exitWithUsage();
@@ -337,6 +347,9 @@ int main(int argc, char** argv){
             case 'e':
                 exportFile = std::string(argv[i]);
                 break;
+            case 'r':
+                runtimeFile = std::string(argv[i]);
+                break;
             case 't':
                 msl::setNumThreads(getIntArg(argv[i]));
                 break;
@@ -350,7 +363,7 @@ int main(int argc, char** argv){
     msl::initSkeletons(argc, argv);
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
-    msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile);
+    msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile, runtimeFile);
     msl::terminateSkeletons();
     return EXIT_SUCCESS;
 }

@@ -294,18 +294,22 @@ endif (BUILD_GPU)
 ## use of glob is discouraged, so add each file separately
 ## names must be unique, folders are not considered
 set(EXAMPLE_SRCS
-        ${PROJECT_SOURCE_DIR}/examples/da_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
+        #${PROJECT_SOURCE_DIR}/examples/da_test.cpp
+        #${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
+        #${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
+        #${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
+        #${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
+        #${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
+        #${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
+        #${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
+        #${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
+        #${PROJECT_SOURCE_DIR}/examples/aco.cpp
+        #${PROJECT_SOURCE_DIR}/examples/minnested.cpp
         ${PROJECT_SOURCE_DIR}/examples/gassimulation_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
-        ${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
-        ${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
         ${PROJECT_SOURCE_DIR}/examples/meanblur2.cpp
-        ${PROJECT_SOURCE_DIR}/examples/piDA.cpp
+        ${PROJECT_SOURCE_DIR}/examples/meanblur8.cpp
+        ${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
+        #${PROJECT_SOURCE_DIR}/examples/piDA.cpp
         )
 
 foreach (example_src ${EXAMPLE_SRCS})
