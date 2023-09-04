@@ -311,15 +311,15 @@ set(EXAMPLE_SRCS
         ${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
         #${PROJECT_SOURCE_DIR}/examples/piDA.cpp
         )
-
 foreach (example_src ${EXAMPLE_SRCS})
 
   ### get name of current example
   get_filename_component(example_name ${example_src} NAME_WE)
-  if (NOT EXISTS "${PROJECT_SOURCE_DIR}/build/${example_name}")
-    file(MAKE_DIRECTORY ${directory} "${PROJECT_SOURCE_DIR}/build/${example_name}")
-  endif (NOT EXISTS "${PROJECT_SOURCE_DIR}/build/${example_name}")
-  set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build/${example_name}")
+  if (NOT EXISTS "${PROJECT_SOURCE_DIR}/${path}/${example_name}")
+    file(MAKE_DIRECTORY ${directory} "${PROJECT_SOURCE_DIR}/${path}/${example_name}")
+  endif (NOT EXISTS "${PROJECT_SOURCE_DIR}/${path}/${example_name}")
+  message(STATUS "${PROJECT_SOURCE_DIR}/${path}/${example_name}")  
+  set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/${path}/${example_name}")
 
   ### custom target to build all variants for one example
   add_custom_target(${example_name})
