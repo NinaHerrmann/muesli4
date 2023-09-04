@@ -321,6 +321,7 @@ int main(int argc, char** argv){
     vec3<int> size {100, 100, 100};
     int gpus = 1;
     int iterations = 1;
+    int runs = 1;
     std::string importFile, exportFile, runtimeFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
@@ -350,6 +351,9 @@ int main(int argc, char** argv){
             case 'r':
                 runtimeFile = std::string(argv[i]);
                 break;
+            case 'u':
+                runs = getIntArg(argv[i]);
+                break;
             case 't':
                 msl::setNumThreads(getIntArg(argv[i]));
                 break;
@@ -358,12 +362,13 @@ int main(int argc, char** argv){
         }
     }
 
-    msl::setNumRuns(1);
     msl::setDebug(false);
     msl::initSkeletons(argc, argv);
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
-    msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile, runtimeFile);
+    for (int i = 0; i < runs; i++) {
+        msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile, runtimeFile);
+    }
     msl::terminateSkeletons();
     return EXIT_SUCCESS;
 }
