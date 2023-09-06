@@ -129,7 +129,7 @@ if (BUILD_GPU)
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
 
-  set(GPU_COMPILER_OPTIONS "-arch=sm_86;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
+  set(GPU_COMPILER_OPTIONS "-arch=sm_75;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
   set(GPU_COMPILER_OPTIONS_DEBUG "-g;-G;-O0")
   set(GPU_COMPILER_OPTIONS_RELEASE "-O3")
   set(GPU_COMPILER_OPTIONS_MINSIZEREL "-O2")
@@ -360,7 +360,7 @@ foreach (example_src ${EXAMPLE_SRCS})
 
     ## link libs
     target_link_libraries(${example_name}_gpu ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${OpenMP_CXX_FLAGS} cuda)
-    set_property(TARGET ${example_name}_gpu PROPERTY CUDA_ARCHITECTURES 86)
+    set_property(TARGET ${example_name}_gpu PROPERTY CUDA_ARCHITECTURES 75)
 
     ### add to custom targets
     add_dependencies(${example_name} ${example_name}_gpu)
