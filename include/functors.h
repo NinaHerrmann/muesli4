@@ -44,6 +44,7 @@
 #include "argtype.h"
 #include "detail/functor_base.h"
 #include "plcube.h"
+#include "nplmatrix.h"
 
 namespace msl {
 
@@ -382,5 +383,7 @@ class DMNVFMapStencilFunctor : public detail::MatrixFunctorBase {
 
 template <typename T>
 using DCMapStencilFunctor = T(*)(const PLCube<T> &cs, int x, int y, int z);
+template <typename T>
+using NPLMMapStencilFunctor = T(*)(const NPLMatrix<T> &pl, int x, int y);
 
 } // namespace msl

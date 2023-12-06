@@ -102,26 +102,20 @@ namespace msl {
         MSL_USERFUNC
         T get(int row, int col) {
 #ifdef __CUDA_ARCH__
-                if (padding_size + ((row) * (cols+kw)) + col + stencil_size >= 0 && padding_size + ((row) * (cols+kw)) + col + stencil_size < ((cols+kw)*(rows+kw))){
-                    return current_data[padding_size + ((row) * (cols+kw)) + col + stencil_size];
-                } else {// SHOULD not happen
-                    return neutral_value;
-                }
-                // TODO If GPU first GPU top nvf
+            if (padding_size + ((row) * (cols+kw)) + col + stencil_size >= 0
+            && padding_size + ((row) * (cols+kw)) + col + stencil_size < ((cols+kw)*(rows+kw))
+            ){
+                return current_data[padding_size + ((row) * (cols+kw)) + col + stencil_size];
+            } else {
+                return neutral_value;
+            }
+            // TODO If GPU first GPU top nvf
 #else
         // CPU version: read from main memory.
         if (col >= 0 && col <= cols) {
             return current_data[((row+(kw/2)) * cols) + col];
         }
         return neutral_value;
-
-       /*         if ((col < 0) || (col >= m)) {
-      // out of bounds -> return neutral value
-      return neutral_value;
-    } else { // in bounds -> return desired value
-        printf("Get %d ... \n", (row-firstRow+stencil_size)*cols + col);
-        return current_data[(row-firstRow+stencil_size)*cols + col];
-    }*/
 #endif
         }
 

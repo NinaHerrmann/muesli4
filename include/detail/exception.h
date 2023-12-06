@@ -332,7 +332,7 @@ public:
 class DeviceOutOfMemory: public Exception
     {
     public:
-        std::string tostring() const
+        [[nodiscard]] std::string tostring() const override
         {
             return "Device is out of Memory";
         }
@@ -352,6 +352,7 @@ operator<<(std::ostream& os, const Exception& e)
 
   return os;
 }
+
     }
 
 }

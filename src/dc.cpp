@@ -588,21 +588,35 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
 #else
     syncPLCubes(stencilSize, neutralValue);
     syncPLCubesMPI(stencilSize);
-    if (msl::isRootProcess()){
-        Muesli::start_time = MPI_Wtime(); // For performance testing.
-    }
     const PLCube<T> cube = this->plCubes[0];
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    // DO we need local index?
+    // Do we need local index?
     for (int k = 0; k < this->nLocal; k++) {
         int l = (k + this->firstIndex) / (ncol*nrow);
         int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
         int i = (k + this->firstIndex) % ncol;
+        // i is the column index, j is the row index, l is the depth index.
         result.localPartition[k] = f(cube, i, j, l);
     }
 #endif
+}
+
+template<typename T>
+void msl::DC<T>::set( int col, int row, int ldepth, T value) const {
+    int index = (row * ncol) + col + (nrow * ncol * ldepth);
+    if ((index >= this->firstIndex) && (index < this->firstIndex + this->nLocal)) {
+        this->localPartition[index] = value;
+    }
+}
+template<typename T>
+T msl::DC<T>::get(int col, int row, int ldepth) const {
+    int index = (row * ncol) + col + (nrow * ncol * ldepth);
+    if ((index >= this->firstIndex) && (index < this->firstIndex + this->nLocal)) {
+        return this->localPartition[index];
+    }
+    return 0;
 }
 
 

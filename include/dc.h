@@ -299,6 +299,25 @@ public:
    */
     MSL_USERFUNC
     T get3D(int row, int col, int depth, int gpu) const;
+  /**
+   * \brief Returns the element at the given global index \em row, col.
+   *
+   * @param row The row index.
+   * @param col The col index.
+   * @param depth The z index.
+   * @return The element at the given global index.
+   */
+    MSL_USERFUNC
+    void set(int row, int col, int depth, T value) const;  /**
+   * \brief Returns the element at the given global index \em row, col.
+   *
+   * @param row The row index.
+   * @param col The col index.
+   * @param depth The z index.
+   * @return The element at the given global index.
+   */
+    MSL_USERFUNC
+    T get(int row, int col, int depth) const;
     /**
      * \brief Returns the element at the given row \em row and column \em column.
      *
@@ -506,16 +525,6 @@ public:
             printf("\n");
         }
     }
-
-  /**
-   * \brief Manually download the local partition from GPU memory.
-   */
-  //void downloadupperpart(int paddingsize);
-  /**
-   * \brief Manually download the local partition from GPU memory.
-   */
-  //void downloadlowerpart(int paddingsize);
-
   /**
    * \brief Prints the local partion of the root processor of the distributed
    * array to standard output. Optionally, the user may pass a description that

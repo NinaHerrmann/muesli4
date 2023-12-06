@@ -12,6 +12,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # config status messages
 message(STATUS "Host System: " ${CMAKE_HOST_SYSTEM})
+#  -ftree-vectorize
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize -funroll-loops -fopenmp")
 
 message(STATUS "compiler id: " ${CMAKE_CXX_COMPILER_ID})
 message(STATUS "compiler flags: " ${CMAKE_CXX_FLAGS})
@@ -38,6 +40,7 @@ message("Example build output directory: " ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL
 
 ### this is a cmake bug: MPI link flags are preceeded by two whitespaces, which leads to one leading whitespace, which is now an error according to policy CMP0004.
 string(STRIP "${MPI_CXX_LINK_FLAGS}" MPI_CXX_LINK_FLAGS)
+#set(MPI_CXX_COMPILE_FLAGS "${MPI_CXX_COMPILE_FLAGS} -march=native -ftree-vectorize -funroll-loops -mt_mpi ")
 
 message(STATUS "mpi compiler: " ${MPI_CXX_COMPILER})
 message(STATUS "mpi compile flags: " ${MPI_CXX_COMPILE_FLAGS})
@@ -131,7 +134,7 @@ if (BUILD_GPU)
 
   set(GPU_COMPILER_OPTIONS "-arch=sm_75;-std=c++11;--expt-extended-lambda") # C++11 lambdas are still experimental in CUDA 7.5. This flag may be removed with CUDA 8.0
   set(GPU_COMPILER_OPTIONS_DEBUG "-g;-G;-O0")
-  set(GPU_COMPILER_OPTIONS_RELEASE "-O3")
+  set(GPU_COMPILER_OPTIONS_RELEASE "-O3;-use_fast_math;-Xptxas -O3")
   set(GPU_COMPILER_OPTIONS_MINSIZEREL "-O2")
   set(GPU_COMPILER_OPTIONS_RELWITHDEBINFO "-g;-G;-O2")
 
@@ -300,15 +303,16 @@ set(EXAMPLE_SRCS
         #${PROJECT_SOURCE_DIR}/examples/dm_test.cpp
         #${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
         #${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
-        #${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
         #${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
         #${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
         #${PROJECT_SOURCE_DIR}/examples/aco.cpp
         #${PROJECT_SOURCE_DIR}/examples/minnested.cpp
-        ${PROJECT_SOURCE_DIR}/examples/gassimulation_test.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gassimulation.cpp
+        ${PROJECT_SOURCE_DIR}/examples/heatdiffusion.cpp
         ${PROJECT_SOURCE_DIR}/examples/meanblur2.cpp
-        ${PROJECT_SOURCE_DIR}/examples/meanblur8.cpp
-        ${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
+        #${PROJECT_SOURCE_DIR}/examples/meanblur8.cpp
+        #${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
         #${PROJECT_SOURCE_DIR}/examples/piDA.cpp
         )
 foreach (example_src ${EXAMPLE_SRCS})

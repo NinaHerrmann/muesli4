@@ -46,7 +46,7 @@ int msl::Muesli::num_threads;
 int msl::Muesli::num_runs;
 int msl::Muesli::num_gpus;
 int msl::Muesli::max_gpus;
-double msl::Muesli::cpu_fraction = 0.2; // fraction of each DA partition handled
+double msl::Muesli::cpu_fraction = 0.0; // fraction of each DA partition handled
 // by CPU cores (rather than GPUs)
 int msl::Muesli::elem_per_thread = 1;
 int msl::Muesli::threads_per_block;
@@ -76,11 +76,11 @@ void msl::initSkeletons(int argc, char **argv, bool debug) {
 
     int device_count = 0;
 #ifdef __CUDACC__
-    CUDA_CHECK_RETURN(cudaGetDeviceCount(&device_count));
+    (cudaGetDeviceCount(&device_count));
     Muesli::streams.resize(device_count);
     for (size_t i = 0; i < Muesli::streams.size(); i++) {
         cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaStreamCreate(&Muesli::streams[i]));
+        (cudaStreamCreate(&Muesli::streams[i]));
     }
 #endif
     Muesli::max_gpus = device_count;
@@ -103,9 +103,9 @@ void msl::initSkeletons(int argc, char **argv, bool debug) {
     setThreadsPerBlock(1024);    // default for one dimensional thread blocks
     setThreadsPerBlock(16, 16); // default for two dimensional thread blocks
 #ifdef MPI_VERSION
-    Muesli::start_time = MPI_Wtime();
+    //Muesli::start_time = MPI_Wtime();
 #else
-    Muesli::start_time = clock();
+    //Muesli::start_time = clock();
 #endif
 }
 
@@ -148,7 +148,7 @@ void msl::terminateSkeletons() {
 
 #ifdef _CUDACC__
     for (auto it = Muesli::streams.begin(); it != Muesli::streams.end(); ++it) {
-      CUDA_CHECK_RETURN(cudaStreamDestroy(*it));
+      (cudaStreamDestroy(*it));
     }
 #endif
 #ifdef MPI_VERSION
@@ -214,7 +214,7 @@ void msl::syncStreams() {
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
+        (cudaStreamSynchronize(Muesli::streams[i]));
     }
 #endif
 }

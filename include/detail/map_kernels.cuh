@@ -36,6 +36,7 @@
 #include "functors.h"
 #include "plcube.h"
 #include "plmatrix.h"
+#include "nplmatrix.h"
 
 // #include "plarray.h"
 
@@ -82,6 +83,7 @@ namespace msl {
         template<typename T, typename R, typename F>
         __global__ void mapIndexKernelDM(T *in, R *out, size_t size, size_t first, F func,
                                          int ncols);
+
         /**
         * \brief MapIndex function for DA. \em Calls Functor which has two Arguments: the index and the value at the index.
         *
@@ -123,7 +125,7 @@ namespace msl {
         __global__ void mapInPlaceKernelDC(T *inout, int gpuRows, int gpuCols,
                                            int gpuDepth, F func);
 
-        template <typename T, msl::DCMapStencilFunctor<T> f>
+        template<typename T, msl::DCMapStencilFunctor<T> f>
         __global__ void mapStencilKernelDC(T *out, const PLCube<T> in, unsigned int size) {
             int i = blockIdx.x * blockDim.x + threadIdx.x;
             if (i >= size) {
@@ -134,26 +136,47 @@ namespace msl {
             out[i] = v;
         }
 
-/*
-template <typename T, typename R, typename F, typename NeutralValueFunctor>
-__global__ void mapStencilKernel(R *out, GPUExecutionPlan<T> plan,
-                                 PLMatrix<T> *input,
-                                 F func, int tile_width, int tile_height, NeutralValueFunctor nv);
+        /**
+        * \brief MapStencil function for DM. \em Calls Functor which has three Arguments: the data structure to read and indices.
+        *
+        * @param inout Pointer to gpu memory of datastructure (DM) which provides the data to calcuate on.
+        * @param gpuRows Rows per GPU.
+        * @param gpuCols Cols per GPU.
+        * @param func functor to be called.
+        */
+        template<typename T, msl::NPLMMapStencilFunctor<T> f>
+        __global__ void mapStencilKernelDM(T *out, const NPLMatrix<T> in, unsigned int size) {
+            int i = blockIdx.x * blockDim.x + threadIdx.x;
+            if (i >= size) {
+                return;
+            }
+            int2 coords = in.indexToCoordinate(in.dataStartIndex + i);
+            T v = f(in, coords.x, coords.y);
+            out[i] = v;
+        }
 
-
-*/
-template <typename T, typename R, typename F>
-__global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
+        template<typename T, typename R, typename F>
+        __global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
                                             F func, int i);
-template <typename T> __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss, T neutral_value, int coloffset);
-template <typename T> __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols);
-template <typename T> __global__ void printGPU(T *destination, int size);
-template <typename T, typename R, typename F>
-__global__ void mapStencilMMKernel(R *out,int gpuRows, int gpuCols, int firstCol, int firstRow,  PLMatrix<T> *dm, T * current_data,
-                                   F func, int tile_width, int reps, int kw);
-template <typename T, typename R, typename F>
-__global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
-                                        F func, int reps, int tile_width);
+
+        template<typename T>
+        __global__ void fillsides(T *A, int paddingoffset, int gpuRows, int ss, T neutral_value, int coloffset);
+
+        template<typename T>
+        __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols);
+
+        template<typename T>
+        __global__ void printGPU(T *destination, int size, int col);
+
+        template<typename T, typename R, typename F>
+        __global__ void
+        mapStencilMMKernel(R *out, int gpuRows, int gpuCols, int firstCol, int firstRow, PLMatrix<T> *dm,
+                           T *current_data,
+                           F func, int tile_width, int reps, int kw);
+
+        template<typename T, typename R, typename F>
+        __global__ void mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,
+                                                F func, int reps, int tile_width);
     } // namespace detail
 } // namespace msl
 

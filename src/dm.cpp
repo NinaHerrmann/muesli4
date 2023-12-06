@@ -51,7 +51,7 @@ template<typename T>
 msl::DM<T>::DM(int row, int col, const T &v)
         : ncol(col), nrow(row), DS<T>(row*col, v) {
 
-    if (this->nLocal% ncol == 0) {
+    if (this->nLocal % ncol == 0) {
         rowComplete = true;
     } else {
         rowComplete = false;
@@ -241,7 +241,13 @@ T msl::DM<T>::get2D(int row, int col) const {
     int index = (row) * ncol + col;
     return this->get(index);
 }
-
+template<typename T>
+void msl::DM<T>::set2D(int row, int col, T value) {
+    int index = (row * ncol) + col;
+    if ((index >= this->firstIndex) && (index < this->firstIndex + this->nLocal)) {
+        this->localPartition[index] = value;
+    }
+}
 template<typename T>
 void msl::DM<T>::setPointer(const T * pointer) {
     memcpy(this->localPartition, pointer, this->nLocal * sizeof(T));
@@ -968,7 +974,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f,
 template<typename T>
 template<typename T2, typename MapStencilFunctor>
 void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_value) {
-    double t = MPI_Wtime();
 
     if (!rowComplete) {
         std::cout << "The matrix must be distributed between nodes in full rows to "
@@ -1030,7 +1035,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
                 if (fillblocks.x == 0) {
                     fillblocks = 1;
                 }
-                printf("rowoffset %d; stencil_size %d; withpaddingsizeof %d \n\n", rowoffset, stencil_size, withpaddingsizeof);
+                //printf("rowoffset %d; stencil_size %d; withpaddingsizeof %d \n\n", rowoffset, stencil_size, withpaddingsizeof);
                 detail::fillsides<<<fillblocks,fillthreads, 0, Muesli::streams[j]>>>(this->all_data[j], rowoffset,
                                                                                      this->plans[j].gpuCols, stencil_size,
                                                                                      neutral_value, withpaddingsizeof);
@@ -1157,11 +1162,14 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
         detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(this->all_data[i], this->plans[i].d_Data,
                 stencil_size * (this->plans[i].gpuCols + (2*stencil_size)),
                 this->plans[i].gpuCols, stencil_size, nrow, ncol);
+        // detail::printGPU<<<1, 1, 0, Muesli::streams[i]>>>(this->all_data[i], (this->plans[0].gpuRows+kw) * (this->plans[0].gpuCols+kw) , this->plans[i].gpuCols + kw);
+
         if (Muesli::debug) {
             gpuErrchk(cudaPeekAtLastError());
             gpuErrchk(cudaDeviceSynchronize());
         }
         plm.addDevicePtr(this->all_data[i]);
+
     }
     cudaDeviceSynchronize();
 
@@ -1241,7 +1249,6 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
     f.notify();
     if (this->nCPU != 0) {
         if (Muesli::debug)
-            printf("Calculating %d Elements on the CPU ... \n", this->nCPU);
 #pragma omp parallel for
         for (int i = 0; i < this->nCPU; i++) {
             // TODO CPU PLM Matrix
@@ -1574,5 +1581,38 @@ void msl::DM<T>::rotateCols(int a) {
     this->updateDevice() ;
 
 }
+
+template<typename T>
+template<msl::NPLMMapStencilFunctor<T> f>
+void msl::DM<T>::mapStencil(msl::DM<T> &result, size_t stencilSize, T neutralValue) {
+#ifdef __CUDACC__
+    this->updateDevice();
+    syncNPLMatrixes(stencilSize, neutralValue);
+    syncNPLMatrixesMPI(stencilSize);
+
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
+        NPLMatrix<T> matrix = this->nplMatrixes[i];
+        detail::mapStencilKernelDM<T, f><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, matrix, result.plans[i].size);
+    }
+    result.setCpuMemoryInSync(false);
+#else
+    syncNPLMatrixes(stencilSize, neutralValue);
+    syncNPLMatrixesMPI(stencilSize);
+    const NPLMatrix<T> matrix = this->nplMatrixes[0];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int k = 0; k < this->nLocal; k++) {
+        int i = (k + this->firstIndex) / ncol;
+        int j = (k + this->firstIndex) % ncol;
+        result.localPartition[k] = f(matrix, i, j);
+    }
+#endif
+}
+
+
 
 

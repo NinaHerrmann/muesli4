@@ -30,14 +30,11 @@ namespace msl::jacobi {
             // this should never be called if indexes don't represent border points
             return default_neutral;
         }
-
     private:
         // Global number of rows
         int glob_rows_;
-
         // Global number of columns
         int glob_cols_;
-
         float default_neutral = 75.0;
     };
 

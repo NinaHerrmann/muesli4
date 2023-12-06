@@ -195,11 +195,21 @@ __global__ void msl::detail::fillsides(T *A, int paddingoffset, int gpuCols, int
 template<typename T>
 __global__ void
 msl::detail::fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols) {
+    // Does not fill the sides correctly.
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-    if (x * y < ss + rows * cols) {
+    if (x * y < ss + rows * cols && y < (gpuCols + ss-1)) {
         destination[paddingoffset + ss + (x * (gpuCols + (2 * ss)) + y)] = source[(x * gpuCols) + y];
     }
 
+}
+template<typename T>
+__global__ void
+msl::detail::printGPU(T *data, int size, int col) {
+    for (int i = 0; i < size; i++) {
+        if (i % col == 0 && i != 0) {printf("\n");}
+
+        printf("%.2f;\t", data[i]);
+    }
 }
 

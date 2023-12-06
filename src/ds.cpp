@@ -370,11 +370,10 @@ T msl::DS<T>::operator[](int index) {
 // TODO:adjust to new structure
 template<typename T>
 void msl::DS<T>::setLocal(int localIndex, const T &v) {
-    if (localIndex < nCPU) {
-        localPartition[localIndex] = v;
-    } else if (localIndex >= nLocal) {
+    if (localIndex >= nLocal) {
         throws(detail::NonLocalAccessException());
     } else {
+        localPartition[localIndex] = v;
 #ifdef __CUDACC__
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
@@ -394,7 +393,6 @@ void msl::DS<T>::set(int globalIndex, const T &v) {
 template<typename T>
 void msl::DS<T>::set(const T * pointer) {
     memcpy(localPartition, pointer, nLocal * sizeof(T));
-    printf("0 - %d; 1 - %d, 2 - %d\n", localPartition[0][0], localPartition[0][1], localPartition[0][2]);
 #ifdef __CUDACC__
     updateDevice();
     cudaDeviceSynchronize();
@@ -408,17 +406,17 @@ GPUExecutionPlan<T> *msl::DS<T>::getExecPlans() {
 }
 
 template<typename T>
-void msl::DS<T>::updateDevice() {
+void msl::DS<T>::updateDevice(int forceupdate) {
     std::vector<T *> dev_pointers;
 #ifdef __CUDACC__
-    if (cpuMemoryInSync) {
+    if (cpuMemoryInSync || forceupdate) {
         for (int i = 0; i < ng; i++) {
             cudaSetDevice(i);
             // upload data to host
             (cudaMemcpyAsync(plans[i].d_Data, plans[i].h_Data,
-                                              plans[i].bytes,
-                                              cudaMemcpyHostToDevice,
-                                              Muesli::streams[i]));
+                             plans[i].bytes,
+                             cudaMemcpyHostToDevice,
+                             Muesli::streams[i]));
         }
 
         for (int i = 0; i < ng; i++) {
@@ -736,7 +734,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
             if (blocks[i] > maxBlocks) {
                 blocks[i] = maxBlocks;
             }
-            CUDA_CHECK_RETURN(cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
+            (cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
         }
 
         // fold on gpus: step 1
@@ -771,7 +769,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         // copy final sum from device to host
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
-            CUDA_CHECK_RETURN(cudaMemcpyAsync(&gpu_results[i],
+            (cudaMemcpyAsync(&gpu_results[i],
                                               d_odata[i],
                                               sizeof(T),
                                               cudaMemcpyDeviceToHost,
@@ -809,27 +807,27 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
                 cudaSetDevice(0);         // calculate local result on device 0
 
                 // upload data
-                CUDA_CHECK_RETURN(cudaMalloc((void **) &d_gpu_results, Muesli::num_gpus * sizeof(T)));
-                CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results,
+                (cudaMalloc((void **) &d_gpu_results, Muesli::num_gpus * sizeof(T)));
+                (cudaMemcpyAsync(d_gpu_results,
                                                   gpu_results,
                                                   Muesli::num_gpus * sizeof(T),
                                                   cudaMemcpyHostToDevice,
                                                   Muesli::streams[0]));
-                CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+                (cudaStreamSynchronize(Muesli::streams[0]));
 
                 // final (local) fold
                 detail::reduce<T, FoldFunctor>(Muesli::num_gpus, d_gpu_results, d_gpu_results, Muesli::num_gpus, 1, f,
                                                Muesli::streams[0], 0);
-                CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+                (cudaStreamSynchronize(Muesli::streams[0]));
 
                 // copy result from device to host
-                CUDA_CHECK_RETURN(cudaMemcpyAsync(&local_result,
+                (cudaMemcpyAsync(&local_result,
                                                   d_gpu_results,
                                                   sizeof(T),
                                                   cudaMemcpyDeviceToHost,
                                                   Muesli::streams[0]));
-                CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
-                CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+                (cudaStreamSynchronize(Muesli::streams[0]));
+                (cudaFree(d_gpu_results));
             } else {
                 local_result = gpu_results[0];
             }
@@ -840,8 +838,8 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
                 // calculate global result from local results
                 // upload data
-                CUDA_CHECK_RETURN(cudaMalloc((void **) &d_gpu_results, np * sizeof(T)));
-                CUDA_CHECK_RETURN(cudaMemcpyAsync(d_gpu_results,
+                (cudaMalloc((void **) &d_gpu_results, np * sizeof(T)));
+                (cudaMemcpyAsync(d_gpu_results,
                                                   local_results,
                                                   np * sizeof(T),
                                                   cudaMemcpyHostToDevice,
@@ -849,16 +847,16 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
                 // final fold
                 detail::reduce<T, FoldFunctor>(np, d_gpu_results, d_gpu_results, np, 1, f, Muesli::streams[0], 0);
-                CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
+                (cudaStreamSynchronize(Muesli::streams[0]));
 
                 // copy final result from device to host
-                CUDA_CHECK_RETURN(cudaMemcpyAsync(&final_result,
+                (cudaMemcpyAsync(&final_result,
                                                   d_gpu_results,
                                                   sizeof(T),
                                                   cudaMemcpyDeviceToHost,
                                                   Muesli::streams[0]));
-                CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[0]));
-                CUDA_CHECK_RETURN(cudaFree(d_gpu_results));
+                (cudaStreamSynchronize(Muesli::streams[0]));
+                (cudaFree(d_gpu_results));
             } else {
                 final_result = local_result;
             }
@@ -867,8 +865,8 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         // Cleanup
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
-            CUDA_CHECK_RETURN(cudaStreamSynchronize(Muesli::streams[i]));
-            CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
+            (cudaStreamSynchronize(Muesli::streams[i]));
+            (cudaFree(d_odata[i]));
         }
         delete[] gpu_results;
         delete[] d_odata;

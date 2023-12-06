@@ -174,7 +174,6 @@ namespace msl::gassimulation {
             vp += offsets[i] * cellwidth * cell[i];
         }
         vec3f v = p == 0 ? vp : vp * (1 / p);
-
         for (size_t i = 0; i < Q; i++) {
             cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
         }
@@ -192,7 +191,6 @@ namespace msl::gassimulation {
 
         MSL_USERFUNC cell_t operator()(int x, int y, int z, cell_t c) const override {
             for (int i = 0; i < Q; i++) {
-                // feq(size_t i, float p, const vec3f& v
                 float wi = wis[i];
                 float cw = cellwidth;
                 vec3f v = {.1f, 0, 0};
@@ -201,7 +199,7 @@ namespace msl::gassimulation {
             }
 
             if (x <= 1 || y <= 1 || z <= 1 || x >= sizex - 2 || y >= sizey - 2 || z >= sizez - 2
-                 || POW(x - 50, 2) + POW(y - 50, 2) + POW(z - 8, 2) <= 225) {
+                || POW(x - 50, 2) + POW(y - 50, 2) + POW(z - 8, 2) <= 225) {
 
                 auto* parts = (floatparts*) &c[0];
                 parts->sign = 0;
@@ -224,9 +222,7 @@ namespace msl::gassimulation {
         size = dimension;
 
         DC<cell_t> dc(size.x, size.y, size.z);
-
         double start = MPI_Wtime();
-
         if (importFile.empty()) {
             Initialize initialize(size.x, size.y, size.z);
             dc.mapIndexInPlace(initialize);
@@ -267,6 +263,7 @@ namespace msl::gassimulation {
             dcp1->mapStencil<update>(*dcp2, 1, {});
             dcp2->mapStencil<update>(*dcp1, 1, {});
         }
+
         double endTime = MPI_Wtime();
 
         totalkerneltime += endTime-startkernel;
@@ -278,7 +275,7 @@ namespace msl::gassimulation {
                       << totalkerneltime << std::endl;
             if (!runtimeFile.empty()) {
                 FILE *file = fopen(runtimeFile.c_str(), "w"); // append file or create a file if it does not exist
-                fprintf(file, "%d;%d;%d;%d;%d;%.4f;%.4f \n", size.x, iterations , msl::Muesli::num_total_procs, msl::Muesli::num_threads ,
+                fprintf(file, "%d;%d;%d;%d;%d;%.4f;%.4f", size.x, iterations , msl::Muesli::num_total_procs, msl::Muesli::num_threads ,
                         msl::Muesli::num_gpus , totaltime, totalkerneltime); // write
                 fclose(file);        // close file
             }

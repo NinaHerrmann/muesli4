@@ -489,7 +489,7 @@ namespace msl {
          * @return void
          */
 
-        void updateDevice();
+        void updateDevice(int forceupdate = 0);
 
         /**
          * \brief Manually download the local partition from GPU memory.

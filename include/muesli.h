@@ -165,7 +165,7 @@ public:
       threads_per_block; // for one dimensional GPU thread blocks (DArray)
   static int tpb_x;      // for two dimensional GPU thread blocks (DMatrix)
   static int tpb_y;      // for two dimensional GPU thread blocks (DMatrix)
-  static bool debug; // farm skeleton
+  static bool debug;
   static bool use_timer;           // use a timer?
 
   static int elem_per_thread;     // collect statistics of how many task were
