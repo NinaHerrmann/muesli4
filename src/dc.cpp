@@ -221,7 +221,7 @@ template<typename T>
 T msl::DC<T>::get3D(int row, int col, int ndepth, int gpu) const {
     int index = (row) * ncol + col + (nrow*ncol) * ndepth;
     T message;
-    return this->get(index);
+    return this->getLocal(index);
 }
 
 template<typename T>

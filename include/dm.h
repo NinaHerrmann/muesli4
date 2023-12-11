@@ -35,7 +35,7 @@
 #include <type_traits>
 #include "ds.h"
 #include "da.h"
-
+#include <cstring>
 #ifndef MUESLI_DM_H
 #define MUESLI_DM_H
 
