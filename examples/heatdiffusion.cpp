@@ -38,7 +38,7 @@ namespace msl::heatdiffusion {
 
         double init = MPI_Wtime();
         double timeinit = init-timeStart;
-#pragma omp parallel for
+#pragma omp parallel for default(none) shared(dm,size)
         for (size_t i = 0; i < size; ++i) {
             dm.set2D(i, 0, 2);
             dm.set2D(i, size-1, 2);
@@ -91,26 +91,26 @@ namespace msl::heatdiffusion {
         exit(0);
     }
 
-    void heat_3D(int size, int iterations, int output) {
-        double timeStart = MPI_Wtime();
+    void heat_3D(int size, int iterations, int output, int argc, char *argv[]) {
+       double timeStart = MPI_Wtime();
+       msl::initSkeletons(argc, argv);
+       DC<float> dc(size, size, size, 0, false);
+       DC<float> dc_copy(size, size, size, 0, false);
 
-        DC<float> dc(size, size, size, 0, false);
-        DC<float> dc_copy(size, size, size, 0, false);
+       double init = MPI_Wtime();
+       double timeinit = init-timeStart;
+#pragma omp parallel for default(none) shared(dc,size)
+       for (size_t i = 0; i < size; ++i) {
+           for (size_t j = 0; j < size; ++j) {
+               dc.set(0, i, j, 1);
+               dc.set(size-1, i, j, 5);
+               dc.set(i, 0, j, 2);
+               dc.set(i, size-1, j, 2);
+           }
+       }
+       dc.updateDevice(1);
 
-        double init = MPI_Wtime();
-        double timeinit = init-timeStart;
-#pragma omp parallel for
-        for (size_t i = 0; i < size; ++i) {
-            for (size_t j = 0; j < size; ++j) {
-                dc.set(0, i, j, 1);
-                dc.set(size-1, i, j, 5);
-                dc.set(i, 0, j, 2);
-                dc.set(i, size-1, j, 2);
-            }
-        }
-        dc.updateDevice(1);
-
-        double fill = MPI_Wtime();
+       double fill = MPI_Wtime();
         double timefill = fill-init;
 
         DC<float> *dcp1 = &dc;
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
 #endif
 #if ENABLE_3D_EXAMPLE
         if (dim == 3) {
-            msl::heatdiffusion::heat_3D(size, iterations, output);
+            msl::heatdiffusion::heat_3D(size, iterations, output, argc, argv);
         }
 #endif
     }
