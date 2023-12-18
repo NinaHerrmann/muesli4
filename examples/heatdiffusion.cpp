@@ -7,6 +7,52 @@
 #define ENABLE_3D_EXAMPLE 1
 
 namespace msl::heatdiffusion {
+    class Initialize_2D : public Functor3<int, int, float, float> {
+    public:
+        Initialize_2D(int rows, int cols) : Functor3() {
+            this->rows = rows;
+            this->cols = cols;
+        }
+
+        MSL_USERFUNC float operator()(int x, int y, float c) const override {
+            float value = 0;
+
+            if ((y == 0 || y == cols - 1) && x != 0) {
+                value = 2;
+            }
+            if (x == rows - 1) {
+                value = 5;
+            }
+            return value;
+        }
+
+    private:
+        int rows, cols;
+    };
+
+    class Initialize_3D : public Functor4<int, int, int, float, float> {
+    public:
+        Initialize_3D(int cols, int depth) : Functor4() {
+            this->cols = cols;
+            this->depth = depth;
+        }
+
+        MSL_USERFUNC float operator()(int x, int y, int z, float c) const override {
+            float value = 0;
+            if (z == 0 && y != 0) {
+                value = 1;
+            } else if (y == 0 || y == cols - 1) {
+                value = 2;
+            } else if (z == depth - 1) {
+                value = 5;
+            }
+            return value;
+        }
+
+    private:
+        int cols, depth;
+    };
+
     MSL_USERFUNC float heat3D(const PLCube<float> &plCube, int x, int y, int z) {
         float newval = 0;
         newval += plCube(x - 1, y, z);
@@ -18,6 +64,7 @@ namespace msl::heatdiffusion {
         newval /= 6;
         return newval;
     }
+
     MSL_USERFUNC float heat2D(const NPLMatrix<float> &nplMatrix, int x, int y) {
         float newval = 0;
         newval += nplMatrix(x - 1, y);
@@ -82,36 +129,31 @@ namespace msl::heatdiffusion {
         double totaltime = endTime - timeStart;
 
         if (msl::isRootProcess()) {
-            std::string fileName = "init-runtime-d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
+            std::string fileName =
+                    "init-runtime-d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
             std::ofstream outputFile(fileName, std::ios::app); // append file or create a file if it does not exist
-            outputFile << "2" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc << ";"
-                << totaltime << "\n"; // write
+            outputFile << "2" << ";" << size << ";" << iterations << ";" << timeinit << ";" << timefill << ";"
+                       << timecalc << ";"
+                       << totaltime << "\n"; // write
             outputFile.close();
         }
+        msl::terminateSkeletons();
         exit(0);
     }
 
     void heat_3D(int size, int iterations, int output, int argc, char *argv[]) {
-       double timeStart = MPI_Wtime();
-       msl::initSkeletons(argc, argv);
-       DC<float> dc(size, size, size, 0, false);
-       DC<float> dc_copy(size, size, size, 0, false);
+        double timeStart = MPI_Wtime();
+        msl::initSkeletons(argc, argv);
+        DC<float> dc(size, size, size, 0, false);
+        DC<float> dc_copy(size, size, size, 0, false);
 
-       double init = MPI_Wtime();
-       double timeinit = init-timeStart;
-#pragma omp parallel for default(none) shared(dc,size)
-       for (size_t i = 0; i < size; ++i) {
-           for (size_t j = 0; j < size; ++j) {
-               dc.set(0, i, j, 1);
-               dc.set(size-1, i, j, 5);
-               dc.set(i, 0, j, 2);
-               dc.set(i, size-1, j, 2);
-           }
-       }
-       dc.updateDevice(1);
+        double init = MPI_Wtime();
+        double timeinit = init - timeStart;
 
-       double fill = MPI_Wtime();
-        double timefill = fill-init;
+        Initialize_3D init3d = Initialize_3D(size, size);
+        dc.mapIndexInPlace(init3d);
+        double fill = MPI_Wtime();
+        double timefill = fill - init;
 
         DC<float> *dcp1 = &dc;
         DC<float> *dcp2 = &dc_copy;
@@ -147,14 +189,16 @@ namespace msl::heatdiffusion {
         if (msl::isRootProcess()) {
             std::string fileName = "runtime-d3-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
             std::ofstream outputFile(fileName, std::ios::app); // append file or create a file if it does not exist
-            outputFile << "3" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc
-                << ";" << totaltime << "\n"; // write
+            outputFile << "3" << ";" << size << ";" << iterations << ";" << timeinit << ";" << timefill << ";"
+                       << timecalc
+                       << ";" << totaltime << "\n"; // write
             outputFile.close();
         }
-
+        msl::terminateSkeletons();
         exit(0);
     }
 }
+
 void exitWithUsage() {
     std::cerr
             << "Usage: ./heat_diffusion [-d <dim> ] [-s <size> ] [-g <nGPUs>] [-n <iterations>] [-e <exportFile>]"

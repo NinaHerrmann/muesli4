@@ -251,7 +251,6 @@ void msl::DM<T>::set2D(int row, int col, T value) {
 template<typename T>
 void msl::DM<T>::setPointer(const T * pointer) {
     memcpy(this->localPartition, pointer, this->nLocal * sizeof(T));
-    printf("DM - 0 - %d; 1 - %d, 2 - %d\n", this->localPartition[0][0], this->localPartition[0][1], this->localPartition[0][2]);
 #ifdef __CUDACC__
     initGPUs();
     this->updateDevice();
