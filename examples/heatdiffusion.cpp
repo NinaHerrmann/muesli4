@@ -29,9 +29,10 @@ namespace msl::heatdiffusion {
         return newval;
     }
 
-    void heat_2D(int size, int iterations, int output, int argc, char *argv[]) {
+    void heat_2D(int size, int iterations, int output, int argc, char *argv[], int gpu) {
         double timeStart = MPI_Wtime();
         msl::initSkeletons(argc, argv);
+        msl::Muesli::num_gpus = gpu;
 
         DM<float> dm(size, size, 0, true);
         DM<float> dm_copy(size, size, 0, true);
@@ -82,18 +83,22 @@ namespace msl::heatdiffusion {
         double totaltime = endTime - timeStart;
 
         if (msl::isRootProcess()) {
-            std::string fileName = "init-runtime-d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
+            std::string fileName = "init-runtime-d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + "-g" + std::to_string(msl::Muesli::num_gpus) + ".out";
             std::ofstream outputFile(fileName, std::ios::app); // append file or create a file if it does not exist
             outputFile << "2" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc << ";"
-                << totaltime << "\n"; // write
+                << totaltime << ";" << msl::Muesli::num_gpus << ";" << msl::Muesli::num_total_procs << "\n"; // write
             outputFile.close();
         }
+        msl::terminateSkeletons();
+
         exit(0);
     }
 
-    void heat_3D(int size, int iterations, int output, int argc, char *argv[]) {
+    void heat_3D(int size, int iterations, int output, int argc, char *argv[], int gpu) {
        double timeStart = MPI_Wtime();
        msl::initSkeletons(argc, argv);
+	msl::Muesli::num_gpus = gpu;
+	
        DC<float> dc(size, size, size, 0, false);
        DC<float> dc_copy(size, size, size, 0, false);
 
@@ -145,12 +150,13 @@ namespace msl::heatdiffusion {
         double totaltime = endTime - timeStart;
 
         if (msl::isRootProcess()) {
-            std::string fileName = "runtime-d3-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
+            std::string fileName = "runtime-d3-s" + std::to_string(size) + "-i" + std::to_string(iterations) + "-g" + std::to_string(msl::Muesli::num_gpus) + ".out";
             std::ofstream outputFile(fileName, std::ios::app); // append file or create a file if it does not exist
             outputFile << "3" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc
-                << ";" << totaltime << "\n"; // write
+                << ";" << totaltime << ";" << msl::Muesli::num_gpus << ";" << msl::Muesli::num_total_procs << "\n"; // write
             outputFile.close();
         }
+        msl::terminateSkeletons();
 
         exit(0);
     }
@@ -212,12 +218,12 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < runs; i++) {
 #if ENABLE_2D_EXAMPLE
         if (dim == 2) {
-            msl::heatdiffusion::heat_2D(size, iterations, output, argc, argv);
+            msl::heatdiffusion::heat_2D(size, iterations, output, argc, argv, gpus);
         }
 #endif
 #if ENABLE_3D_EXAMPLE
         if (dim == 3) {
-            msl::heatdiffusion::heat_3D(size, iterations, output, argc, argv);
+            msl::heatdiffusion::heat_3D(size, iterations, output, argc, argv, gpus);
         }
 #endif
     }

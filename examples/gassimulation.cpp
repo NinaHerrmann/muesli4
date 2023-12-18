@@ -265,7 +265,7 @@ namespace msl::gassimulation {
 
         double endTime = MPI_Wtime();
 
-        double totalkerneltime = startkernel-endTime;
+        double totalkerneltime = endTime-startkernel;
         double totaltime = totalkerneltime+timefill+timeinit;
 
         if (msl::isRootProcess()) {
