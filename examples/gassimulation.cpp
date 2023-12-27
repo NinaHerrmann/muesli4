@@ -218,13 +218,12 @@ namespace msl::gassimulation {
         const int FLAG_KEEP_VELOCITY = 1 << 1;
     };
 
-    void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile, const std::string &runtimeFile, double start) {
+    void gassimulation_test(vec3<int> dimension, int iterations, const std::string &importFile, const std::string &exportFile, const std::string &runtimeFile) {
         size = dimension;
         DC<cell_t> dc(size.x, size.y, size.z);
         DC<cell_t> dc2(size.x, size.y, size.z);
 
-        double initstart = MPI_Wtime();
-        double timeinit = initstart-start;
+        double timeinit = splitTime(0);
         if (importFile.empty()) {
             Initialize initialize(size.x, size.y, size.z);
             dc.mapIndexInPlace(initialize);
@@ -255,18 +254,15 @@ namespace msl::gassimulation {
         // Pointers for swapping.
         DC<cell_t> *dcp1 = &dc;
         DC<cell_t> *dcp2 = &dc2;
-        double startkernel = MPI_Wtime();
-        double timefill = startkernel-initstart;
+        double timefill = splitTime(0);
 
         for (int i = 0; i < iterations; i++) {
             dcp1->mapStencil<update>(*dcp2, 1, {});
             dcp2->mapStencil<update>(*dcp1, 1, {});
         }
 
-        double endTime = MPI_Wtime();
-
-        double totalkerneltime = endTime-startkernel;
-        double totaltime = totalkerneltime+timefill+timeinit;
+        double totalkerneltime = splitTime(0);
+        double totaltime = stopTiming();
 
         if (msl::isRootProcess()) {
             if (!runtimeFile.empty()) {
@@ -281,6 +277,8 @@ namespace msl::gassimulation {
                 outputFile << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";"<< msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus
                             << ";" << timeinit << ";"<< timefill << ";" << totalkerneltime << ";"<< totaltime << "\n"; // write
                 outputFile.close();
+                std::cout << size.x << ";" << iterations << ";" << msl::Muesli::num_total_procs << ";"<< msl::Muesli::num_threads << ";" << msl::Muesli::num_gpus
+                          << ";" << timeinit << ";"<< timefill << ";" << totalkerneltime << ";"<< totaltime << "\n";
             }
         }
         dcp1->updateHost();
@@ -362,12 +360,13 @@ int main(int argc, char** argv){
     }
 
     msl::setDebug(false);
-    double start = MPI_Wtime();
     msl::initSkeletons(argc, argv);
+    msl::startTiming();
+
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
     for (int i = 0; i < runs; i++) {
-        msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile, runtimeFile, start);
+        msl::gassimulation::gassimulation_test(size, iterations, importFile, exportFile, runtimeFile);
     }
     msl::terminateSkeletons();
     return EXIT_SUCCESS;

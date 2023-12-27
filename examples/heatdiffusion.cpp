@@ -2,7 +2,6 @@
 #include "dm.h"
 #include "dc.h"
 
-#define ENABLE_1D_EXAMPLE 1
 #define ENABLE_2D_EXAMPLE 1
 #define ENABLE_3D_EXAMPLE 1
 
@@ -76,35 +75,35 @@ namespace msl::heatdiffusion {
         return newval;
     }
 
+
     void heat_2D(int size, int iterations, int output, int argc, char *argv[], int gpu) {
-        double timeStart = MPI_Wtime();
         msl::initSkeletons(argc, argv);
+        startTiming();
         msl::Muesli::num_gpus = gpu;
 
         DM<float> dm(size, size, 0, true);
         DM<float> dm_copy(size, size, 0, true);
 
-        double init = MPI_Wtime();
-        double timeinit = init-timeStart;
-	Initialize_2D init2d = Initialize_2D(size, size);
+        double timeinit = splitTime(0);
+        Initialize_2D init2d = Initialize_2D(size, size);
         dm.mapIndexInPlace(init2d);
-
-        double fill = MPI_Wtime();
-        double timefill = fill-init;
+        double timefill = splitTime(0);
         DM<float> *dmp1 = &dm;
         DM<float> *dmp2 = &dm_copy;
         for (size_t i = 0; i < iterations; ++i) {
             dmp1->mapStencil<heat2D>(dm_copy, 1, 0);
             dmp2->mapStencil<heat2D>(dm, 1, 0);
+            //dmp1->mapStencil<heat2D>(dm_copy, 1, 0, true);
+            //dmp2->mapStencil<heat2D>(dm, 1, 0, true);
         }
-        double calc = MPI_Wtime();
-        double timecalc = calc-init;
+        double timecalc = splitTime(0);
 
-        if (msl::isRootProcess() && output == 1) {
+        if (msl::isRootProcess() && output) {
             dmp2->updateHost();
             float *gather = dmp2->gather();
             std::string fileName = "d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + ".out";
-            std::ofstream outputFile(fileName, std::ios::app | std::ios::binary); // append file or create a file if it does not exist
+            std::ofstream outputFile(fileName, std::ios::app |
+                                               std::ios::binary); // append file or create a file if it does not exist
             for (int x = 0; x < size; x++) {
                 for (int y = 0; y < size; y++) {
                     int index = y + (size * x);
@@ -115,8 +114,7 @@ namespace msl::heatdiffusion {
             }
             outputFile.close();
         }
-        double endTime = MPI_Wtime();
-        double totaltime = endTime - timeStart;
+        double totaltime = splitTime(0);
 
         if (msl::isRootProcess()) {
             std::string fileName = "init-runtime-d2-s" + std::to_string(size) + "-i" + std::to_string(iterations) + "-g" + std::to_string(msl::Muesli::num_gpus) + ".out";
@@ -124,27 +122,29 @@ namespace msl::heatdiffusion {
             outputFile << "2" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc << ";"
                 << totaltime << ";" << msl::Muesli::num_gpus << ";" << msl::Muesli::num_total_procs << "\n"; // write
             outputFile.close();
+            std::cout << "2;" << size << ";" << iterations << ";" << timeinit << ";" << timefill << ";" << timecalc
+                      << ";" << totaltime << "\n";
         }
         msl::terminateSkeletons();
 
         exit(0);
     }
 
+
     void heat_3D(int size, int iterations, int output, int argc, char *argv[], int gpu) {
-        double timeStart = MPI_Wtime();
         msl::initSkeletons(argc, argv);
         msl::Muesli::num_gpus = gpu;
+
+        startTiming();
 
         DC<float> dc(size, size, size, 0, false);
         DC<float> dc_copy(size, size, size, 0, false);
 
-        double init = MPI_Wtime();
-        double timeinit = init - timeStart;
+        double timeinit = splitTime(0);
 
         Initialize_3D init3d = Initialize_3D(size, size);
         dc.mapIndexInPlace(init3d);
-        double fill = MPI_Wtime();
-        double timefill = fill - init;
+        double timefill = splitTime(0);
 
         DC<float> *dcp1 = &dc;
         DC<float> *dcp2 = &dc_copy;
@@ -153,9 +153,7 @@ namespace msl::heatdiffusion {
             dcp1->mapStencil<heat3D>(*dcp2, 1, 0);
             dcp2->mapStencil<heat3D>(*dcp1, 1, 0);
         }
-        double calc = MPI_Wtime();
-        double timecalc = calc-init;
-
+        double timecalc = splitTime(0);
 
         if (msl::isRootProcess() && output == 1) {
             dcp2->updateHost();
@@ -174,15 +172,17 @@ namespace msl::heatdiffusion {
             }
             outputFile.close();
         }
-        double endTime = MPI_Wtime();
-        double totaltime = endTime - timeStart;
+        double totaltime = stopTiming();
 
         if (msl::isRootProcess()) {
             std::string fileName = "runtime-d3-s" + std::to_string(size) + "-i" + std::to_string(iterations) + "-g" + std::to_string(msl::Muesli::num_gpus) + ".out";
             std::ofstream outputFile(fileName, std::ios::app); // append file or create a file if it does not exist
             outputFile << "3" << ";" <<  size << ";" << iterations << ";" << timeinit << ";"<< timefill << ";" << timecalc
                 << ";" << totaltime << ";" << msl::Muesli::num_gpus << ";" << msl::Muesli::num_total_procs << "\n"; // write
+
             outputFile.close();
+            std::cout << "3;" << size << ";" << iterations << ";" << timeinit << ";" << timefill << ";" << timecalc
+                      << ";" << totaltime << "\n";
         }
         msl::terminateSkeletons();
 
@@ -241,7 +241,6 @@ int main(int argc, char *argv[]) {
                 exitWithUsage();
         }
     }
-    msl::setDebug(false);
     msl::Muesli::cpu_fraction = 0;
     msl::Muesli::num_gpus = gpus;
     for (int i = 0; i < runs; i++) {

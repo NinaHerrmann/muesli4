@@ -279,7 +279,7 @@ void startTiming();
 /**
  * \brief Prints the time elapsed since last split time.
  */
-void splitTime(int run);
+double splitTime(int run);
 
 /**
  * \brief Ends timing.
