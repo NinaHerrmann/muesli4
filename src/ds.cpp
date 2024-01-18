@@ -148,6 +148,7 @@ void msl::DS<T>::copyLocalPartition(const DS <T> &other) {
 #else
     localPartition = new T[nLocal];
 #endif
+    nCPUPartition = new T[nCPU];
     for (int i = 0; i < nLocal; i++)
         localPartition[i] = other.localPartition[i];
     for (int i = 0; i < nCPU; i++)
@@ -162,6 +163,8 @@ void msl::DS<T>::freeLocalPartition() {
 #else
     delete[] localPartition;
     localPartition = nullptr;
+    delete[] nCPUPartition
+    nCPUPartition = nullptr;
 #endif
 }
 
@@ -249,6 +252,7 @@ msl::DS<T>::~DS() {
     }
 #else
     delete[] localPartition;
+    delete[] nCPUPartition;
 #endif
 }
 
@@ -273,6 +277,11 @@ void msl::DS<T>::setLocalPartition(T *elements) {
     for (int k = 0; k < n; k++) {
         localPartition[k] = elements[k];
     }
+    T * nCPUPartition = new T[nCPU];
+
+    for (int k = 0; k < nCPU; k++) {
+        nCPUPartition[k] = elements[k];
+    }
     updateDevice();
 }
 
@@ -284,6 +293,7 @@ void msl::DS<T>::fill(const T &element) {
     for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
+    T * nCPUPartition = new T[nCPU];
     for(int i = 0; i<nCPU; i++){
         nCPUPartition[i] = element;
     }
@@ -297,6 +307,9 @@ template<typename T>
 void msl::DS<T>::fill(T *const values) {
     if (ng == 1) {
         this->localPartition = values;
+        for(int i = 0; i<nCPU; i++){
+            nCPUPartition[i] = values[i];
+        }
     } else {
         if (msl::isRootProcess()) {
             printf("fill from array:\n");
@@ -407,6 +420,9 @@ void msl::DS<T>::set(int globalIndex, const T &v) {
 template<typename T>
 void msl::DS<T>::set(const T * pointer) {
     memcpy(localPartition, pointer, nLocal * sizeof(T));
+    for (int i = 0; i < nCPU; i++) {
+        nCPUPartition[i] = pointer[i];
+    }
 #ifdef __CUDACC__
     updateDevice();
     cudaDeviceSynchronize();

@@ -117,13 +117,20 @@ namespace msl::test {
         }
         // ************* Init *********************** //
         int elements = dim * dim * dim;
-        double runtimes[9] = {0.0}; double t;
-        Mult5 mul5(3); Mult3 mul3(3); LiMult3 limul3(3);LiMult5 limul5(3); Sum sum; Sum4 sum4; Sum5 sum5;
+        double runtimes[9] = {0.0};
+        double t;
+        Mult5 mul5(3);
+        Mult3 mul3(3);
+        LiMult3 limul3(3);
+        LiMult5 limul5(3);
+        Sum sum;
+        Sum4 sum4;
+        Sum5 sum5;
         DC<double> a(dim, dim, dim, 2.0);
         DC<double> b(dim, dim, dim, 3.0);
         DC<double> map_dest(dim, dim, dim, 5.0);
         double *pResults;
-        double *manpResults = new double[dim * dim * dim];
+        auto *manpResults = new double[dim * dim * dim];
 
         if (check_str_inside(skeletons, "map,")) {
             t = MPI_Wtime();
@@ -134,7 +141,7 @@ namespace msl::test {
             runtimes[0] += MPI_Wtime() - t;
             if (CHECK && msl::isRootProcess()) {
                 manpResults = map_dest.gather();
-                check_array_value_equal("Map", elements, manpResults, 9.0);
+                check_array_array_equal("Map", elements, pResults, manpResults);
             }
         }
         b.fill(2.0);
@@ -207,7 +214,7 @@ namespace msl::test {
             runtimes[8] += MPI_Wtime() - t;
 
             if (CHECK && msl::isRootProcess()) {
-                check_value_value_equal("Fold", result, elements*3.0);
+                check_value_value_equal("Fold", result, elements * 3.0);
             }
         }
         // ************* Zip *********************** //
@@ -251,7 +258,8 @@ namespace msl::test {
             }
         }
         if (check_str_inside(skeletons, "zipIndex,")) {
-            b.fill(7.0); c.fill(5.0);
+            b.fill(7.0);
+            c.fill(5.0);
             t = MPI_Wtime();
             for (int i = 0; i < reps; i++) {
                 d.zipIndex(b, c, sum5);
@@ -269,7 +277,8 @@ namespace msl::test {
         }
 
 
-        b.fill(3.0); c.fill(2.0);
+        b.fill(3.0);
+        c.fill(2.0);
         if (check_str_inside(skeletons, "zipIndexInPlace,")) {
             t = MPI_Wtime();
             for (int i = 0; i < reps; i++) {
@@ -284,7 +293,7 @@ namespace msl::test {
                     int depth = int(j / (dim * dim));
                     manpResults[j] = depth + int(j - (depth * dim * dim)) / dim + (j % dim) + 3 + 2;
                 }
-                for (int i = 0; i < reps-1; i++) {
+                for (int i = 0; i < reps - 1; i++) {
                     for (int j = 0; j < elements; j++) {
                         int depth = int(j / (dim * dim));
                         manpResults[j] = depth + int(j - (depth * dim * dim)) / dim + (j % dim) + manpResults[j] + 2;
@@ -305,12 +314,12 @@ int main(int argc, char **argv) {
     //printf("Starting Main...\n");
 
     int dim = 4, nGPUs = 1, reps = 1;
-    const char * skeletons;
+    const char *skeletons;
     arg_helper(argc, argv, dim, nGPUs, reps, CHECK, const_cast<char *&>(skeletons));
 
     std::string nextfile = "Data/dc_" + std::to_string(msl::Muesli::num_total_procs) + "_" +
-                          std::to_string(msl::Muesli::num_gpus) + "_" +
-                          std::to_string(reps) + "_" + std::to_string(dim) ;
+                           std::to_string(msl::Muesli::num_gpus) + "_" +
+                           std::to_string(reps) + "_" + std::to_string(dim);
     if (msl::isRootProcess() && OUTPUT) {
         printf("%d; %d; %d; %d; %.2f\n", dim, msl::Muesli::num_total_procs,
                msl::Muesli::num_local_procs, msl::Muesli::num_gpus, msl::Muesli::cpu_fraction);
