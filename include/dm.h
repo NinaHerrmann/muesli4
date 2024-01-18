@@ -219,11 +219,11 @@ public:
     * @return void
     */
     template<msl::NPLMMapStencilFunctor<T> f>
-    void mapStencil(DM<T> &result, size_t stencilSize, T neutralValue);
+    void mapStencil(DM<T> &result, size_t stencilSize, T neutralValue, bool shared_mem);
+
     void initNPLMatrixes(int stencilSize, T neutralValue) {
         nplMatrixes = std::vector<NPLMatrix<T>>();
 #ifdef __CUDACC__
-
         nplMatrixes.reserve(this->ng);
         for (int i = 0; i < this->ng; i++) {
             nplMatrixes.push_back(NPLMatrix<T>(

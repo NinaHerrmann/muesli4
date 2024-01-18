@@ -250,17 +250,14 @@ void msl::startTiming() {
     timer = new Timer();
 }
 
-void msl::splitTime(int run) {
-    timer->splitTime();
-    if (isRootProcess()) {
-        //std::cout << "Run " << run << ": " << result << "s" << std::endl;
-    }
+double msl::splitTime(int run) {
+    return timer->splitTime();
 }
 
 double msl::stopTiming() {
     int runs = timer->getNumSplits();
     double total_time = timer->stop();
-    msl::printv("%f;", total_time / runs);
+    //msl::printv("%f;", total_time / runs);
     return total_time;
 }
 

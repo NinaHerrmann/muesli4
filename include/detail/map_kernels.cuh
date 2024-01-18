@@ -154,6 +154,16 @@ namespace msl {
             T v = f(in, coords.x, coords.y);
             out[i] = v;
         }
+        /**
+        * \brief MapStencil function for DM. \em Calls Functor which has three Arguments: the data structure to read and indices.
+        *
+        * @param inout Pointer to gpu memory of datastructure (DM) which provides the data to calcuate on.
+        * @param gpuRows Rows per GPU.
+        * @param gpuCols Cols per GPU.
+        * @param func functor to be called.
+        */
+        template<typename T, msl::NPLMMapStencilFunctor<T> f>
+        __global__ void mapStencilKernelDMSM(T *out, NPLMatrix<T> in, unsigned int size) ;
 
         template<typename T, typename R, typename F>
         __global__ void mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix<T> *dm,

@@ -184,7 +184,7 @@ void msl::DM<T>::DMinit() {
                 }
             }
         } else {
-            this->nLocal= this->n / this->np;
+            this->nLocal = this->n / this->np;
         }
         nlocalRows = this->nLocal% ncol == 0 ? this->nLocal/ ncol : this->nLocal/ ncol + 1;
     } else {
@@ -232,6 +232,7 @@ void msl::DM<T>::initGPUs() {
             this->plans[i].gpuCols = this->plans[i].lastCol - this->plans[i].firstCol;
         }
     }
+
 #endif
 }
 
@@ -1158,6 +1159,7 @@ void msl::DM<T>::mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_va
             gpuErrchk(cudaPeekAtLastError());
             gpuErrchk(cudaDeviceSynchronize());
         }
+
         detail::fillcore<<<fillblocks,fillthreads, 0, Muesli::streams[i]>>>(this->all_data[i], this->plans[i].d_Data,
                 stencil_size * (this->plans[i].gpuCols + (2*stencil_size)),
                 this->plans[i].gpuCols, stencil_size, nrow, ncol);
@@ -1583,18 +1585,46 @@ void msl::DM<T>::rotateCols(int a) {
 
 template<typename T>
 template<msl::NPLMMapStencilFunctor<T> f>
-void msl::DM<T>::mapStencil(msl::DM<T> &result, size_t stencilSize, T neutralValue) {
+void msl::DM<T>::mapStencil(msl::DM<T> &result, size_t stencilSize, T neutralValue, bool shared_mem) {
 #ifdef __CUDACC__
     this->updateDevice();
     syncNPLMatrixes(stencilSize, neutralValue);
     syncNPLMatrixesMPI(stencilSize);
 
-    for (int i = 0; i < this->ng; i++) {
-        cudaSetDevice(i);
-        dim3 dimBlock(Muesli::threads_per_block);
-        dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
-        NPLMatrix<T> matrix = this->nplMatrixes[i];
-        detail::mapStencilKernelDM<T, f><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, matrix, result.plans[i].size);
+    if (shared_mem) {
+
+        for (int i = 0; i < this->ng; i++) {
+            //cudaSetDevice(i);
+            //cudaDeviceProp devProp;
+            //cudaGetDeviceProperties(&devProp, i);
+            //int shared_mem = devProp.sharedMemPerBlock;
+            //printf("Shared Memory --- %d\n", shared_mem);
+            dim3 dimBlock(Muesli::threads_per_block);
+            dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
+            NPLMatrix <T> matrix = this->nplMatrixes[i];
+            int smem_size = 32 * 32 * sizeof(T);
+
+            detail::mapStencilKernelDMSM < T,
+                    f ><<<dimGrid, dimBlock, smem_size, Muesli::streams[i]>>>(result.plans[i].d_Data, matrix, result.plans[i].size);
+        }
+        if (Muesli::debug) {
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
+        }
+    } else {
+        for (int i = 0; i < this->ng; i++) {
+            // detail::printGPU<<<1, 1>>>(this->nplMatrixes[i].data, 8 * 8, this->plans[i].gpuCols + 2 * stencilSize);
+            cudaSetDevice(i);
+            dim3 dimBlock(Muesli::threads_per_block);
+            dim3 dimGrid((this->plans[i].size + dimBlock.x - 1) / dimBlock.x);
+            NPLMatrix <T> matrix = this->nplMatrixes[i];
+            detail::mapStencilKernelDM < T,
+                    f ><<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(result.plans[i].d_Data, matrix, result.plans[i].size);
+        }
+        if (Muesli::debug) {
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
+        }
     }
     result.setCpuMemoryInSync(false);
 #else

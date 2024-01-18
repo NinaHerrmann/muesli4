@@ -142,6 +142,20 @@ msl::detail::mapStencilGlobalMem_rep(R *out, GPUExecutionPlan<T> plan, PLMatrix 
     }
 }
 
+template<typename T, msl::NPLMMapStencilFunctor<T> f>
+__global__ void
+msl::detail::mapStencilKernelDMSM(T *out, NPLMatrix<T> in, unsigned int size) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= size) {
+        return;
+    }
+    int2 coords = in.indexToCoordinate(in.dataStartIndex + i);
+    in.readTosm(in.dataStartIndex + i, threadIdx.x, 1);
+    __syncthreads();
+    //in.printsm(i, threadIdx.x);
+    T v = f(in, coords.x, coords.y);
+    out[i] = v;
+}
 template<typename T, typename R, typename F>
 __global__ void
 msl::detail::mapStencilMMKernel(R *out, int gpuRows, int gpuCols, int firstCol, int firstRow, PLMatrix <T> *pl,
@@ -209,6 +223,13 @@ msl::detail::printGPU(T *data, int size, int col) {
     for (int i = 0; i < size; i++) {
         if (i % col == 0 && i != 0) {printf("\n");}
 
+        printf("%.2f;\t", data[i]);
+    }
+}
+template<typename T>
+__global__ void printNPL(T *data, int size, int col) {
+    for (int i = 0; i < size; i++) {
+        if (i % col == 0 && i != 0) {printf("\n");}
         printf("%.2f;\t", data[i]);
     }
 }

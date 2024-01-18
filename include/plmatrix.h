@@ -130,7 +130,7 @@ namespace msl {
          */
         __device__
         void readToSM(int r, int c, int reps) {
-            extern __shared__ int s[];
+            /*extern __shared__ int s[];
             shared_data = SharedMemory<T>();
             int x = blockIdx.x * blockDim.x + threadIdx.x;
             int g_row = (reps*tile_width * (x / tile_width)) + (threadIdx.x%tile_width);
@@ -150,7 +150,7 @@ namespace msl {
             }
             shared_mem = true;
             __syncthreads();
-            //shared_data = smem;
+            //shared_data = smem;*/
         }
 #endif
 

@@ -40,15 +40,18 @@
 #include <utility>
 #include "array.h"
 #include "vec2.h"
+#include "Randoms.h"
 
-const size_t nants = 256;
-const size_t ncities = 256;
-typedef array<float, ncities> tour;
-typedef array<tour, nants> tours;
-typedef array<int, 2> city;
-// typedef vec2<int> city;
+typedef array<double, 2> city;
+Randoms *randoms;
+
+#define PHERINIT 0.005
+#define EVAPORATION 0.5
+#define ALPHA 1
+#define BETA 2
+#define TAUMAX 2
 std::ostream& operator<< (std::ostream& os, const city f) {
-    os << "(" << f[0] << ", " << f[1] << ", " << "...)";
+    os << "(" << f[0] << ", " << f[1] << ")";
     return os;
 }
 namespace msl::aco {
@@ -65,24 +68,16 @@ namespace msl::aco {
         }
     };
 
-    class Initialize : public Functor3<int, int, int, int> {
+    class InitializeDistance : public Functor3<int, int, int, int> {
     public:
-        MSL_USERFUNC int operator()(int i, int j, int x) const {
-            if (i == j) { return 0; }
-            return ((i + 1) * (j + 1)) % 30 + 1;
+        InitializeDistance(DA<city> cities) : Functor3(){
+            this->cities = cities;
         }
-    };
+            MSL_USERFUNC int operator()(int i, int j, int x) const {
 
-    class InitializeDouble : public Functor3<int, int, double, double> {
-    public:
-        MSL_USERFUNC double operator()(int i, int j, double x) const {
-            double phero = (double) ((i + 1) * (j + 1) % 9 + 1) * 0.01;
-            if (i == j) { return 0.0; }
-            if (phero > 1) {
-                phero = 1.0;
-            }
-            return phero;
         }
+    private:
+        DA<city> cities;
     };
 
     class RouteCalculation : public Functor3<int, int, double, double> {
@@ -92,10 +87,8 @@ namespace msl::aco {
         explicit RouteCalculation(DM<double> probs) :
                 probabilites(std::move(probs)) {}
 
-        MSL_USERFUNC double operator()(int i, int j, double x, int ncities) const {
-            //double phero = (double) ((i + 1) * (j + 1) % 9 + 1) * 0.01;
-            // TODO update
-            /*int newroute = 0;
+        MSL_USERFUNC double operator()(int xindex, int yindex, double value, int ncities) const {
+            int newroute = 0;
             int route[ncities] = {0};
             int visited[ncities] = {0};
             double sum = 0.0;
@@ -105,11 +98,9 @@ namespace msl::aco {
             double random = 0.0;
             int initial_city = 0;
             route[0] = initial_city;
-            for (int i=0; i < ncities-1; i++) {
+            /*for (int i = 0; i < ncities-1; i++) {
               int cityi = route[0];
               int count = 0;
-              // Find the shortest not visited city.
-
               for (int c = 0; c < ncities; c++) {
                 next_city = d_iroulette[c];
                 int visited = 0;
@@ -180,28 +171,122 @@ namespace msl::aco {
         }
     };
 
-    void aco(int iterations, std::string importFile) {
+    DA <city> readsize(const std::string &basicString);
+
+    void readData(const std::string &basicString, int ncities, DA <city> &da, DM<double> &phero);
+
+    void aco(int iterations, const std::string& importFile, int nants) {
         // TODO distance could also be array ncities*ncities/2
-        DM<int> distance(ncities, ncities, 1);
-        DM<double> phero(ncities, ncities, 2.0);
+
+        DA<city> cities = readsize(importFile);
+        int ncities = cities.getSize();
+        DM<double> phero(ncities, ncities, 0.0);
+        readData(importFile, ncities, cities, phero);
+        // cities.showLocal("cities");
+        DM<double> distance(ncities, ncities, 1);
         DA<int> routelength(nants, 0);
-        DA<city> cities(ncities);
-        DM<double> probabilities(ncities, ncities, 3.0);
-        Initialize init;
-        distance.mapIndexInPlace(init);
-        InitializeDouble init_d;
-        phero.mapIndexInPlace(init_d);
-        // Calculate the closest x cities.
+        DM<double> probabilities(ncities, ncities, 0.0);
+        // TODO parallelization not possible since passing of DA does not work.
+        // distance = size cities x cities
+        for (int i = 0; i < ncities; i++) {
+            for (int j = 0; j < ncities; j++) {
+                if (i == j) {
+                    distance.setLocal(i*ncities + j, 0);
+                } else {
+                    distance.setLocal(i*ncities + j, sqrt(pow(cities.get(j)[0] - cities.get(i)[0], 2) +
+                                pow(cities.get(j)[1] - cities.get(i)[1], 2)));
+                }
+            }
+        }
+        // distance.show("distance");
+        phero.show("phero");
 
         Probabilities prob;
         msl::startTiming();
 
         for (int i = 0; i < iterations; i++) {
-            //RouteCalculation route(probabilities);
+            // Was sollte raus kommen? Möglich ant x cities (tour für jede ant) - DA ants länge jeder tour
+            RouteCalculation route(probabilities);
             //phero = ant.combine(probabilities, route, prob, ncities);
         }
         msl::stopTiming();
     }
+
+    void readData(const std::string &basicString, int ncities, DA <city> &cities, DM<double> &phero) {
+        std::ifstream data;
+        data.open("/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/data/" + basicString + ".txt", std::ifstream::in);
+        randoms = new Randoms(15);
+        if (data.is_open()){
+            double randn = 0.0;
+            for(int j = 0;j<ncities;j++){
+                for(int k = 0;k<ncities;k++){
+                    if(j!=k){
+                        randn = randoms -> Uniforme() * TAUMAX;
+                        phero.setLocal((j*ncities) + k, randn);
+                        phero.setLocal((k*ncities) + j, randn);
+                    }
+                    else{
+                        phero.setLocal((j*ncities) + k, 0);
+                        phero.setLocal((k*ncities) + j, 0);
+                    }
+                }
+            }
+            int i = 0;
+            double index, x, y;
+            index = 0.0; x = 0.0; y = 0.0;
+            city city = {0,0};
+            while(i < ncities){
+                data >> index;
+                data >> x;
+                data >> y;
+
+                city[0] = (double)x;
+                city[1] = (double)y;
+                cities.setLocal(i, city);
+                i += 1;
+            }
+            data.close();
+            printf("%.2f \t", cities.localPartition[0][0]);
+        } else{
+            printf(" File not opened\n");
+        }
+    }
+
+    DA <city> readsize(const std::string &basicString) {
+        int n_cities = 0;
+
+        if (basicString == "djibouti") {
+            n_cities = 38;
+        } else if (basicString == "luxembourg") {
+            n_cities = 980;
+        } else if (basicString == "catar") {
+            n_cities = 194;
+        } else if (basicString == "a280") {
+            n_cities = 280;
+        } else if (basicString == "d198") {
+            n_cities = 198;
+        } else if (basicString == "d1291") {
+            n_cities = 1291;
+        } else if (basicString == "lin318") {
+            n_cities = 318;
+        } else if (basicString == "pcb442") {
+            n_cities = 442;
+        } else if (basicString == "pcb1173") {
+            n_cities = 1173;
+        } else if (basicString == "pr1002") {
+            n_cities = 1002;
+        } else if (basicString == "pr2392") {
+            n_cities = 2392;
+        } else if (basicString == "rat783") {
+            n_cities = 783;
+        } else {
+            std::cout << "No valid import file provided. Please provide a valid import file." << std::endl;
+            exit(-1);
+        }
+        DA<city> cities(n_cities, {});
+        return cities;
+    }
+
 } // close namespaces
 
 void exitWithUsage() {
@@ -221,7 +306,7 @@ int getIntArg(char *s, bool allowZero = false) {
 
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
-    int gpus = 1, iterations = 1, cities = 0, ants = 16, runs = 1;
+    int gpus = 1, iterations = 1, cities = 0, ants = 16, runs = 1, nants = 256;
     std::string importFile, exportFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
@@ -230,6 +315,9 @@ int main(int argc, char **argv) {
         switch (argv[i++][1]) {
             case 'g':
                 gpus = getIntArg(argv[i]);
+                break;
+            case 'a':
+                nants = getIntArg(argv[i]);
                 break;
             case 'n':
                 iterations = getIntArg(argv[i], true);
@@ -254,7 +342,12 @@ int main(int argc, char **argv) {
     msl::setNumRuns(runs);
     printf("Starting with %d nodes %d cpus and %d gpus\n", msl::Muesli::num_total_procs,
            msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
-    msl::aco::aco(iterations, importFile);
+    if (!importFile.empty()) {
+        msl::aco::aco(iterations, importFile, nants);
+    } else {
+        printf("Providing an import file is mandatory. \n");
+        exit(-1);
+    }
     if (!exportFile.empty()) {
         // TODO Export result
     }

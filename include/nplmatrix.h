@@ -34,6 +34,7 @@
 #include "argtype.h"
 #include "muesli.h"
 #include <array>
+#include "shared_mem.h"
 
 #ifndef __CUDACC__
 typedef struct {
@@ -57,7 +58,7 @@ namespace msl {
     public:
         int width;
         int height;
-
+        bool shared_mem = false;
         int stencilSize;
         T neutralValue;
         int dataStartIndex = 0;
@@ -67,13 +68,14 @@ namespace msl {
         T *data;
         T *topPadding;
         T *bottomPadding;
+        T *shared_data;
 
         /**
          * \brief Constructor: creates a NPLMatrix.
          */
         NPLMatrix(int width, int height, std::array<int, 2> start, std::array<int, 2> end, int device,
                int stencilSize, T neutralValue, T *data)
-                : width(width), height(height),
+                : width(width), height(height), shared_data(0),
                   stencilSize(stencilSize), neutralValue(neutralValue),
                   dataStartIndex(msl::NPLMatrix<T>::coordinateToIndex(start)),
                   dataEndIndex(msl::NPLMatrix<T>::coordinateToIndex(end)),
@@ -98,16 +100,37 @@ namespace msl {
             }
 #endif
         }
+        /**
+         * \brief Load (tile_width+stencil)*(tile_height+stencil)
+         */
+        MSL_USERFUNC
+        void readTosm(int index, int x, int reps) {
+            shared_data = SharedMemory<T>();
+            shared_data[x] = data[index - dataStartIndex];
+        }
+
+        MSL_USERFUNC
+        void printsm(int index, int x) const {
+            if (index == 0 && x == 0) {
+                for (int i = 0; i < 1024; i++) {
+                    if (i % 64 == 0)
+                        printf("\n");
+                    printf("%.2f ", shared_data[i]);
+                }
+            }
+        }
 
         MSL_USERFUNC const T& operator() (int x, int y) const {
             if (x < 0 || y < 0 || x >= width || y >= height) {
                 return neutralValue;
             }
             int index = coordinateToIndex(x, y);
+            //int lindex = coordinateToLocal(x, y);
             if (index >= dataStartIndex) {
                 if (index > dataEndIndex) {
                     return bottomPadding[index - dataEndIndex - 1];
                 } else {
+
                     return data[index - dataStartIndex];
                 }
             } else {
@@ -118,6 +141,11 @@ namespace msl {
         MSL_USERFUNC inline int coordinateToIndex(int x, int y) const {
             return y * width + x;
         }
+        /*MSL_USERFUNC inline int coordinateToLocal(int x, int y) const {
+            int localx = x % 32;
+            int localy = y % 32;
+            return localy * 32 + localx;
+        }*/
 
         [[nodiscard]] inline int coordinateToIndex(const std::array<int, 2> &coords) const {
             return coordinateToIndex(coords[0], coords[1]);
