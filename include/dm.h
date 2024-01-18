@@ -612,7 +612,8 @@ private:
      * \brief Malloc the necessary space for all GPUs and generates the necessary GPU plans.
      */
     void DMinit();
-};
+
+    };
 
 } // namespace msl
 #include "../src/dm.cpp"

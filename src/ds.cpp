@@ -85,12 +85,16 @@ msl::DS<T>::DS(int elements, const T &v)
 #else
     localPartition = new T[nLocal];
 #endif
+    nCPUPartition = new T[nCPU];
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i = 0; i < nLocal; i++){
         localPartition[i] = v;
+    }
+    for (int i=0; i< nCPU; i++){
+        nCPUPartition[i] = v;
     }
     cpuMemoryInSync = true;
 #ifdef __CUDACC__
@@ -127,13 +131,13 @@ msl::DS<T>::DS(DS <T> &&other)
 }
 template<typename T>
 msl::DS<T> &msl::DS<T>::operator=(msl::DS<T> &&other) noexcept {
-    printf("=\n");
+    printf("operator =\n");
     throws(detail::NotYetImplementedException());
 }
 
 template<typename T>
 msl::DS<T> &msl::DS<T>::operator=(const DS <T> &other) {
-    printf("=\n");
+    printf("operator without nonexcept =\n");
     throws(detail::NotYetImplementedException());
 }
 
@@ -146,7 +150,8 @@ void msl::DS<T>::copyLocalPartition(const DS <T> &other) {
 #endif
     for (int i = 0; i < nLocal; i++)
         localPartition[i] = other.localPartition[i];
-
+    for (int i = 0; i < nCPU; i++)
+        nCPUPartition[i] = other.nCPUPartition[i];
     cpuMemoryInSync = true;
 }
 
@@ -192,6 +197,7 @@ void msl::DS<T>::init() {
     nGPU = ng > 0 ? nLocal * (1.0 - Muesli::cpu_fraction) / ng : 0;
     nCPU = nLocal - nGPU * ng; // [0, nCPU-1] elements will be handled by the CPU.
     indexGPU = nCPU;
+    //printf("nGPU: %d, nCPU: %d, nLocal: %d, n: %d\n", nGPU, nCPU, nLocal, n);
 #else
     // If GPU not used all Elements to CPU.
     nGPU = 0;
@@ -253,6 +259,10 @@ T *msl::DS<T>::getLocalPartition() {
     updateHost();
     return localPartition;
 }
+template<typename T>
+T *msl::DS<T>::getnCPUPartition() {
+    return nCPUPartition;
+}
 
 template<typename T>
 void msl::DS<T>::setLocalPartition(T *elements) {
@@ -273,6 +283,9 @@ void msl::DS<T>::fill(const T &element) {
 #endif
     for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
+    }
+    for(int i = 0; i<nCPU; i++){
+        nCPUPartition[i] = element;
     }
     cpuMemoryInSync = true;
 #ifdef __CUDACC__
@@ -374,6 +387,7 @@ void msl::DS<T>::setLocal(int localIndex, const T &v) {
         throws(detail::NonLocalAccessException());
     } else {
         localPartition[localIndex] = v;
+
 #ifdef __CUDACC__
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
@@ -440,10 +454,10 @@ void msl::DS<T>::updateHost() {
                                               Muesli::streams[i]));
         }
 
-        // wait until download is finished
+       /* // wait until download is finished
         for (int i = 0; i < ng; i++) {
             (cudaStreamSynchronize(Muesli::streams[i]));
-        }
+        }*/
         cpuMemoryInSync = true;
     }
 #endif
@@ -617,11 +631,12 @@ void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in o
 #endif
 
     if (nCPU > 0) {
+        T *bPartition = b.getnCPUPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
         for (int k = 0; k < nCPU; k++) {
-            localPartition[k] = f(b.getLocal(k));
+            localPartition[k] = f(bPartition[k]);
         }
     }
     setCpuMemoryInSync(false);
@@ -633,28 +648,26 @@ template<typename T>
 template<typename T2, typename ZipFunctor>
 void msl::DS<T>::zipInPlace(DS <T2> &b, ZipFunctor &f) {
     // zip on GPU
-    updateDevice();
 #ifdef __CUDACC__
 
     for (int i = 0; i < ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
-        auto bplans = b.getExecPlans();
         detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                plans[i].d_Data, bplans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+                plans[i].d_Data, b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
     }
 #endif
-    T2 *bPartition = b.getLocalPartition();
+    if (nCPU > 0) {
+        T2 *bPartition = b.getnCPUPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for (int k = 0; k < nCPU; k++) {
-        localPartition[k] = f(localPartition[k], bPartition[k]);
+        for (int k = 0; k < nCPU; k++) {
+            localPartition[k] = f(localPartition[k], bPartition[k]);
+        }
     }
-
     // check for errors during gpu computation
-    msl::syncStreams();
     cpuMemoryInSync = false;
 }
 
@@ -662,9 +675,7 @@ template<typename T>
 template<typename T2, typename ZipFunctor>
 void
 msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
-                ZipFunctor &f) { // should have result type DS<R>; debug
-    updateDevice();
-
+                ZipFunctor &f) { // should have result type DS<R>;
     // zip on GPUs
 #ifdef __CUDACC__
 
@@ -676,17 +687,19 @@ msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
                 b.getExecPlans()[i].d_Data, c.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
     }
 #endif
-    // zip on CPU cores
-    T2 *bPartition = b.getLocalPartition();
-    T2 *cPartition = c.getLocalPartition();
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int k = 0; k < nCPU; k++) {
-        this->localPartition[k] = f(cPartition[k], bPartition[k]);
+    if (nCPU > 0) {
+        // zip on CPU cores
+        T2 *bPartition = b.getnCPUPartition();
+        T2 *cPartition = c.getnCPUPartition();
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+        for (int k = 0; k < nCPU; k++) {
+            this->localPartition[k] = f(cPartition[k], bPartition[k]);
+        }
     }
     // check for errors during gpu computation
-    msl::syncStreams();
+
     setCpuMemoryInSync(false);
 }
 

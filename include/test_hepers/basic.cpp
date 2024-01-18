@@ -56,6 +56,7 @@ void arg_helper(int argc, char** argv, int &dim, int &nGPUs, int &reps, bool &CH
     argc >= 5 ? CHECK = to_bool(argv[4]) : CHECK = true;
     argc >= 6 ? reps = std::stoi(argv[5]) : reps = 1;
     argc >= 7 ? skeletons = argv[6] : skeletons = "all";
+    CHECK = false;
     if (msl::isRootProcess()){
         if (argc < 2 || CHECK) {
             printf("FYI Taking cl arguments: #elements \t nGPUs \t cpu-Fraction \t compare results to non parallel results "
@@ -118,14 +119,15 @@ void print_and_doc_runtimes(int OUTPUT, const std::string &nextfile, T runtimes[
         std::ofstream outputFile;
         std::cout << "Follow this command: " << nextfile << "\n";
         outputFile.open(nextfile, std::ios_base::app);
+        outputFile << std::to_string(msl::Muesli::cpu_fraction) + ";";
         for (int i = 0; i < arraysize; i++) {
             outputFile << "" + std::to_string(runtimes[i]) + ";";
         }
         outputFile << "\n";
         outputFile.close();
     }
-    // printf("Filltime ; consttime ; Map ; Mapinplace ; mapindex ; mapindexinplace, fold, zip, zipinplace, zipindex, zipindexinplace\n");
+    printf("Map; \tMapInPlace; \tMapIndex; \tMapIndexInPlace; \tZip; \tZipInPlace; \tZipIndex; \tZipIndexInPlace; \tFold\n");
     for (int i = 0; i < arraysize; i++) {
-        printf("%.4f;", runtimes[i]);
+        printf("%.4f;\t\t", runtimes[i]);
     }
 }

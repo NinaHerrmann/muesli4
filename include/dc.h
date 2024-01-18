@@ -87,7 +87,7 @@ public:
    */
   DC(int row, int col, int depth);
 
-  DC(int row, int col, int depth, bool rowComplete);
+  //DC(int row, int col, int depth, bool rowComplete);
 
   /**
    * \brief Creates a distributed matrix with \em size elements equal to

@@ -301,7 +301,6 @@ set(EXAMPLE_SRCS
         #${PROJECT_SOURCE_DIR}/examples/da_test.cpp
         #${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
         ${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
-        ${PROJECT_SOURCE_DIR}/examples/dm_split_performance.cpp
         #${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
         #${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
         #${PROJECT_SOURCE_DIR}/examples/nbody.cpp

@@ -36,9 +36,7 @@
 
 #include "exec_plan.h"
 
-namespace msl {
-
-    namespace detail {
+namespace msl::detail {
 
         /**
       * \brief Zip function for Index less Variants of DA and DM.
@@ -52,48 +50,12 @@ namespace msl {
       */
         template<typename T1, typename T2, typename R, typename FCT2>
         __global__ void
-        zipKernel(T1 *in0,
-                  T2 *in1,
+        zipKernel(const T1 *in0,
+                  const T2 *in1,
                   R *out,
                   size_t n,
                   FCT2 func);
 
-        /**
-         * \brief Zip function for Index less Variants of DA and DM.
-         *
-         * @param in1 Pointer to gpu memory of datastructure which provides the data to calcuate on.
-         * @param in2 Pointer to gpu memory of datastructure which provides the data to calcuate on.
-         * @param out Pointer to gpu memory of datastructure where the data is written to.
-         * @param func functor to be called.
-         * @param gpuDepth Depth per GPU.
-         * @param gpuRows Rows per GPU.
-         * @param gpuCols Cols per GPU.
-         */
-        template<typename T1, typename T2, typename R, typename FCT2>
-        __global__ void
-        zip3DKernel(T1 *in1,
-                    T2 *in2,
-                    R *out,
-                    FCT2 func, int gpuDepth, int gpuRow, int gpuCol);
-        /**
-         * \brief From HK Zip function for InPlace Variants of DA and DM.
-         * \em Remark: this function could also be called with a DC in case threads are started 1D
-         *
-         * @param in1 Pointer to gpu memory of datastructure which provides the data to calculate on.
-         * @param in2 Pointer to gpu memory of datastructure which provides the data to calculate on.
-         * @param in3 Pointer to gpu memory of datastructure which provides the data to calculate on.
-         * @param out Pointer to gpu memory of datastructure where the data is written to.
-         * @param size of the data.
-         * @param func functor to be called.
-         */
-        template<typename T1, typename T2, typename T3, typename R, typename FCT3>
-        __global__ void
-        zipKernel(T1 *in1,
-                  T2 *in2,
-                  T3 *in3,
-                  R *out,
-                  size_t n,
-                  FCT3 func);
 
         /**
        * \brief From HK Zip Skeleton for Index Variants of DMs.
@@ -226,14 +188,13 @@ namespace msl {
        */
         template<typename T1, typename T2, typename R, typename FCT4>
         __global__ void
-        zipIndexKernelDC(T1 *in1,
-                       T2 *in2,
+        zipIndexKernelDC(const T1 *in1,
+                       const T2 *in2,
                        R *out,
                        FCT4 func,
                        int gpuRow, int gpuCol, int gpuDepth,
                        int firstRow, int firstCol, int firstDepth);
     }
-}
 
 #include "../../src/zip_kernels.cu"
 

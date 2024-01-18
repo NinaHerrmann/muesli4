@@ -123,6 +123,7 @@ msl::DM<T> &msl::DM<T>::operator=(DM <T> &&other) noexcept {
     return *this;
 }
 
+
 template<typename T>
 msl::DM<T> &msl::DM<T>::operator=(const DM <T> &other) {
     if (&other == this) {

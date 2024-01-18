@@ -349,6 +349,12 @@ namespace msl {
          * @return The local partition.
          */
         T *getLocalPartition();
+        /**
+         * \brief Returns the nCPU partition.
+         *
+         * @return The nCPU partition.
+         */
+        T *getnCPUPartition();
 
         /**
          * \briefs Sets the local partition.
@@ -572,7 +578,7 @@ namespace msl {
          *
          * @param other Another distributed dm which should be copied
          */
-        void copyLocalPartition(const DM<T> &other);
+        void copyLocalPartition(const DS<T> &other);
 
         /**
         * \brief Deletes the local Partition.
@@ -590,6 +596,7 @@ namespace msl {
         // position of processor in data parallel group of processors; zero-base
         int id{};
         T *localPartition;
+        T *nCPUPartition;
 
         // number of elements
         int n;
@@ -624,13 +631,6 @@ namespace msl {
         // points to the right data?
         std::vector<T *> all_data;
         T *padding_stencil;
-
-        //
-        // AUXILIARY
-        //
-
-        void copyLocalPartition(const DS <T> &other);
-
     };
 
 } // namespace msl

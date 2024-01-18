@@ -58,7 +58,7 @@ msl::DC<T>::DC(int row, int col, int depth) : ncol(col), nrow(row), depth(depth)
 #endif
 }
 
-template<typename T>
+/*template<typename T>
 msl::DC<T>::DC(int row, int col, int depth, bool rowComplete)
 : ncol(col), nrow(row), depth(depth), rowComplete(rowComplete), DS<T>(row*col*depth) {
 
@@ -66,7 +66,7 @@ msl::DC<T>::DC(int row, int col, int depth, bool rowComplete)
 #ifdef __CUDACC__
     initGPUs();
 #endif
-}
+}*/
 
 // constructor creates a DC, initialized with v
 template<typename T>
@@ -176,8 +176,6 @@ msl::DC<T> &msl::DC<T>::operator=(const DC <T> &other) noexcept {
 
 
 // template <typename T> void msl::DC<T>::swap(DC<T> &first, DC<T> &second) {}
-
-
 
 // auxiliary method initGPUs
 template<typename T>
@@ -412,14 +410,12 @@ void msl::DC<T>::mapIndexInPlace(MapIndexFunctor &f) {
         this->localPartition[k] = f(i, j, l, this->localPartition[k]);
     }
     // check for errors during gpu computation
-    msl::syncStreams();
-
     this->cpuMemoryInSync = false;
 }
 
 template<typename T>
 template<typename MapIndexFunctor>
-void msl::DC<T>::mapIndex(MapIndexFunctor &f, DC <T> &b) {
+void msl::DC<T>::mapIndex(MapIndexFunctor &f, DC<T>& b) {
 
 #ifdef __CUDACC__
 
@@ -431,28 +427,26 @@ void msl::DC<T>::mapIndex(MapIndexFunctor &f, DC <T> &b) {
         int dimcol = ceil(this->plans[i].gpuCols / 8.0);
         int dimdepth = ceil(this->plans[i].gpuDepth / 8.0);
         dim3 dimGrid(dimrow, dimcol, dimdepth);
-           detail::mapIndexKernelDC<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        detail::mapIndexKernelDC<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                    b.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].gpuRows, this->plans[i].gpuCols,
                 this->plans[i].gpuDepth, this->plans[i].firstRow, this->plans[i].firstCol, this->plans[i].firstDepth, f);
    }
 #endif
 
     if (this->nCPU > 0){
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int k = 0; k < this->nCPU; k++) {
-        T *bPartition = b.getLocalPartition();
-        int l = (k + this->firstIndex) / (ncol*nrow);
-        int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
-        int i = (k + this->firstIndex) % ncol;
-        this->localPartition[k] = f(i, j, l, bPartition[k]);
-    }
-}
+        T *bPartition = b.getnCPUPartition();
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+            for (int k = 0; k < this->nCPU; k++) {
+                int l = (k + this->firstIndex) / (ncol*nrow);
+                int j = ((k + this->firstIndex) - l*(ncol*nrow)) / ncol;
+                int i = (k + this->firstIndex) % ncol;
+                this->localPartition[k] = f(i, j, l, bPartition[k]);
+            }
+        }
    this->setCpuMemoryInSync(false);
-
     // check for errors during gpu computation
-    msl::syncStreams();
 }
 // ************************************ zip
 // ***************************************
@@ -474,11 +468,11 @@ void msl::DC<T>::zipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
                 this->plans[i].d_Data, b.getExecPlans()[i].d_Data, this->plans[i].d_Data,
                 f, this->plans[i].gpuRows, this->plans[i].gpuCols, this->plans[i].gpuDepth,
                 this->plans[i].firstRow, this->plans[i].firstCol, this->plans[i].firstDepth);
-
     }
+
 #endif
     if (this->nCPU > 0){
-        T2 *bPartition = b.getLocalPartition();
+        T2 *bPartition = b.getnCPUPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -489,7 +483,6 @@ void msl::DC<T>::zipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
             this->localPartition[k] = f(i, j, l, this->localPartition[k], bPartition[k]);
         }
     }
-     msl::syncStreams();
 	// check for errors during gpu computation
     this->cpuMemoryInSync = false;
 }
@@ -509,7 +502,7 @@ void msl::DC<T>::crossZipIndexInPlace(DC <T2> &b, ZipIndexFunctor &f) {
     }
 #endif
     if (this->nCPU > 0){
-        T2 *bPartition = b.getLocalPartition();
+        T2 *bPartition = b.getnCPUPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -544,9 +537,8 @@ void msl::DC<T>::zipIndex(DC <T2> &b, DC <T2> &c, ZipIndexFunctor &f) {
 #endif
     // zip on CPU cores
     if (this->nCPU > 0){
-        T2 *bPartition = b.getLocalPartition();
-        T2 *cPartition = c.getLocalPartition();
-
+        T2 *bPartition = b.getnCPUPartition();
+        T2 *cPartition = c.getnCPUPartition();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -558,7 +550,6 @@ void msl::DC<T>::zipIndex(DC <T2> &b, DC <T2> &c, ZipIndexFunctor &f) {
         }
     }
     this->cpuMemoryInSync = false;
-    msl::syncStreams();
 }
 
 
@@ -601,6 +592,7 @@ void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralVal
         result.localPartition[k] = f(cube, i, j, l);
     }
 #endif
+    msl::syncStreams();
 }
 
 template<typename T>
@@ -618,5 +610,3 @@ T msl::DC<T>::get(int col, int row, int ldepth) const {
     }
     return 0;
 }
-
-
