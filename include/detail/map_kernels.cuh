@@ -110,7 +110,7 @@ namespace msl {
         */
         template<typename T, typename R, typename F>
         __global__ void mapIndexKernelDC(T *in, R *out, int gpuRows, int gpuCols,
-                                         int gpuDepth, int firstRow, int firstCol, int firstDepth, F func);
+                                         int offset, int elements, F func);
 
         /**
         * \brief MapInPlace function for DC. \em Calls Functor which has one Arguments: the value at the index.

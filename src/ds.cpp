@@ -163,7 +163,7 @@ void msl::DS<T>::freeLocalPartition() {
 #else
     delete[] localPartition;
     localPartition = nullptr;
-    delete[] nCPUPartition
+    delete[] nCPUPartition;
     nCPUPartition = nullptr;
 #endif
 }
@@ -277,7 +277,6 @@ void msl::DS<T>::setLocalPartition(T *elements) {
     for (int k = 0; k < n; k++) {
         localPartition[k] = elements[k];
     }
-    T * nCPUPartition = new T[nCPU];
 
     for (int k = 0; k < nCPU; k++) {
         nCPUPartition[k] = elements[k];
@@ -293,14 +292,13 @@ void msl::DS<T>::fill(const T &element) {
     for (int i = 0; i<nLocal; i++){
         localPartition[i] = element;
     }
-    T * nCPUPartition = new T[nCPU];
     for(int i = 0; i<nCPU; i++){
         nCPUPartition[i] = element;
     }
     cpuMemoryInSync = true;
 #ifdef __CUDACC__
     initGPUs();
-    updateDevice();
+    updateDevice(true);
 #endif
 }
 template<typename T>
@@ -317,7 +315,7 @@ void msl::DS<T>::fill(T *const values) {
             // TODO: in case of multiple nodes set offsetd messages to all nodes.
         }
     }
-    this->updateDevice();
+    this->updateDevice(true);
 }
 template<typename T>
 T msl::DS<T>::get(int index) const {
@@ -469,11 +467,8 @@ void msl::DS<T>::updateHost() {
                                               plans[i].bytes, cudaMemcpyDeviceToHost,
                                               Muesli::streams[i]));
         }
+        msl::syncStreams();
 
-       /* // wait until download is finished
-        for (int i = 0; i < ng; i++) {
-            (cudaStreamSynchronize(Muesli::streams[i]));
-        }*/
         cpuMemoryInSync = true;
     }
 #endif
@@ -614,8 +609,7 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-                plans[i].d_Data, plans[i].d_Data, plans[i].size,
-                f);
+                plans[i].d_Data, plans[i].d_Data, plans[i].size, f);
     }
 #endif
     if (nCPU > 0) {
@@ -626,6 +620,7 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
             localPartition[k] = f(localPartition[k]);
         }
     }
+    msl::syncStreams();
     setCpuMemoryInSync(false);
 }
 
@@ -655,6 +650,8 @@ void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in o
             localPartition[k] = f(bPartition[k]);
         }
     }
+    msl::syncStreams();
+
     setCpuMemoryInSync(false);
 }
 
@@ -683,6 +680,8 @@ void msl::DS<T>::zipInPlace(DS <T2> &b, ZipFunctor &f) {
             localPartition[k] = f(localPartition[k], bPartition[k]);
         }
     }
+    msl::syncStreams();
+
     // check for errors during gpu computation
     cpuMemoryInSync = false;
 }
@@ -715,6 +714,7 @@ msl::DS<T>::zip(DS <T2> &b, DS <T2> &c,
         }
     }
     // check for errors during gpu computation
+    msl::syncStreams();
 
     setCpuMemoryInSync(false);
 }

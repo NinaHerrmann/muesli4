@@ -182,7 +182,7 @@ public:
    * @return The newly created distributed array.
    */
   template <typename MapIndexFunctor>
-  void mapIndex(MapIndexFunctor &f, DC<T> &b); // should be return type DA<R>; debug
+  void mapIndex(MapIndexFunctor &f, DC<T>& b); // should be return type DA<R>; debug
 /*
     TODO Stencil Functor
   */
@@ -541,6 +541,8 @@ public:
    * @param descr The description string.
    */
   void show(const std::string &descr = std::string());
+
+  void printnCPU();
 
   int getCols() {
       return ncol;

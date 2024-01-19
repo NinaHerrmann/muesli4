@@ -50,9 +50,10 @@ namespace msl::test {
                 y(factor) {}
 
         MSL_USERFUNC int operator()(int x) const override {
-            return y * x ;
+            return y * x;
         }
     };
+
     class LiMult3 : public Functor<double, double> {
     private:
         int y;
@@ -76,6 +77,7 @@ namespace msl::test {
             return i * j * l * Ai * Bi * y;
         }
     };
+
     class LiMult5 : public Functor5<int, int, double, double, double, double> {
     private:
         int y;
@@ -95,10 +97,9 @@ namespace msl::test {
         }
     };
 
-
-    class Sum4 : public Functor4<int, int, int, int, int> {
+    class Sum4 : public Functor4<int, int, int, double, double> {
     public:
-        MSL_USERFUNC int operator()(int i, int j, int x, int y) const override {
+        MSL_USERFUNC double operator()(int i, int j, int x, double y) const override {
             return i + j + x + y;
         }
     };
@@ -165,6 +166,7 @@ namespace msl::test {
 
         b.fill(2.0);
         a.fill(6.0);
+
         if (check_str_inside(skeletons, "mapIndex,")) {
             t = MPI_Wtime();
             for (int i = 0; i < reps; i++) {
@@ -228,7 +230,6 @@ namespace msl::test {
                 d.zip(b, c, sum);
             }
             pResults = d.gather();
-
             runtimes[4] += MPI_Wtime() - t;
 
             if (CHECK && msl::isRootProcess()) {
@@ -243,7 +244,6 @@ namespace msl::test {
                 b.zipInPlace(c, sum);
             }
             pResults = b.gather();
-
             runtimes[5] += MPI_Wtime() - t;
             for (int j = 0; j < elements; j++) {
                 manpResults[j] = 10;
@@ -265,8 +265,8 @@ namespace msl::test {
                 d.zipIndex(b, c, sum5);
             }
             pResults = d.gather();
-
             runtimes[6] += MPI_Wtime() - t;
+
             if (CHECK && msl::isRootProcess()) {
                 for (int j = 0; j < elements; j++) {
                     int depth = int(j / (dim * dim));
@@ -285,7 +285,6 @@ namespace msl::test {
                 b.zipIndexInPlace(c, sum5);
             }
             pResults = b.gather();
-
             runtimes[7] += MPI_Wtime() - t;
 
             if (CHECK && msl::isRootProcess()) {

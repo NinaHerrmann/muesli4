@@ -82,7 +82,7 @@ template <typename T>
 void check_array_array_equal(const char* skelet, int elements, T array[], T expected_array[]){
         for (int i = 0; i < elements; i++) {
             if (array[i] != expected_array[i]) {
-                printf("%s \t\t\t\t \xE2\x9C\x97 At Index %d - Value %d != %d \nNo further checking.\n", skelet,
+                printf("%s \t\t\t\t \xE2\x9C\x97 At Index %d - Value %.2f != %.2f \nNo further checking.\n", skelet,
                        i, array[i], expected_array[i]);
                 break;
             }
@@ -95,7 +95,7 @@ template <typename T>
 void check_array_value_equal(const char* skelet, int elements, T array[], T expected_value){
         for (int i = 0; i < elements; i++) {
             if (array[i] != expected_value) {
-                printf("%s \t\t\t\t \xE2\x9C\x97 At Index %d - Value %d != %d \nNo further checking.\n", skelet,
+                printf("%s \t\t\t\t \xE2\x9C\x97 At Index %d - Value %.2f != %.2f \nNo further checking.\n", skelet,
                        i, array[i], expected_value);
                 break;
             }
@@ -107,7 +107,7 @@ void check_array_value_equal(const char* skelet, int elements, T array[], T expe
 template <typename T>
 void check_value_value_equal(const char* skelet, T value, T expected_value){
     if (value != expected_value) {
-        printf("%s \t\t\t\t \xE2\x9C\x97 Value %d != %d \nNo further checking.\n", skelet,
+        printf("%s \t\t\t\t \xE2\x9C\x97 Value %.2f != %.2f\nNo further checking.\n", skelet,
                 value, expected_value);
     } else {
         printf("%s \t\t\t \xE2\x9C\x93\n", skelet);

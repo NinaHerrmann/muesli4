@@ -87,19 +87,19 @@ __global__ void msl::detail::zipIndexKernelDA(T1 *in1, T2 *in2, R *out, size_t n
 
 template<typename T1, typename T2, typename R, typename FCT4>
 __global__ void
-msl::detail::zipIndexKernelDC(const T1 *in1, const T2 *in2, R *out, FCT4 func, int gpuRows, int gpuCols, int gpuDepth,
-                              int firstRow, int firstCol, int firstDepth) {
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+msl::detail::zipIndexKernelDC(const T1 *in1, const T2 *in2, R *out, FCT4 func, int gpuRows, int gpuCols,
+                              int offset, int elements) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int z = blockIdx.z * blockDim.z + threadIdx.z;
-
-
-    // TODO compare map less params
-    int localoverall = (z * (gpuRows * gpuCols)) + (y * gpuCols) + x;
-    if (z < gpuDepth && y < gpuRows && x < gpuCols) {
-        out[localoverall] = func(y + firstRow, x + firstCol, z + firstDepth,
-                                 in1[localoverall], in2[localoverall]);
+    int elementlayer = gpuRows * gpuCols;
+    int l = (x + offset) / (elementlayer);
+    int remaining_index = (x + offset) % (elementlayer);
+    int j = remaining_index / gpuCols;
+    int i = remaining_index % gpuCols;
+    // calculate
+    if (x < elements) {
+        out[x] = func(i, j, l, in1[x], in2[x]);
     }
+
 }
 
 template<typename T1, typename T2, typename R, typename FCT3>

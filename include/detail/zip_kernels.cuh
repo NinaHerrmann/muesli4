@@ -192,8 +192,8 @@ namespace msl::detail {
                        const T2 *in2,
                        R *out,
                        FCT4 func,
-                       int gpuRow, int gpuCol, int gpuDepth,
-                       int firstRow, int firstCol, int firstDepth);
+                       int gpuRow, int gpuCol,
+                       int offset, int elements);
     }
 
 #include "../../src/zip_kernels.cu"
