@@ -35,7 +35,8 @@
 
 template<typename T, typename R, typename F>
 __global__ void msl::detail::mapKernel(T *in, R *out, size_t size, F func) {
-    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+
     if (x < size) {
         out[x] = func(in[x]);
     }
@@ -62,7 +63,8 @@ __global__ void msl::detail::mapIndexKernelDM(T *in, R *out, size_t size,
     size_t k = blockIdx.x * blockDim.x + threadIdx.x;
     int i = (k + first) / nCols;
     int j = (k + first) % nCols;
-    if (k < size) {
+    if (k < size-1) {
+        //out[k] = in[k];
         out[k] = func(i, j, in[k]);
     }
 }
@@ -110,12 +112,9 @@ __global__ void
 msl::detail::mapStencilGlobalMem(R *out, GPUExecutionPlan<T> plan, PLMatrix <T> *pl, F func, int i) {
 
     size_t thread = threadIdx.x + blockIdx.x * blockDim.x;
-
     int y = thread / plan.gpuCols;
     int x = thread % plan.gpuCols;
-
     pl->readToGlobalMemory();
-
     if ((y) < plan.gpuRows) {
         if (x < plan.gpuCols) {
             out[thread] = func(y, x, pl, plan.gpuCols, plan.gpuRows);
@@ -151,7 +150,6 @@ msl::detail::mapStencilKernelDMSM(T *out, NPLMatrix<T> in, unsigned int size) {
     int2 coords = in.indexToCoordinate(in.dataStartIndex + i);
     in.readTosm(in.dataStartIndex + i, threadIdx.x, 1);
     __syncthreads();
-    //in.printsm(i, threadIdx.x);
     T v = f(in, coords.x, coords.y);
     out[i] = v;
 }
@@ -222,7 +220,7 @@ msl::detail::printGPU(T *data, int size, int col) {
     for (int i = 0; i < size; i++) {
         if (i % col == 0 && i != 0) {printf("\n");}
 
-        printf("%.2f;\t", data[i]);
+        printf("%d;", data[i]);
     }
 }
 template<typename T>
@@ -231,5 +229,10 @@ __global__ void printNPL(T *data, int size, int col) {
         if (i % col == 0 && i != 0) {printf("\n");}
         printf("%.2f;\t", data[i]);
     }
+}
+
+__global__ void msl::detail::generateRandom(curandState* state, unsigned long seed) {
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    curand_init(seed, id, 0, &state[id]);
 }
 

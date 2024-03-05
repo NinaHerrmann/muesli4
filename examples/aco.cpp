@@ -34,227 +34,307 @@
 #include <cmath>
 #include "dm.h"
 #include "da.h"
-#include "dc.h"
 #include "muesli.h"
 #include <algorithm>
-#include <utility>
 #include "array.h"
-#include "vec2.h"
 #include "Randoms.h"
 
+#ifdef __CUDACC__
+#define MSL_MANAGED __managed__
+#define MSL_CONSTANT __constant__
+#define POW(a, b)      powf(a, b)
+#define EXP(a)      exp(a)
+__device__ double d_PHERINIT;
+__device__ double d_EVAPORATION;
+__device__ double d_ALPHA;
+__device__ double d_BETA ;
+__device__ double d_TAUMAX;
+__device__ int d_BLOCK_SIZE;
+__device__ int d_GRAPH_SIZE;
+#else
+#define MSL_MANAGED
+#define MSL_CONSTANT
+#define POW(a, b)      std::pow(a, b)
+#define EXP(a)      std::exp(a)
+#endif
+
+const int Q = 38;
 typedef array<double, 2> city;
 Randoms *randoms;
 
-#define PHERINIT 0.005
-#define EVAPORATION 0.5
-#define ALPHA 1
-#define BETA 2
+
 #define TAUMAX 2
-std::ostream& operator<< (std::ostream& os, const city f) {
-    os << "(" << f[0] << ", " << f[1] << ")";
+#define IROULETE 32
+#define CHECKCORRECTNESS 1
+
+std::ostream& operator<< (std::ostream& os, const city t) {
+    os << "(" << t[0] << ", " << t[1] << ")";
     return os;
 }
 namespace msl::aco {
-    class Probabilities : public Functor2<double, double, double> {
-        // j is distance, x is phero
+
+    class Reset : public Functor<double, double> {
     public:
-        MSL_USERFUNC double operator()(double j, double x) const {
-            double result = x * j;
-            // Prevent to high values.
-            if (result > 1.0) {
-                result = 1.0;
-            }
-            return result;
-        }
-    };
-
-    class InitializeDistance : public Functor3<int, int, int, int> {
-    public:
-        InitializeDistance(DA<city> cities) : Functor3(){
-            this->cities = cities;
-        }
-            MSL_USERFUNC int operator()(int i, int j, int x) const {
-
-        }
-    private:
-        DA<city> cities;
-    };
-
-    class RouteCalculation : public Functor3<int, int, double, double> {
-    private:
-        DM<double> probabilites;
-    public:
-        explicit RouteCalculation(DM<double> probs) :
-                probabilites(std::move(probs)) {}
-
-        MSL_USERFUNC double operator()(int xindex, int yindex, double value, int ncities) const {
-            int newroute = 0;
-            int route[ncities] = {0};
-            int visited[ncities] = {0};
-            double sum = 0.0;
-            int next_city = -1;
-            double ETA = 0.0;
-            double TAU = 0.0;
-            double random = 0.0;
-            int initial_city = 0;
-            route[0] = initial_city;
-            /*for (int i = 0; i < ncities-1; i++) {
-              int cityi = route[0];
-              int count = 0;
-              for (int c = 0; c < ncities; c++) {
-                next_city = d_iroulette[c];
-                int visited = 0;
-                for (int l=0; l <= i; l++) {
-                  if (route[l] == next_city){visited[]}
-                }
-                if (!visited){
-                  int indexpath = (cityi * ncities) + next_city;
-                  double firstnumber = 1 / distance[indexpath];
-                  ETA = (double) mkt::pow(firstnumber, BETA);
-                  TAU = (double) mkt::pow(phero[indexpath], ALPHA);
-                  sum += ETA * TAU;
-                }
-              }
-              for (int c = 0; c < IROULETE; c++) {
-                next_city = d_iroulette[(cityi * IROULETE) + c];
-                int visited = 0;
-                for (int l=0; l <= i; l++) {
-                  if (d_routes[ant_index*ncities+l] == next_city) {visited = 1;}
-                }
-                if (visited) {
-                  d_probabilities[ant_index*ncities+c] = 0.0;
-                } else {
-                  double dista = (double)distance[cityi*ncities+next_city];
-                  double ETAij = (double) mkt::pow(1 / dista , BETA);
-                  double TAUij = (double) mkt::pow(phero[(cityi * ncities) + next_city], ALPHA);
-                  d_probabilities[ant_index*ncities+c] = (ETAij * TAUij) / sum;
-                  count = count + 1;
-                }
-              }
-
-              if (0 == count) {
-                int breaknumber = 0;
-                for (int nc = 0; nc < (ncities); nc++) {
-                  int visited = 0;
-                  for (int l = 0; l <= i; l++) {
-                    if (d_routes[(ant_index * ncities) + l] == nc) { visited = 1;}
-                  }
-                  if (!(visited)) {
-                    breaknumber = (nc);
-                    nc = ncities;
-                  }
-                }
-                newroute = breaknumber;
-              } else {
-                random = mkt::rand(0.0, (double)ncities);
-                int ii = -1;
-                double summ = d_probabilities[ant_index*ncities];
-
-                for(int check = 1; check > 0; check++){
-                  if (summ >= random){
-                    check = -2;
-                  } else {
-                    i = i+1;
-                    summ += d_probabilities[ant_index*ncities+ii];
-                  }
-                }
-                int chosen_city = ii;
-                newroute = d_iroulette[cityi*IROULETE+chosen_city];
-              }
-              d_routes[(ant_index * ncities) + (i + 1)] = newroute;
-              sum = 0.0;
-            }
-
-
-            return value;*/
+        MSL_USERFUNC double operator()(double x) const override {
             return 0.0;
         }
     };
 
-    DA <city> readsize(const std::string &basicString);
+    class EtaTauCalc : public Functor3<int, int, city, city> {
+    private:
+        int * iroulette{}, * routes{};
+        double * phero{}, * dist{};
+        int cities, iteration;
+    public:
+        EtaTauCalc(int cities, int i) {
+            this->cities = cities;
+            this->iteration = i;
+        }
+        void setiterationParams(int * iroulet, int i, double * distance, int * tours, double * pheromones) {
+            this->iroulette = iroulet;
+            this->iteration = i;
+            this->dist = distance;
+            this->routes = tours;
+            this->phero = pheromones;
+        }
 
-    void readData(const std::string &basicString, int ncities, DA <city> &da, DM<double> &phero);
+        MSL_USERFUNC city operator()(int xindex, int yindex, city eta_tau) const override {
+            int d_ALPHA = 1;
+            int d_BETA = 2;
+            int fromcity = routes[xindex * cities + iteration];
+            int next_city = iroulette[(fromcity * 32) + yindex];
+            bool bvisited = false;
+            city eta_tau_return = {0,0};
+            for (int y = 0; y < this->cities; y++) {
+                if (routes[xindex * cities + y] == next_city) {
+                    bvisited = true;
+                    break;
+                }
+            }
+            // For every city which can be visited, calculate the eta and tau value.
+            if (fromcity != next_city && !bvisited) {
+                // Looks like zero but is just very small.
+                eta_tau_return[0] = (double) pow(1 /  dist[fromcity * this->cities + next_city], d_BETA);
+                eta_tau_return[1] = (double) pow(phero[fromcity * this->cities + next_city], d_ALPHA);
+            }
+            return eta_tau_return;
+        }
+    };
 
-    void aco(int iterations, const std::string& importFile, int nants) {
-        // TODO distance could also be array ncities*ncities/2
+    class CalcProbs : public Functor5<int, int, double, city, double, double> {
+    private:
+        int i{}, ncities{};
+        int * routes{}, * iroulette{};
+    public:
+        CalcProbs(int i, int ncities, int * iroulet) {
+            this->i = i;
+            this->ncities = ncities;
+            this->iroulette = iroulet;
+        }
+        void setiterationparams(int ii, int * tours) {
+            this->i = ii;
+            this->routes = tours;
+        }
 
-        DA<city> cities = readsize(importFile);
-        int ncities = cities.getSize();
-        DM<double> phero(ncities, ncities, 0.0);
-        readData(importFile, ncities, cities, phero);
-        // cities.showLocal("cities");
-        DM<double> distance(ncities, ncities, 1);
-        DA<int> routelength(nants, 0);
-        DM<double> probabilities(ncities, ncities, 0.0);
-        // TODO parallelization not possible since passing of DA does not work.
-        // distance = size cities x cities
-        for (int i = 0; i < ncities; i++) {
-            for (int j = 0; j < ncities; j++) {
-                if (i == j) {
-                    distance.setLocal(i*ncities + j, 0);
+        MSL_USERFUNC double operator()(int x, int y, double t, city etatau, double sum) const override {
+            // Calculates the probability of an ant going to the city at index x in the 32 closest cities.
+            int cityi = routes[x*ncities+i];
+            int next_city = iroulette[cityi*IROULETE+y];
+            if (cityi == next_city || vizited(x, next_city, routes, ncities, i+1)) {
+                return 0;
+            } else {
+                if (sum == 0.0) {
+                    return 0;
                 } else {
-                    distance.setLocal(i*ncities + j, sqrt(pow(cities.get(j)[0] - cities.get(i)[0], 2) +
-                                pow(cities.get(j)[1] - cities.get(i)[1], 2)));
+                    return (etatau[0] * etatau[1]) / sum;
                 }
             }
         }
-        // distance.show("distance");
-        phero.show("phero");
-
-        Probabilities prob;
-        msl::startTiming();
-
-        for (int i = 0; i < iterations; i++) {
-            // Was sollte raus kommen? Möglich ant x cities (tour für jede ant) - DA ants länge jeder tour
-            RouteCalculation route(probabilities);
-            //phero = ant.combine(probabilities, route, prob, ncities);
-        }
-        msl::stopTiming();
-    }
-
-    void readData(const std::string &basicString, int ncities, DA <city> &cities, DM<double> &phero) {
-        std::ifstream data;
-        data.open("/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/data/" + basicString + ".txt", std::ifstream::in);
-        randoms = new Randoms(15);
-        if (data.is_open()){
-            double randn = 0.0;
-            for(int j = 0;j<ncities;j++){
-                for(int k = 0;k<ncities;k++){
-                    if(j!=k){
-                        randn = randoms -> Uniforme() * TAUMAX;
-                        phero.setLocal((j*ncities) + k, randn);
-                        phero.setLocal((k*ncities) + j, randn);
-                    }
-                    else{
-                        phero.setLocal((j*ncities) + k, 0);
-                        phero.setLocal((k*ncities) + j, 0);
-                    }
+        MSL_USERFUNC static bool vizited(int antk, int c, const int* routes, int n_cities, int step) {
+            for (int l=0; l <= step; l++) {
+                if (routes[antk*n_cities+l] == c) {
+                    return true;
                 }
             }
+            return false;
+        }
+    };
+    class SUM : public Functor2<city, double, double> {
+    public:
+        MSL_USERFUNC double operator()(city x, double y) const override {
+            return (x[0] * x[1]) + y;
+        }
+    };
+    class Min : public Functor2<double, double, double> {
+    public:
+        MSL_USERFUNC double operator()(double x, double y) const override {
+            if (x < y) { return x; }
+            return y;}
+    };
+    class ZipSum : public Functor3<int, int, double, double> {
+    private:
+        double * dist{};
+        int ncities{};
+    public:
+        explicit ZipSum(int cities) {
+            this->ncities = cities;
+        }
+        void setDist(double * distance) {
+            this->dist = distance;
+        }
+        MSL_USERFUNC double operator()(int x, int x2, double y) const override {
+            double newdist = dist[x*ncities + x2];
+            return y + newdist;
+        }
+    };
+    class CalcRlength : public Functor2<int, double, double> {
+    private:
+        int * routes{};
+        double * distances{};
+        int ncities;
+    public:
+        explicit CalcRlength(int cities) {
+            this->ncities = cities;
+        }
+        void setIterationsParams(int * tours, double * distance) {
+            this->routes = tours;
+            this->distances = distance;
+        }
+        MSL_USERFUNC double operator()(int x, double value) const override {
+            double sum = 0.0;
+            for (int j=0; j < ncities - 1; j++) {
+                int cityi = routes[x * ncities + j];
+                int cityj = routes[x * ncities + j + 1];
+                sum += distances[cityi * ncities + cityj];
+            }
+
+            int cityi = routes[x * ncities + ncities - 1];
+            int cityj = routes[x * ncities];
+            sum += distances[cityi * ncities + cityj];
+
+            return sum;
+        }
+    };
+    class nextStep : public Functor3<int, int, int, int> {
+    private:
+        int * iroulette{};
+        double * d_sum{};
+        int * routes{};
+        double * d_probs{};
+        int ncities, i;
+        double * randoms;
+    public:
+        nextStep(int i, int ncities, double * randomp) {
+            this->i = i;
+            this->ncities = ncities;
+            this->randoms = randomp;
+        }
+        void setIterationsParams(int * iroulet, int ii, double * dprobs, double * dSum, int * tours) {
+            this->iroulette = iroulet;
+            this->i = ii;
+            this->d_probs = dprobs;
+            this->d_sum = dSum;
+            this->routes = tours;
+        }
+
+        MSL_USERFUNC int operator()(int ant_index, int column, int citytobe) const override {
+            if (column != i) {
+                return citytobe;
+            } else {
+                int cityi = routes[ant_index * ncities + i];
+                if (d_sum[ant_index] > 0.0) {
+                    int nextCity = city(ant_index, d_probs, randoms, 32);
+                    if (nextCity == -1) {
+                        int nc;
+                        for (nc = 0; nc < ncities; nc++) {
+                            if (!vizited(ant_index, nc, routes, ncities, i+1)) {
+                                break;
+                            }
+                        }
+                        return nc;
+                    }
+                    return iroulette[cityi*IROULETE+nextCity];
+                } else {
+                    int nc;
+                    for (nc = 0; nc < ncities; nc++) {
+                        if (!vizited(ant_index, nc, routes, ncities, i+1)) {
+                            break;
+                        }
+                    }
+                    return nc;
+                }
+            }
+        }
+
+        MSL_USERFUNC static int city(int antK, const double *probabilities, const double *rand_states, int iroulette) {
+            double random = rand_states[antK];
             int i = 0;
-            double index, x, y;
-            index = 0.0; x = 0.0; y = 0.0;
-            city city = {0,0};
-            while(i < ncities){
-                data >> index;
-                data >> x;
-                data >> y;
-
-                city[0] = (double)x;
-                city[1] = (double)y;
-                cities.setLocal(i, city);
-                i += 1;
+            // In case a city was already visited the probability is zero therefore the while loop should not terminate.
+            double sum = probabilities[antK * iroulette];
+            while (sum < random) {
+                i++;
+                sum += probabilities[antK * iroulette + i];
             }
-            data.close();
-            printf("%.2f \t", cities.localPartition[0][0]);
-        } else{
-            printf(" File not opened\n");
+            if (i > iroulette) {
+                return -1;
+            }
+            return (int) i;
         }
-    }
 
-    DA <city> readsize(const std::string &basicString) {
-        int n_cities = 0;
+        MSL_USERFUNC static bool vizited(int antk, int c, const int* routes, int n_cities, int step) {
+            for (int l=0; l <= step; l++) {
+                if (routes[antk*n_cities+l] == c) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
 
+
+    class UpdateDelta : public Functor3<int, int, double, double> {
+    private:
+        int *routes{};
+        double *dist_routes{};
+        int nants, ncities;
+    public:
+        UpdateDelta(int cities, int ants) {
+            this->nants = ants;
+            this->ncities = cities;
+        }
+
+        void setIterationsParams(int *tours, double *distroutes) {
+            this->routes = tours;
+            this->dist_routes = distroutes;
+        }
+
+        MSL_USERFUNC double operator()(int row, int column, double phero) const override {
+            int Q = 11340;
+            int cityi = row+1;
+            int cityj = column+1;
+            double result = 0.0;
+            for (int k = 0; k < nants; k++) {
+                double rlength = dist_routes[k];
+                dist_routes[k] = rlength;
+                for (int r = 0; r < ncities-1; r++) {
+                    if ((routes[k * ncities + r] == cityi && routes[k * ncities + r + 1] == cityj) ||
+                            (routes[k * ncities + r] == cityj && routes[k * ncities + r + 1] == cityi)) {
+                        result += Q / rlength;
+                    }
+                }
+            }
+            return result;
+        }
+    };
+    class UpdatePhero : public Functor4<int, int, double, double, double> {
+    public:
+        MSL_USERFUNC double operator()(int x, int y, double prevphero, double deltaphero) const override {
+            double RO = 0.5;
+            return (1 - RO) * (prevphero + deltaphero);
+        }
+    };
+    int readsize(const std::string &basicString) {
+        int n_cities;
         if (basicString == "djibouti") {
             n_cities = 38;
         } else if (basicString == "luxembourg") {
@@ -283,10 +363,185 @@ namespace msl::aco {
             std::cout << "No valid import file provided. Please provide a valid import file." << std::endl;
             exit(-1);
         }
-        DA<city> cities(n_cities, {});
-        return cities;
+        return n_cities;
     }
 
+
+    void readData(const std::string &basicString, int ncities, DA <city> &cities, DM<double> &phero) {
+        std::ifstream data;
+        data.open("/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/data/" + basicString + ".txt", std::ifstream::in);
+        randoms = new Randoms(15);
+
+        if (data.is_open()){
+            double randn;
+            for(int j = 0;j<ncities;j++){
+                for(int k = 0;k<ncities;k++){
+                    if(j!=k){
+                        randn = randoms -> Uniforme() * TAUMAX;
+                        phero.setLocal((j * ncities) + k, randn);
+                        phero.setLocal((k * ncities) + j, randn);
+                    }
+                    else{
+                        phero.setLocal((j * ncities) + k, 0.0);
+                        phero.setLocal((k * ncities) + j, 0.0);
+                    }
+                }
+            }
+            int i = 0;
+            double index, x, y;
+            index = 0.0; x = 0.0; y = 0.0;
+            city city = {0.0,0.0};
+            while(i < ncities){
+                data >> index;
+                data >> x;
+                data >> y;
+
+                city[0] = (double)x;
+                city[1] = (double)y;
+                cities.setLocal(i, city);
+                i += 1;
+            }
+            data.close();
+        } else{
+            printf(" File not opened\n");
+        }
+    }
+    void checkminroute(int nants, double minroute, const DA<double>& dist_routes) {
+        for (int ii = 0; ii < nants; ii++) {
+            if (minroute > dist_routes.localPartition[ii]) {
+                printf("minimum route %.2f bigger than distance at %d %.2f\n", minroute, ii, dist_routes.localPartition[ii]);
+                exit(1);
+            }
+        }
+    }
+    void checkvalidroute(const DM<int>& routes, int ncities, int nants) {
+        for (int ii = 0; ii < nants; ii++) {
+            for (int jj = 0; jj < ncities; jj++) {
+                int currentcity = routes.localPartition[ii * ncities + jj];
+                for (int kk = 0; kk < ncities; kk++) {
+                    if (kk != jj && currentcity == routes.localPartition[ii * ncities + kk]) {
+                        printf("city %d visited twice in ant %d\n", currentcity, ii);
+                        exit(1);
+                    }
+                }
+            }
+        }
+    }
+    void aco(int iterations, const std::string& importFile, int nants) {
+        int niroulet = 32;
+        int ncities = readsize(importFile);
+        DA<city> cities(ncities, {});
+        DM<double> phero(ncities, ncities, {});
+        DM<double> distance(ncities, ncities, {});
+        readData(importFile, ncities, cities, phero);
+        DA<int> routelength(nants, 0);
+        DM<int> iroulet(ncities, niroulet, 0);
+        DM<double> probabilities(nants, niroulet, 0.0);
+        for (int i = 0; i < ncities; i++) {
+            for (int j = 0; j < ncities; j++) {
+                if (i == j) {
+                    distance.setLocal(i*ncities + j, 0.0);
+                } else {
+                    double dist = sqrt(pow(cities.get(j)[0] - cities.get(i)[0], 2) +
+                                   pow(cities.get(j)[1] - cities.get(i)[1], 2));
+                    distance.setLocal(i*ncities + j, dist);
+                }
+            }
+        }
+        for (int i = 0; i < ncities; i++) {
+            for (int y = 0; y < IROULETE; y++) {
+
+                double maxdistance = 999999.9;
+                double c_dist;
+                int city = -1;
+                for (int j = 0; j < ncities; j++) {
+                    bool check = true;
+                    for (int k = 0; k < y; k++) {
+                        if (iroulet.get(i * IROULETE + k) == j) {
+                            check = false;
+                        }
+                    }
+
+                    if (i != j && check) {
+                        c_dist = distance.get(i*ncities + j);
+                        if (c_dist < maxdistance) {
+                            maxdistance = c_dist;
+                            city = j;
+                        }
+                    }
+                }
+                iroulet.set(i * IROULETE + y, city);
+            }
+        }
+        msl::syncStreams();
+        DM<int> tours(nants, ncities, 0);
+        DM<double> deltaphero(ncities, ncities, 0);
+        DM<city> etatau(nants, niroulet, {});
+        DA<double> sum(nants, 0.0);
+        DA<double> dist_routes(nants, 0.0);
+        DA<double> r_length(nants, 0.0);
+        SUM summe;
+        EtaTauCalc etataucalc(ncities, 0);
+        CalcProbs calcprobs(0, ncities, iroulet.getGpuData());
+        DA<double> randompointer(nants, 0.0);
+        for (int i = 0; i < nants; i++) {
+            randompointer.set(i, randoms->Uniforme());
+        }
+        nextStep nextstep(0, ncities, randompointer.getGpuData());
+        Reset reset;
+        ZipSum zipsum(ncities);
+        Min min;
+        double minroute;
+        zipsum.setDist(distance.getLocalPartition());
+        UpdateDelta updatedelta(ncities, nants);
+        UpdatePhero updatephero;
+        CalcRlength calcrlength(ncities);
+        msl::startTiming();
+        double alltimeminroute = 999999.9;
+        for (int i = 0; i < iterations; i++) {
+            for (int j = 0; j < ncities; j++) {
+                etataucalc.setiterationParams(iroulet.getGpuData(), j, distance.getGpuData(), tours.getGpuData(), phero.getGpuData());
+                // Write the eta tau value to the data structure.
+                etatau.mapIndexInPlace(etataucalc);
+                // Write the sum of the etatau value for each ant to the sum datastructure.
+                etatau.reduceColumns(sum, summe);
+                calcprobs.setiterationparams(j, tours.getGpuData());
+                // Set the probabilites to visit city x next.
+                probabilities.zipIndexInPlaceMA(etatau, sum, calcprobs);
+                nextstep.setIterationsParams(iroulet.getGpuData(), j, probabilities.getGpuData(), sum.getGpuData(), tours.getGpuData());
+                // Getting to the heart of it. Either we want to randomly choose one of the next 32 closest cities ...
+                // ... or we want to take a city not visited.
+                tours.mapIndexInPlace(nextstep);
+                sum.mapInPlace(reset);
+            }
+            calcrlength.setIterationsParams(tours.getGpuData(), distance.getGpuData());
+            // Calculate the length of the route.
+            dist_routes.mapIndexInPlace(calcrlength);
+            // Get the best route.
+            minroute = dist_routes.foldCPU(min);
+            if (minroute < alltimeminroute) {
+                alltimeminroute = minroute;
+            }
+            printf("Minroute %.2f \n", minroute);
+            updatedelta.setIterationsParams(tours.getGpuData(), dist_routes.getGpuData());
+            // Calculate the delta pheromone.
+            deltaphero.mapIndexInPlace(updatedelta);
+            // Update the pheromone.
+            phero.zipIndexInPlace(deltaphero, updatephero);
+        }
+        // Idee Save as {int, int} sehr viele Dopplungen...?
+        // tours.reducetwoColumns(dist_routes, zipsum);
+        // minroute = dist_routes.foldCPU(min);
+        printf("AlltimeminRoute: %.2f \n", alltimeminroute);
+
+        if (CHECKCORRECTNESS) {
+            checkminroute(nants, minroute, dist_routes);
+            checkvalidroute(tours, ncities, nants);
+            printf("Made it!\n");
+        }
+        msl::stopTiming();
+        printf("Minimum Route %.2f \n", minroute);
+    }
 } // close namespaces
 
 void exitWithUsage() {
@@ -306,7 +561,8 @@ int getIntArg(char *s, bool allowZero = false) {
 
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
-    int gpus = 1, iterations = 1, cities = 0, ants = 16, runs = 1, nants = 256;
+    // TODO does not work for less
+    int gpus = 1, iterations = 1, runs = 1, nants = 256;
     std::string importFile, exportFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {

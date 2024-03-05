@@ -57,6 +57,17 @@ namespace msl::detail {
                   FCT2 func);
 
 
+        template<typename T1, typename T2,  typename T3, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernelDMMA(const T1 *in0,
+                           const T2 *in1,
+                           const T3 *in2,
+                           R *out,
+                           size_t n,
+                           int first,
+                           FCT3 func,
+                           int nCols);
+
         /**
        * \brief From HK Zip Skeleton for Index Variants of DMs.
        *

@@ -181,7 +181,7 @@ public:
      * @return The newly created distributed array.
      */
     template<typename MapIndexFunctor>
-    void mapIndex(MapIndexFunctor &f, DM<T> &result); // should be return type DA<R>; debug
+    void mapIndex(MapIndexFunctor &f, DM<T> &b); // should be return type DA<R>; debug
 
     /**
      * \brief TODO Replaces each element a[i] of the distributed array with f(i, a).
@@ -464,8 +464,8 @@ public:
      * @tparam T2 Element type of the distributed matrix to zip with.
      * @tparam ZipIndexFunctor Functor type.
      */
-    template<typename T2, typename T3, typename T4, typename ZipIndexFunctor>
-    void zipInPlaceAAM(DA<T2> &b, DA<T3> &c, DM<T4> &d, ZipIndexFunctor &f);
+    template<typename T2, typename T3, typename ZipIndexFunctor>
+    void zipIndexInPlaceMA(DM<T2> &b, DA<T3> &c, ZipIndexFunctor &f);
 
     /**
      * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
@@ -489,13 +489,26 @@ public:
      * @return The newly created distributed array.
      */
     template<typename T2, typename ZipIndexFunctor>
-    void zipIndex(DM<T2> &b, DM<T2> &result, ZipIndexFunctor &f);
+    void zipIndex(DM<T2> &b, DM<T2> &c, ZipIndexFunctor &f);
+
+    /**
+     * \brief Non-inplace variant of the zipIndex skeleton.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam R Return type.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ReduceFunctor Functor type.
+     * @return The newly created distributed array.
+     */
+    template<typename T2, typename ReduceFunctor>
+    void reduceColumns(DA<T2> &c, ReduceFunctor &f);
+
+    template<typename T2, typename ReduceFunctor>
+    void reducetwoColumns(DA<T2> &c, ReduceFunctor &f);
 
     //
     // SKELETONS / COMMUNICATION
     //
-
-    // SKELETONS / COMMUNICATION / BROADCAST PARTITION
 
     /**
      * \brief Broadcasts the partition with index \em partitionIndex to all
@@ -571,7 +584,7 @@ public:
      *
      * @param descr The description string.
      */
-    void show(const std::string &descr = std::string());
+    void show(const std::string &descr = std::string(), int limited = 0);
     // TODO private?
     std::vector<NPLMatrix<T>> nplMatrixes;
 

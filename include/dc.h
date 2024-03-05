@@ -171,6 +171,7 @@ public:
    */
   template <typename MapIndexFunctor> void mapIndexInPlace(MapIndexFunctor &f);
 
+
   /**
    * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
    *        that besides the element itself also its index is passed to the
@@ -540,7 +541,7 @@ public:
    *
    * @param descr The description string.
    */
-  void show(const std::string &descr = std::string());
+  void show(const std::string &descr = std::string(), int limited = 0);
 
   void printnCPU();
 

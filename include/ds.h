@@ -289,7 +289,7 @@ namespace msl {
          */
 
         template<typename FoldFunctor>
-        T foldCPU(FoldFunctor &f, bool final_fold_on_cpu);
+        T foldCPU(FoldFunctor &f);
 
         //
         // SKELETONS / COMMUNICATION
@@ -525,7 +525,9 @@ namespace msl {
          *
          * @return The GPU distribution scheme.
          */
-        Distribution getGpuDistribution();
+        MSL_USERFUNC T * getGpuData(){
+            return plans[0].d_Data;
+        };
 
         virtual /**
    * \brief Prints the local partion of the root processor of the distributed
@@ -543,7 +545,7 @@ namespace msl {
        * @param descr The description string.
        */
 
-        void show(const std::string &descr = std::string());
+        void show(const std::string &descr = std::string(), int limited = 0);
 
         /**
          * \brief Each process prints its local partition of the ds.
@@ -613,6 +615,8 @@ namespace msl {
         bool cpuMemoryInSync;
         // execution plans for each gpu
         GPUExecutionPlan<T> *plans = 0;
+        // one pointer to get from a GPU all Data.
+        T* gpuPartition;
         // checks whether data is copy distributed among all processes
         Distribution dist = DIST;
         // checks whether data is copy distributed among all gpus

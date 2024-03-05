@@ -281,7 +281,7 @@ void msl::DC<T>::showLocal(const std::string &descr) {
 }
 
 template<typename T>
-void msl::DC<T>::show(const std::string &descr) {
+void msl::DC<T>::show(const std::string &descr, int limited) {
     #ifdef __CUDACC__
     cudaDeviceSynchronize();
     #endif
@@ -296,10 +296,11 @@ void msl::DC<T>::show(const std::string &descr) {
 
 
     msl::allgather(this->localPartition, b, this->nLocal);
+    int localn = limited > 0 ? limited : this->n;
 
     if (msl::isRootProcess()) {
         s << "[";
-        for (int i = 0; i < this->n - 1; i++) {
+        for (int i = 0; i < localn - 1; i++) {
             s << b[i];
             if ((i + 1) % (ncol *nrow) == 0) {
                 s << "\n-------------\n " ;
@@ -307,7 +308,7 @@ void msl::DC<T>::show(const std::string &descr) {
                 ((i + 1) % ncol == 0) ? s << "\n " : s << " ";;
             }
         }
-        s << b[this->n - 1] << "]" << std::endl;
+        s << b[localn - 1] << "]" << std::endl;
         s << std::endl;
     }
 

@@ -175,6 +175,8 @@ namespace msl {
         template<typename T>
         __global__ void fillcore(T *destination, T *source, int paddingoffset, int gpuCols, int ss, int rows, int cols);
 
+        __global__ void generateRandom(curandState* rand_states, unsigned long seed);
+
         template<typename T>
         __global__ void printGPU(T *destination, int size, int col);
 

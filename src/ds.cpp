@@ -217,6 +217,7 @@ void msl::DS<T>::initGPUs() {
 #ifdef __CUDACC__
     plans = new GPUExecutionPlan<T>[ng];
     int gpuBase = indexGPU;
+
     for (int i = 0; i < ng; i++) {
         cudaSetDevice(i);
         plans[i].size = nGPU;
@@ -231,6 +232,7 @@ void msl::DS<T>::initGPUs() {
             exit(0);
         }
         (cudaMalloc(&plans[i].d_Data, plans[i].bytes));
+        (cudaMalloc(&this->gpuPartition, this->plans[i].bytes));
         gpuBase += plans[i].size;
     }
 #endif
@@ -317,6 +319,8 @@ void msl::DS<T>::fill(T *const values) {
     }
     this->updateDevice(true);
 }
+
+
 template<typename T>
 T msl::DS<T>::get(int index) const {
     int idSource;
@@ -382,7 +386,8 @@ T msl::DS<T>::getLocal(int localIndex) {
     if (localIndex >= nLocal)
         throws(detail::NonLocalAccessException());
     if ((!cpuMemoryInSync) && (localIndex >= nCPU)) {
-        updateHost();}
+        updateHost();
+    }
     return localPartition[localIndex];
 }
 
@@ -398,12 +403,12 @@ void msl::DS<T>::setLocal(int localIndex, const T &v) {
         throws(detail::NonLocalAccessException());
     } else {
         localPartition[localIndex] = v;
-
 #ifdef __CUDACC__
         int gpuId = (localIndex - nCPU) / nGPU;
         int idx = localIndex - nCPU - gpuId * nGPU;
         cudaSetDevice(gpuId);
         (cudaMemcpy(&(plans[gpuId].d_Data[idx]), &v, sizeof(T), cudaMemcpyHostToDevice));
+        (cudaMemcpy(&(gpuPartition[idx]), &v, sizeof(T), cudaMemcpyHostToDevice));
 #endif
     }
 }
@@ -445,11 +450,13 @@ void msl::DS<T>::updateDevice(int forceupdate) {
                              plans[i].bytes,
                              cudaMemcpyHostToDevice,
                              Muesli::streams[i]));
+            (cudaMemcpyAsync(gpuPartition, plans[i].h_Data,
+                             plans[i].bytes,
+                             cudaMemcpyHostToDevice,
+                             Muesli::streams[i]));
         }
 
-        for (int i = 0; i < ng; i++) {
-            (cudaStreamSynchronize(Muesli::streams[i]));
-        }
+        msl::syncStreams();
         cpuMemoryInSync = false;
     }
 #endif
@@ -457,6 +464,7 @@ void msl::DS<T>::updateDevice(int forceupdate) {
 
 template<typename T>
 void msl::DS<T>::updateHost() {
+
 #ifdef __CUDACC__
     cpuMemoryInSync = false;
     if (!cpuMemoryInSync) {
@@ -470,6 +478,8 @@ void msl::DS<T>::updateHost() {
         msl::syncStreams();
 
         cpuMemoryInSync = true;
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
     }
 #endif
 }
@@ -499,7 +509,7 @@ void msl::DS<T>::showLocal(const std::string &descr) {
 }
 
 template<typename T>
-void msl::DS<T>::show(const std::string &descr) {
+void msl::DS<T>::show(const std::string &descr, int limited) {
     T *b = new T[n];
     std::ostringstream s;
     if (!descr.empty())
@@ -508,14 +518,14 @@ void msl::DS<T>::show(const std::string &descr) {
         updateHost();
     }
     msl::allgather(localPartition, b, nLocal);
-
+    int localn = limited > 0 ? limited : this->n;
     if (msl::isRootProcess()) {
         s << "[";
-        for (int i = 0; i < n - 1; i++) {
+        for (int i = 0; i < localn - 1; i++) {
             s << b[i];
             s << " ";
         }
-        s << b[n - 1] << "]" << std::endl;
+        s << b[localn - 1] << "]" << std::endl;
         s << std::endl;
     }
 
@@ -603,13 +613,18 @@ long msl::DS<T>::getnCPU(){
 template<typename T>
 template<typename MapFunctor>
 void msl::DS<T>::mapInPlace(MapFunctor &f) {
+    this->updateDevice() ;
+
 #ifdef __CUDACC__
-    for (int i = 0; i < Muesli::num_gpus; i++) {
+    for (int i = 0; i < ng; i++) {
         cudaSetDevice(i);
         dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, plans[i].d_Data, plans[i].size, f);
+
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
     }
 #endif
     if (nCPU > 0) {
@@ -917,19 +932,22 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
 template<typename T>
 template<typename FoldFunctor>
-T msl::DS<T>::foldCPU(FoldFunctor &f, bool final_fold_on_cpu) {
+T msl::DS<T>::foldCPU(FoldFunctor &f) {
     if (!cpuMemoryInSync) {
         updateHost();
     }
-    T localresult = 0;
+    T localresult = localPartition[0];
 
-#ifdef _OPENMP
-#pragma omp parallel for shared(localPartition) reduction(+: localresult)
-#endif
-    for (int i = 0; i < nLocal; i++) {
+/*#ifdef _OPENMP
+#pragma omp parallel for shared(localPartition, localresult)
+#endif*/
+    for (int i = 1; i < nLocal; i++) {
         localresult = f(localresult, localPartition[i]);
     }
 
+    if (msl::Muesli::num_total_procs == 1) {
+        return localresult;
+    }
     T *local_results = new T[np];
     T tmp = localresult;
     // gather all local results
@@ -945,3 +963,4 @@ T msl::DS<T>::foldCPU(FoldFunctor &f, bool final_fold_on_cpu) {
     }
     return global_result;
 }
+

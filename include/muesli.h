@@ -55,6 +55,8 @@
 #include "conversion.h"
 #include "exception.h"
 #include "timer.h"
+#include <random>
+#include <Randoms.h>
 
 /*! \file muesli.h
  * \brief Contains global definitions such as macros, functions, enums and
@@ -62,6 +64,9 @@
  */
 
 #ifdef __CUDACC__
+#include <curand_kernel.h>
+#include <curand.h>
+
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
   if (code != cudaSuccess) {
     fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
@@ -311,7 +316,16 @@ void setDebug(bool val);
  * \brief How often MapStencil is repeated
  */
 void setReps(int val);
+/**
+ * \brief How many randoms are generated.
+ */
+#ifdef __CUDA_ARCH__
+curandState * getGPURandoms(int val);
+#endif
+double * getCPURandoms(int val);
 
+template<typename TT>
+TT getRandoms(int val);
 /**
  * \brief Returns a unique thread id.
  *

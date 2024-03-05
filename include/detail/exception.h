@@ -337,6 +337,14 @@ class DeviceOutOfMemory: public Exception
             return "Device is out of Memory";
         }
     };
+class UsingGPUFunctionOutsideGPU: public Exception
+    {
+    public:
+        [[nodiscard]] std::string tostring() const override
+        {
+            return "A function *_gpu is used outside of gpu code.";
+        }
+    };
 class InvalidCube: public Exception
     {
     public:

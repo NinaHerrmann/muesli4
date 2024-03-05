@@ -97,18 +97,41 @@ namespace msl {
         DA(int size, const T &v);
 
         /**
-         * \brief Copy constructor.
-         *
-         * @param cs The copy source.
-         */
-        // DA(const DA<T>& cs);
-        // ASSIGNMENT OPERATOR
+ * For more details see https://cpppatterns.com/patterns/rule-of-five.html
+ * The 5 functions here are needed to perform operations such as std::move.
+ * See examples/jacobi.cu for a usage reference.
+ */
+
         /**
-         * \brief Assignment operator.
+         * @brief Copy constructor. Fully copies the object and it's data.
          *
-         * @param rhs Right hand side of assignment operator.
          */
-        //  DA<T>& operator=(const DA<T>& rhs);
+        DA(const DA<T> &other);
+
+        /**
+         * @brief Move constructor. Transfers ownership of resources allocated by \em
+         * other to the object that is being created
+         *
+         * @param other
+         */
+        DA(DA<T> &&other) noexcept ;
+
+        /**
+         * @brief Copy assignment operator. Works the same as the copy constructor.
+         *
+         * @param other
+         * @return DC<T>&
+         */
+        DA<T> &operator=(const DA<T> &other) noexcept;
+
+        /**
+         * @brief Move assignment operator. This assigs the object defined in \em
+         * other to the left hand side of the operation without creating copies
+         *
+         * @param other
+         * @return DC<T>&
+         */
+        DA<T> &operator=(DA<T> &&other) noexcept;
 
 
         //
@@ -242,7 +265,7 @@ namespace msl {
          *
          * @param descr The description string.
          */
-        void show(const std::string &descr = std::string());
+        void show(const std::string &descr = std::string(), int limited = 0);
 
     };
 

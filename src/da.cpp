@@ -47,6 +47,65 @@ template<typename T>
 msl::DA<T>::DA(int size, const T &v)
         : DS<T>(size, v) {
 }
+// ***************************** Allow std::move ************************************
+
+template<typename T>
+msl::DA<T>::DA(DA <T> &&other) noexcept {
+    other.plans = nullptr;
+    this->localPartition = other.localPartition;
+    other.localPartition = nullptr;
+}
+
+template<typename T>
+msl::DA<T> &msl::DA<T>::operator=(DA <T> &&other) noexcept {
+    if (&other == this) {
+        return *this;
+    }
+
+    this->freeLocalPartition();
+
+    this->localPartition = other.localPartition;
+    other.localPartition = nullptr;
+    this->freePlans();
+    this->plans = other->plans;
+    other->plans = nullptr;
+
+    this->id = other.id;
+    this->n = other.n;
+    this->nLocal = other->nLocal;
+    this->firstIndex = other.firstIndex;
+    this->np = other.np;
+    this->cpuMemoryInSync = other.cpuMemoryInSync;
+    this->gpuCopyDistributed = other.gpuCopyDistributed;
+    this->ng = other.ng;
+    this->nGPU = other.nGPU;
+    this->indexGPU = other.indexGPU;
+    return *this;
+}
+
+template<typename T>
+msl::DA<T> &msl::DA<T>::operator=(const DA <T> &other) noexcept {
+    if (&other == this) {
+        return *this;
+    }
+    this->freeLocalPartition();
+    copyLocalPartition(other);
+    this->freePlans();
+    this->plans = nullptr;
+    this->plans = new GPUExecutionPlan<T>{*(other.plans)};
+
+    this->id = other.id;
+    this->n = other.n;
+    this->nLocal = other->nLocal;
+    this->firstIndex = other.firstIndex;
+    this->np = other.np;
+    this->cpuMemoryInSync = other.cpuMemoryInSync;
+    this->gpuCopyDistributed = other.gpuCopyDistributed;
+    this->ng = other.ng;
+    this->nGPU = other.nGPU;
+    this->indexGPU = other.indexGPU;
+    return *this;
+}
 
 
 // ***************************** Data-related Operations ******************************
@@ -74,7 +133,7 @@ void msl::DA<T>::showLocal(const std::string &descr) {
 }
 
 template<typename T>
-void msl::DA<T>::show(const std::string &descr) {
+void msl::DA<T>::show(const std::string &descr, int limited) {
     T *b = new T[this->n];
     std::ostringstream s;
     if (descr.size() > 0)
@@ -83,14 +142,15 @@ void msl::DA<T>::show(const std::string &descr) {
         this->updateHost();
     }
     msl::allgather(this->localPartition, b, this->nLocal);
+    int localn = limited > 0 ? limited : this->n;
 
     if (msl::isRootProcess()) {
         s << "[";
-        for (int i = 0; i < this->n - 1; i++) {
+        for (int i = 0; i < localn - 1; i++) {
             s << b[i];
             s << " ";
         }
-        s << b[this->n - 1] << "]" << std::endl;
+        s << b[localn - 1] << "]" << std::endl;
         s << std::endl;
     }
 
@@ -179,7 +239,6 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
     gpuErrchk( cudaDeviceSynchronize() );
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      printf("first %d \n", this->plans[i].first);
       detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
           this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
 
