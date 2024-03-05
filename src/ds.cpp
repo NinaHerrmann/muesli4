@@ -789,7 +789,6 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         }
 
         // fold local elements on CPU (overlap with GPU computations)
-        // TODO: openmp has parallel reduce operators.
         T cpu_result = 0;
         if (nCPU > 0) {
             cpu_result = localPartition[0];
@@ -918,7 +917,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 
         return final_result;
     } else {
-        return this->foldCPU(f, final_fold_on_cpu);
+        return this->foldCPU(f);
     }
 }
 #else
@@ -926,7 +925,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
 template<typename T>
 template<typename FoldFunctor>
 T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
-    return this->foldCPU(f, final_fold_on_cpu);
+    return this->foldCPU(f);
 }
 #endif
 

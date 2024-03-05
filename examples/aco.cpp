@@ -80,7 +80,7 @@ namespace msl::aco {
         }
     };
 
-    class EtaTauCalc : public Functor3<int, int, city, city> {
+    class EtaTauCalc : public Functor3<int, int, double, double> {
     private:
         int * iroulette{}, * routes{};
         double * phero{}, * dist{};
@@ -98,7 +98,7 @@ namespace msl::aco {
             this->phero = pheromones;
         }
 
-        MSL_USERFUNC city operator()(int xindex, int yindex, city eta_tau) const override {
+        MSL_USERFUNC double operator()(int xindex, int yindex, double eta_tau) const override {
             int d_ALPHA = 1;
             int d_BETA = 2;
             int fromcity = routes[xindex * cities + iteration];
@@ -111,17 +111,19 @@ namespace msl::aco {
                     break;
                 }
             }
+            eta_tau = 0;
             // For every city which can be visited, calculate the eta and tau value.
             if (fromcity != next_city && !bvisited) {
                 // Looks like zero but is just very small.
                 eta_tau_return[0] = (double) pow(1 /  dist[fromcity * this->cities + next_city], d_BETA);
                 eta_tau_return[1] = (double) pow(phero[fromcity * this->cities + next_city], d_ALPHA);
+                eta_tau = eta_tau_return[0] * eta_tau_return[1];
             }
-            return eta_tau_return;
+            return eta_tau;
         }
     };
 
-    class CalcProbs : public Functor5<int, int, double, city, double, double> {
+    class CalcProbs : public Functor5<int, int, double, double, double, double> {
     private:
         int i{}, ncities{};
         int * routes{}, * iroulette{};
@@ -136,7 +138,7 @@ namespace msl::aco {
             this->routes = tours;
         }
 
-        MSL_USERFUNC double operator()(int x, int y, double t, city etatau, double sum) const override {
+        MSL_USERFUNC double operator()(int x, int y, double t, double etatau, double sum) const override {
             // Calculates the probability of an ant going to the city at index x in the 32 closest cities.
             int cityi = routes[x*ncities+i];
             int next_city = iroulette[cityi*IROULETE+y];
@@ -146,7 +148,7 @@ namespace msl::aco {
                 if (sum == 0.0) {
                     return 0;
                 } else {
-                    return (etatau[0] * etatau[1]) / sum;
+                    return etatau / sum;
                 }
             }
         }
@@ -159,10 +161,16 @@ namespace msl::aco {
             return false;
         }
     };
-    class SUM : public Functor2<city, double, double> {
+    class Mult : public Functor<city, double> {
     public:
-        MSL_USERFUNC double operator()(city x, double y) const override {
-            return (x[0] * x[1]) + y;
+        MSL_USERFUNC double operator()(city x) const override {
+            return (x[0] * x[1]);
+        }
+    };
+    class SUM : public Functor2<double, double, double> {
+    public:
+        MSL_USERFUNC double operator()(double x, double y) const override {
+            return x + y;
         }
     };
     class Min : public Functor2<double, double, double> {
@@ -476,7 +484,7 @@ namespace msl::aco {
         msl::syncStreams();
         DM<int> tours(nants, ncities, 0);
         DM<double> deltaphero(ncities, ncities, 0);
-        DM<city> etatau(nants, niroulet, {});
+        DM<double> etatau(nants, niroulet, {});
         DA<double> sum(nants, 0.0);
         DA<double> dist_routes(nants, 0.0);
         DA<double> r_length(nants, 0.0);
@@ -496,44 +504,75 @@ namespace msl::aco {
         UpdateDelta updatedelta(ncities, nants);
         UpdatePhero updatephero;
         CalcRlength calcrlength(ncities);
-        msl::startTiming();
+        double etataucalctime = 0.0, reduceRowstime = 0.0, calcprobstime = 0.0, nextsteptime = 0.0, deltapherotime = 0.0,
+        updatepherotime = 0.0, calcrlengthtime = 0.0, minroutetime = 0.0;
+
         double alltimeminroute = 999999.9;
         for (int i = 0; i < iterations; i++) {
             for (int j = 0; j < ncities; j++) {
+                msl::startTiming();
                 etataucalc.setIterationsParams(iroulet.getGpuData(), j, distance.getGpuData(), tours.getGpuData(), phero.getGpuData());
                 // Write the eta tau value to the data structure.
                 etatau.mapIndexInPlace(etataucalc);
+                etataucalctime += msl::stopTiming();
+                //etatau.show("etatau", 32);
                 // Write the sum of the etatau value for each ant to the sum datastructure.
-                etatau.reduceColumns(sum, summe);
+                msl::startTiming();
+                etatau.reduceRows(sum, summe);
+                reduceRowstime += msl::stopTiming();
+                sum.updateHost();
+
+                msl::startTiming();
                 calcprobs.setIterationsParams(j, tours.getGpuData());
+                calcprobstime += msl::stopTiming();
+
                 // Set the probabilites to visit city x next.
+                msl::startTiming();
                 probabilities.zipIndexInPlaceMA(etatau, sum, calcprobs);
+
+                calcprobstime += msl::stopTiming();
+
+                msl::startTiming();
                 nextstep.setIterationsParams(iroulet.getGpuData(), j, probabilities.getGpuData(), sum.getGpuData(), tours.getGpuData());
-                // Getting to the heart of it. Either we want to randomly choose one of the next 32 closest cities ...
+                // Getting to the heart of it. Either we want to "randomly" choose one of the next 32 closest cities ...
                 // ... or we want to take a city not visited.
                 tours.mapIndexInPlace(nextstep);
+                nextsteptime += msl::stopTiming();
                 sum.mapInPlace(reset);
             }
+            msl::startTiming();
             calcrlength.setIterationsParams(tours.getGpuData(), distance.getGpuData());
             // Calculate the length of the route.
             dist_routes.mapIndexInPlace(calcrlength);
+            calcrlengthtime += msl::stopTiming();
             // Get the best route.
+            msl::startTiming();
             minroute = dist_routes.foldCPU(min);
+            minroutetime += msl::stopTiming();
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
             printf("Minroute %.2f \n", minroute);
+            msl::startTiming();
             updatedelta.setIterationsParams(tours.getGpuData(), dist_routes.getGpuData());
             // Calculate the delta pheromone.
             deltaphero.mapIndexInPlace(updatedelta);
+            deltapherotime += msl::stopTiming();
             // Update the pheromone.
+            msl::startTiming();
             phero.zipIndexInPlace(deltaphero, updatephero);
+            updatepherotime += msl::stopTiming();
+            tours.show("lala", 132);
         }
         // Idee Save as {int, int} sehr viele Dopplungen...?
         // tours.reducetwoColumns(dist_routes, zipsum);
         // minroute = dist_routes.foldCPU(min);
         printf("AlltimeminRoute: %.2f \n", alltimeminroute);
-
+        printf("etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime\n");
+        //      0.28,           6.93,           0.05,           2.15,           0.06,           0.00,           0.00,           0.00
+        //      0.39,           19.02,          0.05,           2.29,           0.07,           0.00,           0.00,           0.00
+        //      0.66,           6.26,           0.06,           14.95,          0.06,           0.00,           0.02,           0.00
+        printf("%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f\n", etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime);
         if (CHECKCORRECTNESS) {
             checkminroute(nants, minroute, dist_routes);
             checkvalidroute(tours, ncities, nants);

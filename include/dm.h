@@ -500,8 +500,9 @@ public:
      * @tparam ReduceFunctor Functor type.
      * @return The newly created distributed array.
      */
-    template<typename T2, typename ReduceFunctor>
-    void reduceColumns(DA<T2> &c, ReduceFunctor &f);
+    template<typename ReduceFunctor>
+    void reduceRows(DA<T> &c, ReduceFunctor &f);
+
 
     template<typename T2, typename ReduceFunctor>
     void reducetwoColumns(DA<T2> &c, ReduceFunctor &f);

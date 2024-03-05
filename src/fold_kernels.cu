@@ -47,8 +47,7 @@ size_t msl::detail::nextPow2(size_t x) {
 }
 
 template<typename T, typename F, size_t blockSize, bool nIsPow2>
-__global__ void msl::detail::foldKernel(T *g_idata, T *g_odata, size_t n,
-                                        F func) {
+__global__ void msl::detail::foldKernel(T *g_idata, T *g_odata, size_t n, F func) {
   T *sdata = SharedMemory<T>();
 
   // perform first level of reduction,
@@ -141,11 +140,11 @@ __global__ void msl::detail::foldColsKernel(T *g_idata, T *g_odata, size_t n,
   // we reduce multiple elements per thread.  The number is determined by the
   // number of active thread blocks (via gridDim). More blocks will result
   // in a larger gridSize and therefore fewer elements per thread.
-  T result = g_idata[i];
+  // R result = g_idata[i];
   i += gridSize;
-
+  T result ;
   while (i < n) {
-    result = func(result, g_idata[i]);
+    result = func(g_idata[i], result);
     i += gridSize;
   }
   sdata[tid] = result;
@@ -207,6 +206,7 @@ __global__ void msl::detail::foldColsKernel(T *g_idata, T *g_odata, size_t n,
     g_odata[blockIdx.x] = sdata[0];
   }
 }
+
 
 // size_t n is execPlan.mLocal
 template<typename T, typename F, size_t blockSize, bool nIsPow2>
@@ -403,8 +403,8 @@ template<typename T, typename F>
 void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int threads,
                            int blocks, F& f, cudaStream_t& stream, int gpu) {
   cudaSetDevice(gpu);
-  dim3 dimBlock(threads, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  dim3 dimBlock(threads);
+  dim3 dimGrid(blocks);
   // when there is only one warp per block, we need to allocate two warps
   // worth of shared memory so that we don't index shared memory out of bounds
   int smemSize =
@@ -412,13 +412,16 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
 
   if (isPow2(size)) {
     switch (threads) {
-      case 1024:
-        foldColsKernel<T, F, 1024, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        case 1024:
+            foldColsKernel<T, F, 1024, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
-        break;
+            break;
       case 512:
         foldColsKernel<T, F, 512, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
+
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
         break;
       case 256:
         foldColsKernel<T, F, 256, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
@@ -457,6 +460,9 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
             d_idata, d_odata, size, f);
         break;
     }
+
+      gpuErrchk( cudaPeekAtLastError() );
+      gpuErrchk( cudaDeviceSynchronize() );
   } else {
     switch (threads) {
       case 1024:
@@ -464,11 +470,11 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
             d_idata, d_odata, size, f);
         break;
       case 512:
-        foldColsKernel<T, F, 512, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 512, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 256:
-        foldColsKernel<T, F, 256, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 256, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 128:
@@ -476,34 +482,37 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
             d_idata, d_odata, size, f);
         break;
       case 64:
-        foldColsKernel<T, F, 64, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 64, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 32:
-        foldColsKernel<T, F, 32, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 32, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 16:
-        foldColsKernel<T, F, 16, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 16, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 8:
-        foldColsKernel<T, F, 8, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 8, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 4:
-        foldColsKernel<T, F, 4, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 4, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 2:
-        foldColsKernel<T, F, 2, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 2, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
       case 1:
-        foldColsKernel<T, F, 1, false> <<<dimGrid, dimBlock, smemSize, stream>>>(
+        foldColsKernel<T, F, 1, false>  <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
         break;
     }
+
+      gpuErrchk( cudaPeekAtLastError() );
+      gpuErrchk( cudaDeviceSynchronize() );
   }
 }
 
