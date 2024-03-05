@@ -23,7 +23,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON INFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
@@ -90,7 +90,7 @@ namespace msl::aco {
             this->cities = cities;
             this->iteration = i;
         }
-        void setiterationParams(int * iroulet, int i, double * distance, int * tours, double * pheromones) {
+        void setIterationsParams(int * iroulet, int i, double * distance, int * tours, double * pheromones) {
             this->iroulette = iroulet;
             this->iteration = i;
             this->dist = distance;
@@ -131,7 +131,7 @@ namespace msl::aco {
             this->ncities = ncities;
             this->iroulette = iroulet;
         }
-        void setiterationparams(int ii, int * tours) {
+        void setIterationsParams(int ii, int * tours) {
             this->i = ii;
             this->routes = tours;
         }
@@ -140,7 +140,7 @@ namespace msl::aco {
             // Calculates the probability of an ant going to the city at index x in the 32 closest cities.
             int cityi = routes[x*ncities+i];
             int next_city = iroulette[cityi*IROULETE+y];
-            if (cityi == next_city || vizited(x, next_city, routes, ncities, i+1)) {
+            if (cityi == next_city || visited(x, next_city, routes, ncities, i+1)) {
                 return 0;
             } else {
                 if (sum == 0.0) {
@@ -150,7 +150,7 @@ namespace msl::aco {
                 }
             }
         }
-        MSL_USERFUNC static bool vizited(int antk, int c, const int* routes, int n_cities, int step) {
+        MSL_USERFUNC static bool visited(int antk, int c, const int* routes, int n_cities, int step) {
             for (int l=0; l <= step; l++) {
                 if (routes[antk*n_cities+l] == c) {
                     return true;
@@ -247,7 +247,7 @@ namespace msl::aco {
                     if (nextCity == -1) {
                         int nc;
                         for (nc = 0; nc < ncities; nc++) {
-                            if (!vizited(ant_index, nc, routes, ncities, i+1)) {
+                            if (!visited(ant_index, nc, routes, ncities, i+1)) {
                                 break;
                             }
                         }
@@ -257,7 +257,7 @@ namespace msl::aco {
                 } else {
                     int nc;
                     for (nc = 0; nc < ncities; nc++) {
-                        if (!vizited(ant_index, nc, routes, ncities, i+1)) {
+                        if (!visited(ant_index, nc, routes, ncities, i+1)) {
                             break;
                         }
                     }
@@ -281,7 +281,7 @@ namespace msl::aco {
             return (int) i;
         }
 
-        MSL_USERFUNC static bool vizited(int antk, int c, const int* routes, int n_cities, int step) {
+        MSL_USERFUNC static bool visited(int antk, int c, const int* routes, int n_cities, int step) {
             for (int l=0; l <= step; l++) {
                 if (routes[antk*n_cities+l] == c) {
                     return true;
@@ -500,12 +500,12 @@ namespace msl::aco {
         double alltimeminroute = 999999.9;
         for (int i = 0; i < iterations; i++) {
             for (int j = 0; j < ncities; j++) {
-                etataucalc.setiterationParams(iroulet.getGpuData(), j, distance.getGpuData(), tours.getGpuData(), phero.getGpuData());
+                etataucalc.setIterationsParams(iroulet.getGpuData(), j, distance.getGpuData(), tours.getGpuData(), phero.getGpuData());
                 // Write the eta tau value to the data structure.
                 etatau.mapIndexInPlace(etataucalc);
                 // Write the sum of the etatau value for each ant to the sum datastructure.
                 etatau.reduceColumns(sum, summe);
-                calcprobs.setiterationparams(j, tours.getGpuData());
+                calcprobs.setIterationsParams(j, tours.getGpuData());
                 // Set the probabilites to visit city x next.
                 probabilities.zipIndexInPlaceMA(etatau, sum, calcprobs);
                 nextstep.setIterationsParams(iroulet.getGpuData(), j, probabilities.getGpuData(), sum.getGpuData(), tours.getGpuData());
