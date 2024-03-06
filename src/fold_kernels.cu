@@ -419,9 +419,6 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
       case 512:
         foldColsKernel<T, F, 512, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
             d_idata, d_odata, size, f);
-
-            gpuErrchk( cudaPeekAtLastError() );
-            gpuErrchk( cudaDeviceSynchronize() );
         break;
       case 256:
         foldColsKernel<T, F, 256, true> <<<dimGrid, dimBlock, smemSize, stream>>>(
@@ -460,9 +457,6 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
             d_idata, d_odata, size, f);
         break;
     }
-
-      gpuErrchk( cudaPeekAtLastError() );
-      gpuErrchk( cudaDeviceSynchronize() );
   } else {
     switch (threads) {
       case 1024:
@@ -510,9 +504,6 @@ void msl::detail::foldCols(unsigned int size, T* d_idata, T* d_odata, int thread
             d_idata, d_odata, size, f);
         break;
     }
-
-      gpuErrchk( cudaPeekAtLastError() );
-      gpuErrchk( cudaDeviceSynchronize() );
   }
 }
 

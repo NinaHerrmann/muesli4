@@ -515,13 +515,14 @@ namespace msl::aco {
                 // Write the eta tau value to the data structure.
                 etatau.mapIndexInPlace(etataucalc);
                 etataucalctime += msl::stopTiming();
+
                 //etatau.show("etatau", 32);
                 // Write the sum of the etatau value for each ant to the sum datastructure.
                 msl::startTiming();
                 etatau.reduceRows(sum, summe);
                 reduceRowstime += msl::stopTiming();
-                sum.updateHost();
 
+                sum.show("summe");
                 msl::startTiming();
                 calcprobs.setIterationsParams(j, tours.getGpuData());
                 calcprobstime += msl::stopTiming();

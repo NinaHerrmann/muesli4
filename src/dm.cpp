@@ -1593,102 +1593,120 @@ void msl::DM<T>::mapStencil(msl::DM<T> &result, size_t stencilSize, T neutralVal
 template<typename T>
 template<typename ReduceFunctor>
 void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
-    int num_gpus = this->ng;
-
-    // local partition is row distributed on GPUs
-    // more gpus than rows lead to errors
-    if (nlocalRows < Muesli::num_gpus) {
-        num_gpus = nlocalRows;
-    }
-
-    std::vector<int> blocks(num_gpus);
-    std::vector<int> threads(num_gpus);
-    T** gpu_results = new T*[num_gpus];
-    int maxThreads = 1024;
-    int maxBlocks = 65535;
-    for (int i = 0; i < num_gpus; i++) {
-        threads[i] = maxThreads;
-        gpu_results[i] = new T[this->plans[i].gpuCols];
-    }
     T* local_results = new T[nlocalRows];
     T* global_results = new T[this->np * nlocalRows];
-    T** d_odata = new T*[num_gpus];
+    int num_gpus = this->ng;
 
-    //
-    // Step 1: local fold
-    //
-    // calculate threads, blocks, etc.; allocate device memory
-    for (int i = 0; i < num_gpus; i++) {
-        cudaSetDevice(i);
-        threads[i] = (this->plans[i].nLocal < maxThreads) ? detail::nextPow2((this->plans[i].nLocal + 1) / 2) : maxThreads;
-        blocks[i] = this->plans[i].gpuCols;
-        //dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
-        if (blocks[i] > maxBlocks) {
-            blocks[i] = maxBlocks;  // possibly throw exception, since this case is not handled yet, but should actualy never occur
+    if (this->ng > 1) {
+
+        // local partition is row distributed on GPUs
+        // more gpus than rows lead to errors
+        if (nlocalRows < Muesli::num_gpus) {
+            num_gpus = nlocalRows;
         }
-        CUDA_CHECK_RETURN(cudaMalloc((void**) &d_odata[i], blocks[i] * sizeof(T)));
+
+        std::vector<int> blocks(num_gpus);
+        std::vector<int> threads(num_gpus);
+        T** gpu_results = new T*[num_gpus];
+        int maxThreads = 1024;
+        int maxBlocks = 65535;
+        for (int i = 0; i < num_gpus; i++) {
+            threads[i] = maxThreads;
+            gpu_results[i] = new T[this->plans[i].gpuCols];
+        }
+        T** d_odata = new T*[num_gpus];
+
+        //
+        // Step 1: local fold
+        //
+        // calculate threads, blocks, etc.; allocate device memory
+        for (int i = 0; i < num_gpus; i++) {
+            cudaSetDevice(i);
+            threads[i] = (this->plans[i].nLocal < maxThreads) ? detail::nextPow2((this->plans[i].nLocal + 1) / 2) : maxThreads;
+            blocks[i] = this->plans[i].gpuCols;
+            //dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+            if (blocks[i] > maxBlocks) {
+                blocks[i] = maxBlocks;  // possibly throw exception, since this case is not handled yet, but should actualy never occur
+            }
+            CUDA_CHECK_RETURN(cudaMalloc((void**) &d_odata[i], blocks[i] * sizeof(T)));
+        }
+
+        // fold on gpus: step 1
+        for (int i = 0; i < num_gpus; i++) {
+            detail::printGPU<<<1,1>>>(this->plans[i].d_Data,32,32);
+            cudaSetDevice(i);
+            detail::foldCols<T, ReduceFunctor>(this->plans[i].size, this->plans[i].d_Data, d_odata[i],
+                                         threads[i], blocks[i], f,
+                                         Muesli::streams[i], i);
+        }
+        msl::syncStreams();
+
+        // copy result arrays from device to host
+        for (int i = 0; i < num_gpus; i++) {
+            cudaSetDevice(i);
+            CUDA_CHECK_RETURN(cudaMemcpyAsync(gpu_results[i], d_odata[i], blocks[i] * sizeof(T),
+                            cudaMemcpyDeviceToHost, Muesli::streams[i]));
+        }
+        msl::syncStreams();
+
+        // final fold on CPU
+        // calculate local result for all GPUs
+        for (int i = 0; i < nlocalRows; ++i) {
+            local_results[i] = gpu_results[0][i];
+            //printf("lr %d: %.2f;", i, local_results[i]);
+        }
+        printf("\n");
+
+        for (int i = 1; i < num_gpus; i++) {
+            for (int j = 0; j < nlocalRows; ++j) {
+                local_results[j] = f(local_results[j], gpu_results[i][j]);
+            }
+        }
+        // Cleanup
+        for (int i = 0; i < num_gpus; i++) {
+            cudaSetDevice(i);
+            CUDA_CHECK_RETURN (cudaStreamSynchronize(Muesli::streams[i]));
+            CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
+        }
+        delete[] d_odata;
+
+        for (int i = 0; i < num_gpus; ++i) {
+            delete[] gpu_results[i];
+        }
+        delete[] gpu_results;
+
+    } else {
+        int threads = Muesli::threads_per_block;
+        for (int i = 0; i < this->ng; i++) {
+            int blocks = this->plans[i].gpuCols;
+            //detail::printGPU<<<1,1>>>(this->plans[i].d_Data,32,32);
+            cudaSetDevice(i);
+            detail::foldCols<T, ReduceFunctor>(this->plans[i].size, this->plans[i].d_Data, c.getExecPlans()[i].d_Data,
+                                         threads, blocks, f,
+                                         Muesli::streams[i], i);
+        }
+        msl::syncStreams();
+
     }
 
-    // fold on gpus: step 1
-    for (int i = 0; i < num_gpus; i++) {
-        cudaSetDevice(i);
-        detail::foldCols<T, ReduceFunctor>(this->plans[i].size, this->plans[i].d_Data, d_odata[i],
-                                     threads[i], blocks[i], f,
-                                     Muesli::streams[i], i);
+    if (this->np > 1) {
+        // gather all local results
+        msl::allgather(local_results, global_results, nlocalRows);
+        // calculate global result from local results
+        int end_index = this->np * nlocalRows;
+        for (int i = 0; i < end_index; ++i) {
+            int index = i % nrow;
+            global_results[index] = f(global_results[index], global_results[i]);
+        }
+
+        // msl::DArray<T> result_array(m, global_results, Distribution::DIST);  // just takes the first n folded results from globalResults array
+        c.setLocalPartition(global_results);
+    } else {
+        c.setLocalPartition(local_results);
     }
-    msl::syncStreams();
 
     gpuErrchk( cudaPeekAtLastError() );
     gpuErrchk( cudaDeviceSynchronize() );
-
-    // copy result arrays from device to host
-    for (int i = 0; i < num_gpus; i++) {
-        cudaSetDevice(i);
-        CUDA_CHECK_RETURN(cudaMemcpyAsync(gpu_results[i], d_odata[i], blocks[i] * sizeof(T),
-                        cudaMemcpyDeviceToHost, Muesli::streams[i]));
-    }
-    msl::syncStreams();
-
-    // final fold on CPU
-    // calculate local result for all GPUs
-    for (int i = 0; i < nlocalRows; ++i) {
-        local_results[i] = gpu_results[0][i];
-        //printf("lr %d: %f \t", i, local_results[i]);
-    }
-
-    for (int i = 1; i < num_gpus; i++) {
-        for (int j = 0; j < nlocalRows; ++j) {
-            local_results[j] = f(local_results[j], gpu_results[i][j]);
-        }
-    }
-
-    // gather all local results
-    msl::allgather(local_results, global_results, nlocalRows);
-    // calculate global result from local results
-    int end_index = this->np * nlocalRows;
-    for (int i = 0; i < end_index; ++i) {
-        int index = i % nrow;
-        global_results[index] = f(global_results[index], global_results[i]);
-    }
-
-    // Cleanup
-    for (int i = 0; i < num_gpus; i++) {
-        cudaSetDevice(i);
-        CUDA_CHECK_RETURN (cudaStreamSynchronize(Muesli::streams[i]));
-        CUDA_CHECK_RETURN(cudaFree(d_odata[i]));
-    }
-
-    // msl::DArray<T> result_array(m, global_results, Distribution::DIST);  // just takes the first n folded results from globalResults array
-    c.setLocalPartition(global_results);
-
-    for (int i = 0; i < num_gpus; ++i) {
-        delete[] gpu_results[i];
-    }
-
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
-    delete[] gpu_results;
-    delete[] d_odata;
     delete[] local_results;
     delete[] global_results;
 }

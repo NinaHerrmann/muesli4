@@ -220,7 +220,7 @@ msl::detail::printGPU(T *data, int size, int col) {
     for (int i = 0; i < size; i++) {
         if (i % col == 0 && i != 0) {printf("\n");}
 
-        printf("%d;", data[i]);
+        printf("%f;", data[i]);
     }
 }
 template<typename T>
