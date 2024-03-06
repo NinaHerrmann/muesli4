@@ -1612,7 +1612,7 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
         int maxBlocks = 65535;
         for (int i = 0; i < num_gpus; i++) {
             threads[i] = maxThreads;
-            gpu_results[i] = new T[this->plans[i].gpuCols];
+            gpu_results[i] = new T[this->plans[i].gpuRows];
         }
         T** d_odata = new T*[num_gpus];
 
@@ -1622,9 +1622,8 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
         // calculate threads, blocks, etc.; allocate device memory
         for (int i = 0; i < num_gpus; i++) {
             cudaSetDevice(i);
-            threads[i] = (this->plans[i].nLocal < maxThreads) ? detail::nextPow2((this->plans[i].nLocal + 1) / 2) : maxThreads;
-            blocks[i] = this->plans[i].gpuCols;
-            //dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+            threads[i] = (this->plans[i].gpuCols < maxThreads) ? detail::nextPow2((this->plans[i].gpuCols + 1) / 2) : maxThreads;
+            blocks[i] = this->plans[i].gpuRows;
             if (blocks[i] > maxBlocks) {
                 blocks[i] = maxBlocks;  // possibly throw exception, since this case is not handled yet, but should actualy never occur
             }
@@ -1676,17 +1675,15 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
         delete[] gpu_results;
 
     } else {
-        int threads = Muesli::threads_per_block;
         for (int i = 0; i < this->ng; i++) {
-            int blocks = this->plans[i].gpuCols;
-            //detail::printGPU<<<1,1>>>(this->plans[i].d_Data,32,32);
+            int threads = (this->plans[i].gpuCols < Muesli::threads_per_block) ? detail::nextPow2((this->plans[i].gpuCols + 1) / 2) : Muesli::threads_per_block;
+            int blocks = this->plans[i].gpuRows;
+            // detail::printGPU<<<1,1>>>(this->plans[i].d_Data, 32, 32);
             cudaSetDevice(i);
-            detail::foldCols<T, ReduceFunctor>(this->plans[i].size, this->plans[i].d_Data, c.getExecPlans()[i].d_Data,
-                                         threads, blocks, f,
-                                         Muesli::streams[i], i);
+            detail::foldRows<T, ReduceFunctor>(this->plans[i].gpuCols, this->plans[i].d_Data, c.getExecPlans()[i].d_Data,
+                                         threads, blocks, f, Muesli::streams[i], i);
         }
         msl::syncStreams();
-
     }
 
     if (this->np > 1) {
@@ -1698,7 +1695,6 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
             int index = i % nrow;
             global_results[index] = f(global_results[index], global_results[i]);
         }
-
         // msl::DArray<T> result_array(m, global_results, Distribution::DIST);  // just takes the first n folded results from globalResults array
         c.setLocalPartition(global_results);
     } else {

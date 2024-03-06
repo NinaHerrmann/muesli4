@@ -253,6 +253,7 @@ namespace msl::aco {
                 if (d_sum[ant_index] > 0.0) {
                     int nextCity = city(ant_index, d_probs, randoms, 32);
                     if (nextCity == -1) {
+                        // printf("no city with hp;");
                         int nc;
                         for (nc = 0; nc < ncities; nc++) {
                             if (!visited(ant_index, nc, routes, ncities, i+1)) {
@@ -423,21 +424,34 @@ namespace msl::aco {
         }
     }
     void checkvalidroute(const DM<int>& routes, int ncities, int nants) {
+        int * invalidants = new int[nants];
+        int j = 0;
         for (int ii = 0; ii < nants; ii++) {
             for (int jj = 0; jj < ncities; jj++) {
                 int currentcity = routes.localPartition[ii * ncities + jj];
                 for (int kk = 0; kk < ncities; kk++) {
                     if (kk != jj && currentcity == routes.localPartition[ii * ncities + kk]) {
-                        printf("city %d visited twice in ant %d\n", currentcity, ii);
                         exit(1);
+                        printf("city %d visited twice in ant %d\n", currentcity, ii);
+                        invalidants[j] = ii;
+                        j++;
                     }
                 }
             }
+        }
+        for (int jj=0; jj <= j; jj++) {
+            printf("[ ");
+            for (int kk = 0; kk < ncities; kk++) {
+                printf("%d ", routes.localPartition[invalidants[jj] * ncities + kk]);
+            }
+            printf("]\n");
         }
     }
     void aco(int iterations, const std::string& importFile, int nants) {
         int niroulet = 32;
         int ncities = readsize(importFile);
+        double dsinit = 0.0, fill = 0.0, ds2fill = 0.0;
+        msl::startTiming();
         DA<city> cities(ncities, {});
         DM<double> phero(ncities, ncities, {});
         DM<double> distance(ncities, ncities, {});
@@ -445,6 +459,9 @@ namespace msl::aco {
         DA<int> routelength(nants, 0);
         DM<int> iroulet(ncities, niroulet, 0);
         DM<double> probabilities(nants, niroulet, 0.0);
+        dsinit = msl::stopTiming();
+        msl::startTiming();
+#pragma omp parallel for shared(distance)
         for (int i = 0; i < ncities; i++) {
             for (int j = 0; j < ncities; j++) {
                 if (i == j) {
@@ -456,9 +473,9 @@ namespace msl::aco {
                 }
             }
         }
+#pragma omp parallel for shared(iroulet)
         for (int i = 0; i < ncities; i++) {
             for (int y = 0; y < IROULETE; y++) {
-
                 double maxdistance = 999999.9;
                 double c_dist;
                 int city = -1;
@@ -481,6 +498,8 @@ namespace msl::aco {
                 iroulet.set(i * IROULETE + y, city);
             }
         }
+        fill = msl::stopTiming();
+        startTiming();
         msl::syncStreams();
         DM<int> tours(nants, ncities, 0);
         DM<double> deltaphero(ncities, ncities, 0);
@@ -504,6 +523,7 @@ namespace msl::aco {
         UpdateDelta updatedelta(ncities, nants);
         UpdatePhero updatephero;
         CalcRlength calcrlength(ncities);
+        ds2fill = msl::stopTiming();
         double etataucalctime = 0.0, reduceRowstime = 0.0, calcprobstime = 0.0, nextsteptime = 0.0, deltapherotime = 0.0,
         updatepherotime = 0.0, calcrlengthtime = 0.0, minroutetime = 0.0;
 
@@ -516,13 +536,11 @@ namespace msl::aco {
                 etatau.mapIndexInPlace(etataucalc);
                 etataucalctime += msl::stopTiming();
 
-                //etatau.show("etatau", 32);
                 // Write the sum of the etatau value for each ant to the sum datastructure.
                 msl::startTiming();
                 etatau.reduceRows(sum, summe);
                 reduceRowstime += msl::stopTiming();
 
-                sum.show("summe");
                 msl::startTiming();
                 calcprobs.setIterationsParams(j, tours.getGpuData());
                 calcprobstime += msl::stopTiming();
@@ -538,7 +556,9 @@ namespace msl::aco {
                 // Getting to the heart of it. Either we want to "randomly" choose one of the next 32 closest cities ...
                 // ... or we want to take a city not visited.
                 tours.mapIndexInPlace(nextstep);
+
                 nextsteptime += msl::stopTiming();
+
                 sum.mapInPlace(reset);
             }
             msl::startTiming();
@@ -553,7 +573,6 @@ namespace msl::aco {
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
-            printf("Minroute %.2f \n", minroute);
             msl::startTiming();
             updatedelta.setIterationsParams(tours.getGpuData(), dist_routes.getGpuData());
             // Calculate the delta pheromone.
@@ -563,24 +582,18 @@ namespace msl::aco {
             msl::startTiming();
             phero.zipIndexInPlace(deltaphero, updatephero);
             updatepherotime += msl::stopTiming();
-            tours.show("lala", 132);
         }
-        // Idee Save as {int, int} sehr viele Dopplungen...?
-        // tours.reducetwoColumns(dist_routes, zipsum);
-        // minroute = dist_routes.foldCPU(min);
-        printf("AlltimeminRoute: %.2f \n", alltimeminroute);
-        printf("etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime\n");
-        //      0.28,           6.93,           0.05,           2.15,           0.06,           0.00,           0.00,           0.00
-        //      0.39,           19.02,          0.05,           2.29,           0.07,           0.00,           0.00,           0.00
-        //      0.66,           6.26,           0.06,           14.95,          0.06,           0.00,           0.02,           0.00
-        printf("%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f\n", etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime);
+
+        printf("%s;%d;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f,%.4f \n",  importFile.c_str(), nants, dsinit, fill, ds2fill,
+               etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime, alltimeminroute);
+        dist_routes.updateHost();
+        tours.updateHost();
         if (CHECKCORRECTNESS) {
             checkminroute(nants, minroute, dist_routes);
             checkvalidroute(tours, ncities, nants);
             printf("Made it!\n");
         }
         msl::stopTiming();
-        printf("Minimum Route %.2f \n", minroute);
     }
 } // close namespaces
 
@@ -636,8 +649,6 @@ int main(int argc, char **argv) {
     }
     msl::setNumGpus(gpus);
     msl::setNumRuns(runs);
-    printf("Starting with %d nodes %d cpus and %d gpus\n", msl::Muesli::num_total_procs,
-           msl::Muesli::num_local_procs, msl::Muesli::num_gpus);
     if (!importFile.empty()) {
         msl::aco::aco(iterations, importFile, nants);
     } else {
