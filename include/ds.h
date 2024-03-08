@@ -525,8 +525,13 @@ namespace msl {
          *
          * @return The GPU distribution scheme.
          */
-        MSL_USERFUNC T * getGpuData(){
+        MSL_USERFUNC T * getUserFunctionData(){
+#ifdef __CUDACC__
+            msl::syncStreams();
             return plans[0].d_Data;
+#else
+            return localPartition;
+#endif
         };
 
         virtual /**

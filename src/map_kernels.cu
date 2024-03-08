@@ -216,10 +216,17 @@ msl::detail::fillcore(T *destination, T *source, int paddingoffset, int gpuCols,
 }
 template<typename T>
 __global__ void
+msl::detail::setColumn(T *wdata, T* rdata, int totalrows, int totalcolumns, int col) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < totalrows) {
+        wdata[x*totalcolumns + col] = rdata[x];
+    }
+}
+template<typename T>
+__global__ void
 msl::detail::printGPU(T *data, int size, int col) {
     for (int i = 0; i < size; i++) {
         if (i % col == 0 && i != 0) {printf("\n");}
-
         printf("%f;", data[i]);
     }
 }

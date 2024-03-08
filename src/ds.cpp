@@ -755,7 +755,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         std::vector<int> threads(Muesli::num_gpus);
         T *gpu_results = new T[Muesli::num_gpus];
         int maxThreads = 1024;   // preliminary
-        int maxBlocks = 1024;    // preliminary
+        int maxBlocks = 65535;    // preliminary
         for (int i = 0; i < Muesli::num_gpus; i++) {
             threads[i] = maxThreads;
             gpu_results[i] = 0;
@@ -765,9 +765,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         T **d_odata = new T *[Muesli::num_gpus];
         updateHost();
 
-        //
         // Step 1: local fold
-        //
 
         // prearrangement: calculate threads, blocks, etc.; allocate device memory
         for (int i = 0; i < Muesli::num_gpus; i++) {
@@ -777,6 +775,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
             blocks[i] = plans[i].size / threads[i];
             if (blocks[i] > maxBlocks) {
                 blocks[i] = maxBlocks;
+                throws(detail::FoldToManyBlocks());
             }
             (cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
         }
@@ -812,8 +811,7 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
         // copy final sum from device to host
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
-            (cudaMemcpyAsync(&gpu_results[i],
-                                              d_odata[i],
+            (cudaMemcpyAsync(&gpu_results[i], d_odata[i],
                                               sizeof(T),
                                               cudaMemcpyDeviceToHost,
                                               Muesli::streams[i]));

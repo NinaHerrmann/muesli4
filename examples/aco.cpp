@@ -57,7 +57,7 @@ __device__ int d_GRAPH_SIZE;
 #define POW(a, b)      std::pow(a, b)
 #define EXP(a)      std::exp(a)
 #endif
-
+#include <random>
 const int Q = 38;
 typedef array<double, 2> city;
 Randoms *randoms;
@@ -102,7 +102,7 @@ namespace msl::aco {
             int d_ALPHA = 1;
             int d_BETA = 2;
             int fromcity = routes[xindex * cities + iteration];
-            int next_city = iroulette[(fromcity * 32) + yindex];
+            int next_city = iroulette[(fromcity * IROULETE) + yindex];
             bool bvisited = false;
             city eta_tau_return = {0,0};
             for (int y = 0; y < this->cities; y++) {
@@ -139,7 +139,7 @@ namespace msl::aco {
         }
 
         MSL_USERFUNC double operator()(int x, int y, double t, double etatau, double sum) const override {
-            // Calculates the probability of an ant going to the city at index x in the 32 closest cities.
+            // Calculates the probability of an ant going to the city at index x in the IROULETE closest cities.
             int cityi = routes[x*ncities+i];
             int next_city = iroulette[cityi*IROULETE+y];
             if (cityi == next_city || visited(x, next_city, routes, ncities, i+1)) {
@@ -223,6 +223,38 @@ namespace msl::aco {
             return sum;
         }
     };
+    class initialCity : public Functor3<int, int, int, int> {
+    private:
+        int *randoms;
+    public:
+        initialCity(int * randomp) {
+            this->randoms = randomp;
+        }
+        MSL_USERFUNC int operator()(int antindex, int city, int value) const override {
+            if (city != 0) {
+                return value;
+            } else {
+                return randoms[antindex];
+            }
+        }
+    };
+
+    class calcDistance : public Functor3<int, int, double, double> {
+    private:
+        city *cities;
+    public:
+        explicit calcDistance(city * cities) {
+            this->cities = cities;
+        }
+        MSL_USERFUNC double operator()(int cityi, int cityj, double value) const override {
+            if (cityi == cityj) {
+                return 0.0;
+            } else {
+                return sqrt(pow(cities[cityj][0] - cities[cityi][0], 2) +
+                                          pow(cities[cityj][1] - cities[cityi][1], 2));;
+            }
+        }
+    };
     class nextStep : public Functor3<int, int, int, int> {
     private:
         int * iroulette{};
@@ -251,9 +283,8 @@ namespace msl::aco {
             } else {
                 int cityi = routes[ant_index * ncities + i];
                 if (d_sum[ant_index] > 0.0) {
-                    int nextCity = city(ant_index, d_probs, randoms, 32);
+                    int nextCity = city(ant_index, d_probs, randoms, IROULETE);
                     if (nextCity == -1) {
-                        // printf("no city with hp;");
                         int nc;
                         for (nc = 0; nc < ncities; nc++) {
                             if (!visited(ant_index, nc, routes, ncities, i+1)) {
@@ -299,8 +330,137 @@ namespace msl::aco {
             return false;
         }
     };
+    class nextStep2 : public Functor2<int, int, int> {
+    private:
+        int * iroulette{};
+        double * d_sum{};
+        int * routes{};
+        double * d_probs{};
+        int ncities, i;
+        double * randoms;
+    public:
+        nextStep2(int i, int ncities, double * randomp) {
+            this->i = i;
+            this->ncities = ncities;
+            this->randoms = randomp;
+        }
+        void setIterationsParams(int * iroulet, int ii, double * dprobs, double * dSum, int * tours) {
+            this->iroulette = iroulet;
+            this->i = ii;
+            this->d_probs = dprobs;
+            this->d_sum = dSum;
+            this->routes = tours;
+        }
 
+        MSL_USERFUNC int operator()(int ant_index, int citytobe) const override {
+            int cityi = routes[ant_index * ncities + i];
+            if (d_sum[ant_index] > 0.0) {
+                int nextCity = city(ant_index, d_probs, randoms, IROULETE);
+                if (nextCity == -1) {
+                    int nc;
+                    for (nc = 0; nc < ncities; nc++) {
+                        if (!visited(ant_index, nc, routes, ncities, i+1)) {
+                            break;
+                        }
+                    }
+                    return nc;
+                }
+                return iroulette[cityi*IROULETE+nextCity];
+            } else {
+                int nc;
+                for (nc = 0; nc < ncities; nc++) {
+                    if (!visited(ant_index, nc, routes, ncities, i+1)) {
+                        break;
+                    }
+                }
+                return nc;
+            }
+        }
 
+        MSL_USERFUNC static int city(int antK, const double *probabilities, const double *rand_states, int iroulette) {
+            double random = rand_states[antK];
+            int i = 0;
+            // In case a city was already visited the probability is zero therefore the while loop should not terminate.
+            double sum = probabilities[antK * iroulette];
+            while (sum < random) {
+                i++;
+                sum += probabilities[antK * iroulette + i];
+            }
+            if (i > iroulette) {
+                return -1;
+            }
+            return (int) i;
+        }
+
+        MSL_USERFUNC static bool visited(int antk, int c, const int* routes, int n_cities, int step) {
+            for (int l=0; l <= step; l++) {
+                if (routes[antk*n_cities+l] == c) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
+    class nextStep3 : public Functor2<int, int, int> {
+    private:
+        int * iroulette{};
+        int * routes{};
+        double * d_probs{};
+        int ncities, i;
+        double * randoms;
+    public:
+        nextStep3(int i, int ncities, double * randomp) {
+            this->i = i;
+            this->ncities = ncities;
+            this->randoms = randomp;
+        }
+        void setIterationsParams(int * iroulet, int ii, double * dprobs, int * tours) {
+            this->iroulette = iroulet;
+            this->i = ii;
+            this->d_probs = dprobs;
+            this->routes = tours;
+        }
+
+        MSL_USERFUNC int operator()(int ant_index, int citytobe) const override {
+            int cityi = routes[ant_index * ncities + i];
+            int nextCity = city(ant_index, d_probs, randoms, IROULETE);
+            if (nextCity != -1) {
+                return iroulette[cityi*IROULETE+nextCity];
+            }
+            int nc;
+            for (nc = 0; nc < ncities; nc++) {
+                if (!visited(ant_index, nc, routes, ncities, i+1)) {
+                    break;
+                }
+            }
+            return nc;
+        }
+
+        MSL_USERFUNC static int city(int antK, const double *probabilities, const double *rand_states, int iroulette) {
+            double random = rand_states[antK];
+            int i = 0;
+            // In case a city was already visited the probability is zero therefore the while loop should not terminate.
+            double sum = probabilities[antK * iroulette];
+            while (sum < random) {
+                i++;
+                sum += probabilities[antK * iroulette + i];
+            }
+            if (i > iroulette) {
+                return -1;
+            }
+            return (int) i;
+        }
+
+        MSL_USERFUNC static bool visited(int antk, int c, const int* routes, int n_cities, int step) {
+            for (int l=0; l <= step; l++) {
+                if (routes[antk*n_cities+l] == c) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
     class UpdateDelta : public Functor3<int, int, double, double> {
     private:
         int *routes{};
@@ -423,32 +583,39 @@ namespace msl::aco {
             }
         }
     }
-    void checkvalidroute(const DM<int>& routes, int ncities, int nants) {
-        int * invalidants = new int[nants];
-        int j = 0;
-        for (int ii = 0; ii < nants; ii++) {
-            for (int jj = 0; jj < ncities; jj++) {
-                int currentcity = routes.localPartition[ii * ncities + jj];
-                for (int kk = 0; kk < ncities; kk++) {
-                    if (kk != jj && currentcity == routes.localPartition[ii * ncities + kk]) {
-                        exit(1);
-                        printf("city %d visited twice in ant %d\n", currentcity, ii);
-                        invalidants[j] = ii;
-                        j++;
-                    }
+    bool check_ant(int ncities, const DM<int>& routes, int ant) {
+        bool returnvalid = true;
+        for (int jj = 0; jj < ncities; jj++) {
+            int currentcity = routes.localPartition[ant * ncities + jj];
+            for (int kk = 0; kk < ncities; kk++) {
+                if (kk != jj && currentcity == routes.localPartition[ant * ncities + kk]) {
+                    returnvalid = false;
                 }
             }
         }
-        for (int jj=0; jj <= j; jj++) {
+        return returnvalid;
+    }
+    void checkvalidroute(const DM<int>& routes, int ncities, int nants) {
+        int * invalidants = new int[nants];
+        int j = 0;
+
+        for (int ii = 0; ii < nants; ii++) {
+            if (!check_ant(ncities, routes, ii)) {
+                printf("Ant %d is invalid;", ii);
+                invalidants[j] = ii;
+                j++;
+            }
+        }
+       /* for (int jj=0; jj <= j; jj++) {
             printf("[ ");
             for (int kk = 0; kk < ncities; kk++) {
                 printf("%d ", routes.localPartition[invalidants[jj] * ncities + kk]);
             }
             printf("]\n");
-        }
+        }*/
     }
-    void aco(int iterations, const std::string& importFile, int nants) {
-        int niroulet = 32;
+    void aco(int iterations, const std::string& importFile, int nants, int cols) {
+        int niroulet = IROULETE;
         int ncities = readsize(importFile);
         double dsinit = 0.0, fill = 0.0, ds2fill = 0.0;
         msl::startTiming();
@@ -461,19 +628,10 @@ namespace msl::aco {
         DM<double> probabilities(nants, niroulet, 0.0);
         dsinit = msl::stopTiming();
         msl::startTiming();
-#pragma omp parallel for shared(distance)
-        for (int i = 0; i < ncities; i++) {
-            for (int j = 0; j < ncities; j++) {
-                if (i == j) {
-                    distance.setLocal(i*ncities + j, 0.0);
-                } else {
-                    double dist = sqrt(pow(cities.get(j)[0] - cities.get(i)[0], 2) +
-                                   pow(cities.get(j)[1] - cities.get(i)[1], 2));
-                    distance.setLocal(i*ncities + j, dist);
-                }
-            }
-        }
-#pragma omp parallel for shared(iroulet)
+        calcDistance calcdistance(cities.getUserFunctionData());
+        distance.mapIndexInPlace(calcdistance);
+
+        distance.updateHost();
         for (int i = 0; i < ncities; i++) {
             for (int y = 0; y < IROULETE; y++) {
                 double maxdistance = 999999.9;
@@ -482,13 +640,13 @@ namespace msl::aco {
                 for (int j = 0; j < ncities; j++) {
                     bool check = true;
                     for (int k = 0; k < y; k++) {
-                        if (iroulet.get(i * IROULETE + k) == j) {
+                        if (iroulet.getLocal(i * IROULETE + k) == j) {
                             check = false;
                         }
                     }
 
                     if (i != j && check) {
-                        c_dist = distance.get(i*ncities + j);
+                        c_dist = distance.getLocal(i*ncities + j);
                         if (c_dist < maxdistance) {
                             maxdistance = c_dist;
                             city = j;
@@ -502,19 +660,34 @@ namespace msl::aco {
         startTiming();
         msl::syncStreams();
         DM<int> tours(nants, ncities, 0);
+        DA<int> nextcities(nants, 0);
         DM<double> deltaphero(ncities, ncities, 0);
         DM<double> etatau(nants, niroulet, {});
         DA<double> sum(nants, 0.0);
         DA<double> dist_routes(nants, 0.0);
         DA<double> r_length(nants, 0.0);
         SUM summe;
+        Mult mult;
         EtaTauCalc etataucalc(ncities, 0);
-        CalcProbs calcprobs(0, ncities, iroulet.getGpuData());
+        CalcProbs calcprobs(0, ncities, iroulet.getUserFunctionData());
         DA<double> randompointer(nants, 0.0);
         for (int i = 0; i < nants; i++) {
             randompointer.set(i, randoms->Uniforme());
         }
-        nextStep nextstep(0, ncities, randompointer.getGpuData());
+        DA<int> randomstartcity(nants, 0);
+        std::random_device rd;
+        // Use Mersenne Twister engine for random number generation
+        std::mt19937 gen(rd());
+        // Define the distribution for integers between 1 and x
+        std::uniform_int_distribution<> dis(1, ncities);
+        for (int i = 0; i < nants; i++) {
+            randomstartcity.set(i, dis(gen));
+        }
+        nextStep nextstep(0, ncities, randompointer.getUserFunctionData());
+        nextStep2 nextstep2(0, ncities, randompointer.getUserFunctionData());
+        nextStep3 nextstep3(0, ncities, randompointer.getUserFunctionData());
+        initialCity initialcity(randomstartcity.getUserFunctionData());
+        tours.mapIndexInPlace(initialcity);
         Reset reset;
         ZipSum zipsum(ncities);
         Min min;
@@ -529,52 +702,67 @@ namespace msl::aco {
 
         double alltimeminroute = 999999.9;
         for (int i = 0; i < iterations; i++) {
-            for (int j = 0; j < ncities; j++) {
+            for (int j = 1; j < ncities; j++) {
                 msl::startTiming();
-                etataucalc.setIterationsParams(iroulet.getGpuData(), j, distance.getGpuData(), tours.getGpuData(), phero.getGpuData());
+                etataucalc.setIterationsParams(iroulet.getUserFunctionData(), j, distance.getUserFunctionData(),
+                                               tours.getUserFunctionData(),
+                                               phero.getUserFunctionData());
                 // Write the eta tau value to the data structure.
                 etatau.mapIndexInPlace(etataucalc);
                 etataucalctime += msl::stopTiming();
-
                 // Write the sum of the etatau value for each ant to the sum datastructure.
                 msl::startTiming();
                 etatau.reduceRows(sum, summe);
                 reduceRowstime += msl::stopTiming();
-
                 msl::startTiming();
-                calcprobs.setIterationsParams(j, tours.getGpuData());
-                calcprobstime += msl::stopTiming();
-
-                // Set the probabilites to visit city x next.
-                msl::startTiming();
+                calcprobs.setIterationsParams(j, tours.getUserFunctionData());
                 probabilities.zipIndexInPlaceMA(etatau, sum, calcprobs);
-
                 calcprobstime += msl::stopTiming();
 
                 msl::startTiming();
-                nextstep.setIterationsParams(iroulet.getGpuData(), j, probabilities.getGpuData(), sum.getGpuData(), tours.getGpuData());
-                // Getting to the heart of it. Either we want to "randomly" choose one of the next 32 closest cities ...
+                // TODO Rather create an array and a set column method?
+                // Getting to the heart of it. Either we want to "randomly" choose one of the next IROULETE closest cities ...
                 // ... or we want to take a city not visited.
-                tours.mapIndexInPlace(nextstep);
-
+                if (cols == 1) {
+                    nextstep2.setIterationsParams(iroulet.getUserFunctionData(), j, probabilities.getUserFunctionData(),
+                                                  sum.getUserFunctionData(),
+                                                  tours.getUserFunctionData());
+                    nextcities.mapIndexInPlace(nextstep2);
+                    tours.setColumn(nextcities, j);
+                } else if(cols == 2) {
+                    nextstep.setIterationsParams(iroulet.getUserFunctionData(), j, probabilities.getUserFunctionData(),
+                                                 sum.getUserFunctionData(),
+                                                 tours.getUserFunctionData());
+                    tours.mapIndexInPlace(nextstep);
+                } else if(cols == 3) {
+                    nextstep3.setIterationsParams(iroulet.getUserFunctionData(), j, probabilities.getUserFunctionData(),
+                                                  tours.getUserFunctionData());
+                    nextcities.mapIndexInPlace(nextstep3);
+                    tours.setColumn(nextcities, j);
+                }
+                msl::syncStreams();
                 nextsteptime += msl::stopTiming();
-
                 sum.mapInPlace(reset);
             }
             msl::startTiming();
-            calcrlength.setIterationsParams(tours.getGpuData(), distance.getGpuData());
+            calcrlength.setIterationsParams(tours.getUserFunctionData(), distance.getUserFunctionData());
             // Calculate the length of the route.
             dist_routes.mapIndexInPlace(calcrlength);
             calcrlengthtime += msl::stopTiming();
             // Get the best route.
             msl::startTiming();
+            //dist_routes.show();
+            msl::syncStreams();
+            double minroutegpu = dist_routes.fold(min, true);
             minroute = dist_routes.foldCPU(min);
+            //dist_routes.show();
+            //printf("minroute %f\n", minroutegpu);
             minroutetime += msl::stopTiming();
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
             msl::startTiming();
-            updatedelta.setIterationsParams(tours.getGpuData(), dist_routes.getGpuData());
+            updatedelta.setIterationsParams(tours.getUserFunctionData(), dist_routes.getUserFunctionData());
             // Calculate the delta pheromone.
             deltaphero.mapIndexInPlace(updatedelta);
             deltapherotime += msl::stopTiming();
@@ -583,9 +771,11 @@ namespace msl::aco {
             phero.zipIndexInPlace(deltaphero, updatephero);
             updatepherotime += msl::stopTiming();
         }
-
-        printf("%s;%d;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f,%.4f \n",  importFile.c_str(), nants, dsinit, fill, ds2fill,
+        double calctime = etataucalctime+reduceRowstime+calcprobstime+nextsteptime+deltapherotime+updatepherotime+calcrlengthtime+minroutetime;
+        printf("%s;%d;%d; %.6f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f \n",  importFile.c_str(), nants, cols,calctime,dsinit, fill, ds2fill,
                etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime, alltimeminroute);
+        // importFile.c_str(), nants,   dsinit, fill,   ds2fill     etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime, alltimeminroute);
+        // pcb442;              256;    2.9862; 0.1416; 0.0058;     6.4798;         3.7537;         0.6522;        76.8972;        2.1370;             0.0008;         0.0169;     0.0033,          217790.4655
         dist_routes.updateHost();
         tours.updateHost();
         if (CHECKCORRECTNESS) {
@@ -615,12 +805,13 @@ int getIntArg(char *s, bool allowZero = false) {
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
     // TODO does not work for less
-    int gpus = 1, iterations = 1, runs = 1, nants = 256;
+    int gpus = 1, iterations = 1, runs = 1, nants = 256, cols = 1;
     std::string importFile, exportFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
             exitWithUsage();
         }
+
         switch (argv[i++][1]) {
             case 'g':
                 gpus = getIntArg(argv[i]);
@@ -643,14 +834,18 @@ int main(int argc, char **argv) {
             case 'r':
                 runs = (getIntArg(argv[i]));
                 break;
+            case 'c':
+                cols = (getIntArg(argv[i]));
+                break;
             default:
+                printf("entering default\n");
                 exitWithUsage();
         }
     }
     msl::setNumGpus(gpus);
     msl::setNumRuns(runs);
     if (!importFile.empty()) {
-        msl::aco::aco(iterations, importFile, nants);
+        msl::aco::aco(iterations, importFile, nants, cols);
     } else {
         printf("Providing an import file is mandatory. \n");
         exit(-1);

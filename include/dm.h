@@ -568,7 +568,14 @@ public:
      * @param col The col index.
      * @return The element at the given global index.
      */
-    void set2D(int row, int col, T value);
+    void set2D(int row, int col, T value);/**
+     * \brief Sets a column at the given global index \em col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    void setColumn(DA<T> &da, int col);
     /**
      * \brief Manually download the local partition from GPU memory.
      */

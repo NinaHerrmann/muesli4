@@ -216,6 +216,7 @@ void msl::syncStreams() {
         cudaSetDevice(i);
         (cudaStreamSynchronize(Muesli::streams[i]));
     }
+    cudaDeviceSynchronize();
 #endif
 }
 

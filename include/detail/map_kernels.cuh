@@ -179,6 +179,8 @@ namespace msl {
 
         template<typename T>
         __global__ void printGPU(T *destination, int size, int col);
+        template<typename T>
+        __global__ void setColumn(T *destination, T* rdata, int totalrows, int totalcol, int col);
 
         template<typename T, typename R, typename F>
         __global__ void

@@ -1626,6 +1626,7 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
             blocks[i] = this->plans[i].gpuRows;
             if (blocks[i] > maxBlocks) {
                 blocks[i] = maxBlocks;  // possibly throw exception, since this case is not handled yet, but should actualy never occur
+                throws(detail::FoldToManyBlocks());
             }
             CUDA_CHECK_RETURN(cudaMalloc((void**) &d_odata[i], blocks[i] * sizeof(T)));
         }
@@ -1652,9 +1653,7 @@ void msl::DM<T>::reduceRows(msl::DA<T> &c, ReduceFunctor &f) {
         // calculate local result for all GPUs
         for (int i = 0; i < nlocalRows; ++i) {
             local_results[i] = gpu_results[0][i];
-            //printf("lr %d: %.2f;", i, local_results[i]);
         }
-        printf("\n");
 
         for (int i = 1; i < num_gpus; i++) {
             for (int j = 0; j < nlocalRows; ++j) {
@@ -1777,4 +1776,30 @@ void msl::DM<T>::zipIndexInPlaceMA(msl::DM<T2> &b, msl::DA<T3> &c, ZipIndexFunct
 
     // check for errors during gpu computation
     this->cpuMemoryInSync = false;
+}
+
+template<typename T>
+void msl::DM<T>::setColumn(msl::DA<T> &da, int col) {
+    if (col < 0 || col >= ncol) {
+        throws(detail::IndexOutOfBoundsException());
+    }
+    if (da.getLocalSize() != nrow) {
+        throws(detail::SizeMismatchException());
+    }
+#ifdef __CUDACC__
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        int rows = this->plans[i].gpuRows;
+        int threads = (rows < Muesli::threads_per_block) ? rows : Muesli::threads_per_block;
+        int blocks = ((int)(rows / threads) <= 1) ? 1 : (int)(rows / threads) + 1;
+        dim3 dimBlock(threads);
+        dim3 dimGrid(blocks);
+        detail::setColumn<<<blocks, threads, 0, Muesli::streams[i]>>>(this->plans[i].d_Data, da.getExecPlans()[i].d_Data, rows, this->plans[i].gpuCols, col);
+}
+    this->cpuMemoryInSync = false;
+#else
+    for (int i = 0; i < nrow; i++) {
+        this->setLocal(i * ncol + col, da.get(i));
+    }
+#endif
 }

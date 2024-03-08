@@ -38,328 +38,295 @@
 
 namespace msl {
 
-namespace detail {
+    namespace detail {
 
 /* Abstract
  */
-class Exception
-{
+        class Exception {
 
-public:
+        public:
 
-  virtual ~Exception()
-  {
-  }
-  ;
+            virtual ~Exception() {
+            };
 
-  virtual std::string
-  tostring() const = 0;
+            virtual std::string
+            tostring() const = 0;
 
-};
+        };
 
 // ***************** Exception for Skeletons ****************
 
-class NotYetImplementedException: public Exception
-{
-public:
-  std::string tostring() const
-  {
-    return "NotYetImplementedException";
-  }
-};
+        class NotYetImplementedException : public Exception {
+        public:
+            std::string tostring() const {
+                return "NotYetImplementedException";
+            }
+        };
 
-class NotSameSizeException: public Exception
-{
-public:
-  std::string tostring() const
-  {
-    return "NotSameSizeException";
-  }
-};
+        class NotSameSizeException : public Exception {
+        public:
+            std::string tostring() const {
+                return "NotSameSizeException";
+            }
+        };
 
-class IllegalDistributionException: public Exception
-{
-public:
-    std::string tostring() const
-    {
-      return "IllegalDistributionException";
-    }
-};
+        class IllegalDistributionException : public Exception {
+        public:
+            std::string tostring() const {
+                return "IllegalDistributionException";
+            }
+        };
 
-class UndefinedSourceException: public Exception
-{
+        class UndefinedSourceException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "UndefinedSourceException";
-  }
+            std::string tostring() const {
+                return "UndefinedSourceException";
+            }
 
-};
+        };
 
-class UndefinedDestinationException: public Exception
-{
+        class UndefinedDestinationException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "UndefinedDestinationException";
-  }
+            std::string tostring() const {
+                return "UndefinedDestinationException";
+            }
 
-};
+        };
 
-class NonLocalAccessException: public Exception
-{
+        class NonLocalAccessException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "NonLocalAccessException";
-  }
+            std::string tostring() const {
+                return "NonLocalAccessException";
+            }
 
-};
+        };
 
-class MissingInitializationException: public Exception
-{
+        class MissingInitializationException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "MissingInitializationException";
-  }
+            std::string tostring() const {
+                return "MissingInitializationException";
+            }
 
-};
+        };
 
-class RotateRowCompleteNotImplementedException: public Exception
-{
+        class RotateRowCompleteNotImplementedException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "Rotating when datastructure is not row complete ist not implemented yet.";
-  }
+            std::string tostring() const {
+                return "Rotating when datastructure is not row complete ist not implemented yet.";
+            }
 
-};
-class RotateColCompleteNotImplementedException: public Exception
-{
+        };
 
-public:
+        class RotateColCompleteNotImplementedException : public Exception {
 
-  std::string tostring() const
-  {
-    return "Rotating when datastructure is not row complete ist not implemented yet.";
-  }
+        public:
 
-};
-class RotateRowManyNotImplementedException: public Exception
-{
+            std::string tostring() const {
+                return "Rotating when datastructure is not row complete ist not implemented yet.";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "Rotating more rows than allocated to one node ist not implemented yet.";
-  }
+        class RotateRowManyNotImplementedException : public Exception {
 
-};
+        public:
 
-class IllegalGetException: public Exception
-{
+            std::string tostring() const {
+                return "Rotating more rows than allocated to one node ist not implemented yet.";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "IllegalGetException";
-  }
+        class IllegalGetException : public Exception {
 
-};
+        public:
 
-class IllegalPutException: public Exception
-{
+            std::string tostring() const {
+                return "IllegalGetException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "IllegalPutException";
-  }
+        class IllegalPutException : public Exception {
 
-};
+        public:
 
-class IllegalPartitionException: public Exception
-{
+            std::string tostring() const {
+                return "IllegalPutException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "IllegalPartitionException";
-  }
+        class IllegalPartitionException : public Exception {
 
-};
+        public:
 
-class PartitioningImpossibleException: public Exception
-{
+            std::string tostring() const {
+                return "IllegalPartitionException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "PartitioningImpossibleException";
-  }
+        class PartitioningImpossibleException : public Exception {
 
-};
+        public:
 
-class IllegalPermuteException: public Exception
-{
+            std::string tostring() const {
+                return "PartitioningImpossibleException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "IllegalPermuteException";
-  }
+        class IllegalPermuteException : public Exception {
 
-};
+        public:
 
-class IllegalAllToAllException: public Exception
-{
+            std::string tostring() const {
+                return "IllegalPermuteException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "IllegalAllToAllException";
-  }
+        class IllegalAllToAllException : public Exception {
 
-};
+        public:
 
-class IllegalFunctorException: public Exception
-{
-public:
-  std::string tostring() const
-  {
-    return "IllegalFunctorException\nMust provide a functor for each computing unit!";
-  }
-};
+            std::string tostring() const {
+                return "IllegalAllToAllException";
+            }
 
-class FeatureNotSupportedByDeviceException: public Exception
-{
-public:
-  FeatureNotSupportedByDeviceException(std::string f)
-          : feature(f)
-  {
-  }
+        };
 
-  std::string tostring() const
-  {
-    return feature + " not supported by your device(s)!";
-  }
+        class IllegalFunctorException : public Exception {
+        public:
+            std::string tostring() const {
+                return "IllegalFunctorException\nMust provide a functor for each computing unit!";
+            }
+        };
 
-private:
-  std::string feature;
-};
+        class FeatureNotSupportedByDeviceException : public Exception {
+        public:
+            FeatureNotSupportedByDeviceException(std::string f)
+                    : feature(f) {
+            }
 
-class NoSolutionException: public Exception
-{
+            std::string tostring() const {
+                return feature + " not supported by your device(s)!";
+            }
 
-public:
+        private:
+            std::string feature;
+        };
 
-  std::string tostring() const
-  {
-    return "NoSolutionException";
-  }
+        class NoSolutionException : public Exception {
 
-};
+        public:
 
-class InternalErrorException: public Exception
-{
+            std::string tostring() const {
+                return "NoSolutionException";
+            }
 
-public:
+        };
 
-  std::string tostring() const
-  {
-    return "InternalErrorException";
-  }
+        class InternalErrorException : public Exception {
 
-};
+        public:
+
+            std::string tostring() const {
+                return "InternalErrorException";
+            }
+
+        };
 
 // ***************** Exceptions for Collections *************
 
-class EmptyHeapException: public Exception
-{
+        class EmptyHeapException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "EmptyHeapException";
-  }
+            std::string tostring() const {
+                return "EmptyHeapException";
+            }
 
-};
+        };
 
-class EmptyStackException: public Exception
-{
+        class EmptyStackException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "EmptyStackException";
-  }
+            std::string tostring() const {
+                return "EmptyStackException";
+            }
 
-};
+        };
 
-class EmptyQueueException: public Exception
-{
+        class EmptyQueueException : public Exception {
 
-public:
+        public:
 
-  std::string tostring() const
-  {
-    return "EmptyQueueException";
-  }
+            std::string tostring() const {
+                return "EmptyQueueException";
+            }
 
-};
+        };
 
 // ***************** Various *************
-class DeviceOutOfMemory: public Exception
-    {
-    public:
-        [[nodiscard]] std::string tostring() const override
-        {
-            return "Device is out of Memory";
-        }
-    };
-class UsingGPUFunctionOutsideGPU: public Exception
-    {
-    public:
-        [[nodiscard]] std::string tostring() const override
-        {
-            return "A function *_gpu is used outside of gpu code.";
-        }
-    };
-class InvalidCube: public Exception
-    {
-    public:
-        std::string tostring() const
-        {
-            return "Cube z-Dimension must be a multiple of the number of processes and gpus started.";
-        }
-    };
-inline std::ostream&
-operator<<(std::ostream& os, const Exception& e)
-{
-  os << e.tostring() << std::endl;
+        class DeviceOutOfMemory : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "Device is out of Memory";
+            }
+        };
+        class IndexOutOfBoundsException : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "The column used in setColumns is smaller or larger as the DM.";
+            }
+        };
+        class SizeMismatchException : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "DA in setColumns need to be of same size as number of rows.";
+            }
+        };
 
-  return os;
-}
+        class FoldToManyBlocks : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "The datastructure you are trying to reduce is to big for the GPU used.";
+            }
+        };
+
+        class UsingGPUFunctionOutsideGPU : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "A function *_gpu is used outside of gpu code.";
+            }
+        };
+
+        class InvalidCube : public Exception {
+        public:
+            [[nodiscard]] std::string tostring() const override {
+                return "Cube z-Dimension must be a multiple of the number of processes and gpus started.";
+            }
+        };
+
+        inline std::ostream &
+        operator<<(std::ostream &os, const Exception &e) {
+            os << e.tostring() << std::endl;
+
+            return os;
+        }
 
     }
 
