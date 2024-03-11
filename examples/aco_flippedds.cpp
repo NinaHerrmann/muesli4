@@ -174,7 +174,7 @@ namespace msl::aco {
                     }
                 }
 
-                int nextCity;
+                int nextCity = 0;
                 if (etaTauSum != 0) {
                     double rand = msl::randDouble(0.0, etaTauSum, randomState);
                     double etaTauSum2 = 0;
@@ -193,6 +193,7 @@ namespace msl::aco {
                     for (int j = 0; j < width; j++) {
                         if (rowdata[(startCity + j) % width] == -1) {
                             nextCity = (startCity + j) % width;
+                            break;
                         }
                         if (j == width - 1) {
                             printf("Somehow, ant %d found no free city in step %d\n", row, i);
@@ -202,6 +203,7 @@ namespace msl::aco {
 
                 rowdata[nextCity] = i;
                 distance += distances[nextCity * width + fromCity];
+                fromCity = nextCity;
             }
 
             return distance;
@@ -230,7 +232,6 @@ namespace msl::aco {
             double result = 0.0;
             for (int k = 0; k < nants; k++) {
                 double rlength = dist_routes[k];
-                dist_routes[k] = rlength;
                 int city1VisitIndex = flipped_routes[k * ncities + row];
                 int city2VisitIndex = flipped_routes[k * ncities + column];
                 if (abs(city1VisitIndex - city2VisitIndex) == 1) {
