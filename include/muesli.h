@@ -606,6 +606,40 @@ template <typename C1, typename C2> inline C2 proj2_2(C1 a, C2 b);
 
 template <typename T> inline void show(T *a, int size);
 
+#ifdef CUDA_ARCH
+    typedef curandState MSL_RANDOM_STATE;
+#else
+    typedef bool MSL_RANDOM_STATE;
+#endif
+
+MSL_USERFUNC MSL_RANDOM_STATE generateRandomState(size_t seed, size_t someIndex) {
+#ifdef CUDA_ARCH
+    curandState state;
+    curand_init(seed, someIndex, 0, &state);
+    return state;
+#else
+    return false; // TODO
+#endif
+}
+
+MSL_USERFUNC double randDouble(double min, double max, MSL_RANDOM_STATE& state) {
+#ifdef CUDA_ARCH
+    double f = curand_uniform_double(&state);
+    return (f + min) * (max - min);
+#else
+    return 0; // TODO
+#endif
+}
+
+MSL_USERFUNC int randInt(int min, int max, MSL_RANDOM_STATE& state) {
+#ifdef CUDA_ARCH
+        double f = curand_uniform_double(&state);
+        return (int) (f * (max - min + 0.9999999)) + min;
+#else
+    return 0; // TODO
+#endif
+}
+
 } // namespace msl
 
 #include "../src/muesli_com.cpp"
