@@ -172,16 +172,30 @@ namespace msl::aco {
                     }
                 }
 
-                double rand = msl::randDouble(0.0, etaTauSum, randomState);
-                double etaTauSum2 = 0;
                 int nextCity;
-                for (int j = 0; j < IROULETE; j++) {
-                    nextCity = iroulette[row * IROULETE + j];
-                    if (rowdata[nextCity] == -1) {
-                        etaTauSum2 += etataus[nextCity * width + fromCity];
+                if (etaTauSum != 0) {
+                    double rand = msl::randDouble(0.0, etaTauSum, randomState);
+                    double etaTauSum2 = 0;
+
+                    for (int j = 0; j < IROULETE; j++) {
+                        nextCity = iroulette[row * IROULETE + j];
+                        if (rowdata[nextCity] == -1) {
+                            etaTauSum2 += etataus[nextCity * width + fromCity];
+                        }
+                        if (rand < etaTauSum2)
+                            break;
                     }
-                    if (rand < etaTauSum2)
-                        break;
+                } else {
+                    // Select any city at random
+                    int startCity = msl::randInt(0, width - 1, randomState);
+                    for (int j = 0; j < width; j++) {
+                        if (rowdata[(startCity + j) % width] == -1) {
+                            nextCity = (startCity + j) % width;
+                        }
+                        if (j == width - 1) {
+                            printf("Somehow, ant %d found no free city in step %d\n", row, i);
+                        }
+                    }
                 }
 
                 rowdata[nextCity] = i;
