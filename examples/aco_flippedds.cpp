@@ -58,10 +58,8 @@ __device__ int d_GRAPH_SIZE;
 #define EXP(a)      std::exp(a)
 #endif
 #include <random>
-const int Q = 38;
 typedef array<double, 2> city;
 Randoms *randoms;
-
 
 #define TAUMAX 2
 #define IROULETE 32
@@ -329,7 +327,7 @@ namespace msl::aco {
         }
     }
 
-    void aco(int iterations, const std::string& importFile, int nants, int cols) {
+    void aco(int iterations, const std::string& importFile, int nants) {
         int niroulet = IROULETE;
         int ncities = readsize(importFile);
         double dsinit = 0.0;
@@ -342,9 +340,6 @@ namespace msl::aco {
         CalcDistance calcdistance(cities.getUserFunctionData());
         distance.mapIndexInPlace(calcdistance);
         distance.updateHost();
-
-        std::random_device rd;
-        std::mt19937 generator(rd());
 
         for (int i = 0; i < ncities; i++) {
             for (int y = 0; y < IROULETE; y++) {
@@ -395,18 +390,19 @@ namespace msl::aco {
             // Write the eta tau value to the data structure.
             etatau.mapIndexInPlace(etataucalc);
             etataucalctime += msl::stopTiming();
+            etatau.show("dist routes", 6);
 
             msl::startTiming();
             workHorse.setIterationParams(iroulet.getUserFunctionData(), etatau.getUserFunctionData(), distance.getUserFunctionData(), flipped_tours.getUserFunctionData());
             dist_routes.mapIndexInPlace(workHorse);
             constructtime += msl::stopTiming();
-
+            dist_routes.show("dist routes", 6);
             // Get the best route.
             msl::startTiming();
             msl::syncStreams();
             minroute = dist_routes.foldCPU(min);
             minroutetime += msl::stopTiming();
-
+            printf("minroute: %.2f\n", minroute);
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
@@ -422,17 +418,20 @@ namespace msl::aco {
             updatepherotime += msl::stopTiming();
 
             msl::startTiming();
-            flipped_tours.fill(-1);
+            if (i != iterations - 1) {
+                flipped_tours.fill(-1);
+            }
             resettime += msl::stopTiming();
         }
         double calctime = etataucalctime + constructtime + deltapherotime + updatepherotime + resettime + minroutetime;
-        printf("%s;%d;%d;%.6f;%.6f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f \n", importFile.c_str(), nants,
-               cols, dsinit, calctime, etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime,
+        printf("%s;%d;%.6f;%.6f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f \n", importFile.c_str(), nants,
+               dsinit, calctime, etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime,
                resettime, alltimeminroute);
         // importFile.c_str(), nants,   dsinit, fill,   ds2fill     etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime, alltimeminroute);
         // pcb442;              256;    2.9862; 0.1416; 0.0058;     6.4798;         3.7537;         0.6522;        76.8972;        2.1370;             0.0008;         0.0169;     0.0033,          217790.4655
         dist_routes.updateHost();
         flipped_tours.updateHost();
+        flipped_tours.show("flipped tours", 76);
         if (CHECKCORRECTNESS) {
             checkminroute(nants, minroute, dist_routes);
             checkvalidroute(flipped_tours, ncities, nants);
@@ -460,7 +459,7 @@ int getIntArg(char *s, bool allowZero = false) {
 int main(int argc, char **argv) {
     msl::initSkeletons(argc, argv);
     // TODO does not work for less
-    int gpus = 1, iterations = 1, runs = 1, nants = 256, cols = 1;
+    int gpus = 1, iterations = 1, runs = 1, nants = 256;
     std::string importFile, exportFile;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
@@ -489,9 +488,6 @@ int main(int argc, char **argv) {
             case 'r':
                 runs = (getIntArg(argv[i]));
                 break;
-            case 'c':
-                cols = (getIntArg(argv[i]));
-                break;
             default:
                 printf("entering default\n");
                 exitWithUsage();
@@ -500,7 +496,7 @@ int main(int argc, char **argv) {
     msl::setNumGpus(gpus);
     msl::setNumRuns(runs);
     if (!importFile.empty()) {
-        msl::aco::aco(iterations, importFile, nants, cols);
+        msl::aco::aco(iterations, importFile, nants);
     } else {
         printf("Providing an import file is mandatory. \n");
         exit(-1);
