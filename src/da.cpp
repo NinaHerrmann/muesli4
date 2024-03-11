@@ -233,17 +233,17 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
     // this->updateDevice();
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
-      cudaSetDevice(i);
+        cudaSetDevice(i);
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
-      dim3 dimBlock(Muesli::threads_per_block);
-      dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-          this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+        dim3 dimBlock(1024);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
     }
 #endif
     // calculate offsets for indices
@@ -270,12 +270,12 @@ void msl::DA<T>::mapIndex(MapIndexFunctor &f, DA <T> &b) {
     // map on GPUs
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
-      cudaSetDevice(i);
-      dim3 dimBlock(Muesli::threads_per_block);
-      dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 b.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
-                this->plans[i].first, f);
+                        this->plans[i].first, f);
     }
 #endif
     // map on CPU cores
@@ -315,12 +315,12 @@ void msl::DA<T>::zipIndexInPlace(msl::DA<T2> &b, ZipIndexFunctor &f) {
     this->updateDevice();
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
-      cudaSetDevice(i);
-      dim3 dimBlock(Muesli::threads_per_block);
-      dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-          this->plans[i].d_Data, b.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
-          this->plans[i].first, f);
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                this->plans[i].d_Data, b.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
+                        this->plans[i].first, f);
     }
 #endif
     // zip on CPU cores
@@ -344,13 +344,13 @@ void msl::DA<T>::zipIndex(msl::DA<T2> &b, msl::DA<T2> &c,
 
     // zip on GPUs
 #ifdef __CUDACC__
-    for (int i =0; i < this->ng; i++) {
-      cudaSetDevice(i);
-      dim3 dimBlock(Muesli::threads_per_block);
-      dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-           b.getExecPlans()[i].d_Data, c.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
-          this->plans[i].first, f);
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::zipIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                b.getExecPlans()[i].d_Data, c.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
+                        this->plans[i].first, f);
     }
 #endif
     // zip on CPU cores
@@ -373,13 +373,13 @@ void msl::DA<T>::zipInPlace3(DA <T2> &b, DA <T3> &c, ZipFunctor &f) {  // should
     // zip on GPU
 #ifdef __CUDACC__
     for (int i = 0; i < this->ng; i++) {
-      cudaSetDevice(i);
-      dim3 dimBlock(Muesli::threads_per_block);
-      dim3 dimGrid((this->plans[i].size+dimBlock.x)/dimBlock.x);
-      auto bplans = b.getExecPlans();
-      auto cplans = c.getExecPlans();
-      detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-          this->plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, this->plans[i].d_Data, this->plans[i].size, f);
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        auto bplans = b.getExecPlans();
+        auto cplans = c.getExecPlans();
+        detail::zipKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                this->plans[i].d_Data, bplans[i].d_Data, cplans[i].d_Data, this->plans[i].d_Data, this->plans[i].size, f);
     }
 #endif
     // zip on CPU cores
