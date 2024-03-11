@@ -166,39 +166,47 @@ namespace msl::aco {
             double distance = 0;
 
             for (int i = 1; i < width; i++) {
+                int nextCity = -1;
                 double etaTauSum = 0;
                 for (int j = 0; j < IROULETE; j++) {
                     int toCity = iroulette[row * IROULETE + j];
                     // Not visited yet.
                     if (rowdata[toCity] == -1) {
                         // x = fromCity, y = toCity.
-                        etaTauSum += etataus[toCity * width + fromCity];
+                        double etatau = etataus[toCity * width + fromCity];
+                        // If there is a city with infinite etatau => in the same place. Just go directly to it.
+                        if (isinf(etatau)) {
+                            nextCity = toCity;
+                            break;
+                        }
+                        etaTauSum += etatau;
                     }
                 }
 
-                int nextCity = 0;
-                if (etaTauSum != 0) {
-                    double rand = msl::randDouble(0.0, etaTauSum, randomState);
-                    double etaTauSum2 = 0;
+                if (nextCity == -1) {
+                    if (etaTauSum != 0) {
+                        double rand = msl::randDouble(0.0, etaTauSum, randomState);
+                        double etaTauSum2 = 0;
 
-                    for (int j = 0; j < IROULETE; j++) {
-                        nextCity = iroulette[row * IROULETE + j];
-                        if (rowdata[nextCity] == -1) {
-                            etaTauSum2 += etataus[nextCity * width + fromCity];
+                        for (int j = 0; j < IROULETE; j++) {
+                            nextCity = iroulette[row * IROULETE + j];
+                            if (rowdata[nextCity] == -1) {
+                                etaTauSum2 += etataus[nextCity * width + fromCity];
+                            }
+                            if (rand < etaTauSum2)
+                                break;
                         }
-                        if (rand < etaTauSum2)
-                            break;
-                    }
-                } else {
-                    // Select any city at random
-                    int startCity = msl::randInt(0, width - 1, randomState);
-                    for (int j = 0; j < width; j++) {
-                        if (rowdata[(startCity + j) % width] == -1) {
-                            nextCity = (startCity + j) % width;
-                            break;
-                        }
-                        if (j == width - 1) {
-                            printf("Somehow, ant %d found no free city in step %d\n", row, i);
+                    } else {
+                        // Select any city at random
+                        int startCity = msl::randInt(0, width - 1, randomState);
+                        for (int j = 0; j < width; j++) {
+                            if (rowdata[(startCity + j) % width] == -1) {
+                                nextCity = (startCity + j) % width;
+                                break;
+                            }
+                            if (j == width - 1) {
+                                printf("Somehow, ant %d found no free city in step %d\n", row, i);
+                            }
                         }
                     }
                 }
