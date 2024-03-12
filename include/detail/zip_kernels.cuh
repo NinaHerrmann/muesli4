@@ -88,6 +88,27 @@ namespace msl::detail {
                        int first,
                        FCT3 func,
                        int nCols);
+        /**
+       * \brief Zip Skeleton for 3 DS.
+       *
+       * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param in2 Pointer to gpu memory of DM which provides the data to calculate on.
+       * @param out Pointer to gpu memory of DM where the data is written to.
+       * @param size of the data.
+       * @param first index of first element
+       * @param func functor to be called.
+       * @param nCols number of columns
+       */
+        template<typename T1, typename T2, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernel3(T1 *in1,
+                       T2 *in2,
+                       T2 *in3,
+                       R *out,
+                       size_t n,
+                       int first,
+                       FCT3 func,
+                       int nCols);
 
         /**
          * \brief Original usage read data from another point than the current index for DMs

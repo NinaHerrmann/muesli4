@@ -1803,3 +1803,36 @@ void msl::DM<T>::setColumn(msl::DA<T> &da, int col) {
     }
 #endif
 }
+
+template<typename T>
+template<typename T2, typename T3, typename ZipIndexFunctor>
+void msl::DM<T>::zipIndexInPlace3(msl::DM<T2> &b, msl::DM<T3> &c, ZipIndexFunctor &f) {
+    this->updateDevice();
+#ifdef __CUDACC__
+    for (int i = 0; i < this->ng; i++) {
+        cudaSetDevice(i);
+        dim3 dimBlock(Muesli::threads_per_block);
+        dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+        detail::zipIndexKernel3<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                this->plans[i].d_Data, b.getExecPlans()[i].d_Data, c.getExecPlans()[i].d_Data, this->plans[i].d_Data,
+                        this->plans[i].nLocal, this->plans[i].first, f, ncol);
+    }
+#endif
+    if (this->nCPU > 0) {
+        T2 *bPartition = b.getLocalPartition();
+        T2 *cPartition = c.getLocalPartition();
+        long elementsCPU = this->nCPU;
+        long firstIndexCPU = this->firstIndex;
+#ifdef _OPENMP
+#pragma omp parallel for shared(elementsCPU, firstIndexCPU, ncol, f, bPartition, cPartition) default(none)
+#endif
+        for (int k = 0; k < elementsCPU; k++) {
+            int i = (k + firstIndexCPU) / ncol;
+            int j = (k + firstIndexCPU) % ncol;
+            this->localPartition[k] = f(i, j, this->localPartition[k], bPartition[k], cPartition[k]);
+        }
+    }
+    // check for errors during gpu computation
+    this->cpuMemoryInSync = false;
+    msl::syncStreams();
+}

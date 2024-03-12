@@ -59,7 +59,6 @@ __device__ int d_GRAPH_SIZE;
 #endif
 #include <random>
 typedef array<double, 2> city;
-Randoms *randoms;
 
 #define TAUMAX 2
 #define IROULETE 32
@@ -71,27 +70,19 @@ std::ostream& operator<< (std::ostream& os, const city t) {
 }
 namespace msl::aco {
 
-    class Reset : public Functor<double, double> {
+    class Fill : public Functor<int, int> {
+        int d;
     public:
-        MSL_USERFUNC double operator()(double x) const override {
-            return 0.0;
+        explicit Fill(int d) : d(d) {}
+
+        MSL_USERFUNC int operator()(int x) const override {
+            return d;
         }
     };
 
-    class EtaTauCalc : public Functor3<int, int, double, double> {
-    private:
-        double * phero{}, * dist{};
-        int cities;
+    class EtaTauCalc : public Functor5<int, int, double, double, double, double> {
     public:
-        EtaTauCalc(int cities) {
-            this->cities = cities;
-        }
-        void setIterationsParams(double * distance, double * pheromones) {
-            this->dist = distance;
-            this->phero = pheromones;
-        }
-
-        MSL_USERFUNC double operator()(int xindex, int yindex, double eta_tau) const override {
+        MSL_USERFUNC double operator()(int xindex, int yindex, double eta_tau, double dist, double phero) const override {
             double d_ALPHA = 1;
             double d_BETA = 2;
             int fromcity = xindex;
@@ -101,8 +92,8 @@ namespace msl::aco {
             // For every city which can be visited, calculate the eta and tau value.
             if (fromcity != next_city) {
                 // Looks like zero but is just very small.
-                double eta = pow(1 /  dist[fromcity * this->cities + next_city], d_BETA);
-                double tau = pow(phero[fromcity * this->cities + next_city], d_ALPHA);
+                double eta = pow(1/dist, d_BETA);
+                double tau = pow(phero, d_ALPHA);
                 eta_tau = eta * tau;
             }
             return eta_tau;
@@ -131,7 +122,86 @@ namespace msl::aco {
             }
         }
     };
+    class WorkHorseAllHandler : public Functor2<int, double, double> {
+    private:
+        int width;
+        int seed;
+        int *iroulette{};
+        double *etataus{};
+        double *distances{};
+        int *tours{};
+    public:
+        WorkHorseAllHandler(int width, int seed) : width(width), seed(seed) {
+        }
 
+        void setIterationParams(int *_iroulette, double *_etataus, double *_distances, int *_tours) {
+            this->iroulette = _iroulette;
+            this->etataus = _etataus;
+            this->distances = _distances;
+            this->tours = _tours;
+        }
+
+        MSL_USERFUNC double operator()(int row, double unused) const override {
+            MSL_RANDOM_STATE randomState = msl::generateRandomState(this->seed, row);
+
+            int *rowdata = &this->tours[row * width];
+
+            int fromCity = msl::randInt(0, width - 1, randomState);
+            rowdata[fromCity] = 0;
+
+            double distance = 0;
+
+            for (int i = 1; i < width; i++) {
+                int nextCity = -1;
+                double etaTauSum = 0;
+                for (int j = 0; j < IROULETE; j++) {
+                    int toCity = iroulette[row * IROULETE + j];
+                    // Not visited yet.
+                    if (rowdata[toCity] == -1) {
+                        // x = fromCity, y = toCity.
+                        double etatau = etataus[toCity * width + fromCity];
+                        // If there is a city with infinite etatau => in the same place. Just go directly to it.
+                        if (std::isinf(etatau)) {
+                            nextCity = toCity;
+                            break;
+                        }
+                        etaTauSum += etatau;
+                    }
+                }
+
+                if (nextCity == -1) {
+                    if (etaTauSum != 0) {
+                        double rand = msl::randDouble(0.0, etaTauSum, randomState);
+                        double etaTauSum2 = 0;
+
+                        for (int j = 0; j < IROULETE; j++) {
+                            nextCity = iroulette[row * IROULETE + j];
+                            if (rowdata[nextCity] == -1) {
+                                etaTauSum2 += etataus[nextCity * width + fromCity];
+                            }
+                            if (rand < etaTauSum2)
+                                break;
+                        }
+                    } else {
+                        // Select any city at random
+                        int startCity = msl::randInt(0, width - 1, randomState);
+                        for (int j = 0; j < width; j++) {
+                            if (rowdata[(startCity + j) % width] == -1) {
+                                nextCity = (startCity + j) % width;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                rowdata[nextCity] = i;
+                distance += distances[nextCity * width + fromCity];
+                fromCity = nextCity;
+            }
+
+            return distance;
+        }
+    };
     class WorkHorse : public Functor2<int, double, double> {
     private:
         int width;
@@ -151,17 +221,14 @@ namespace msl::aco {
             this->tours = _tours;
         }
 
-        MSL_USERFUNC double operator()(int row, double unused) const override {
-            MSL_RANDOM_STATE randomState = msl::generateRandomState(this->seed, row);
-
-            int* rowdata = &this->tours[row * width];
-
+        MSL_USERFUNC double operator()(int ant_index, double unused) const override {
+            MSL_RANDOM_STATE randomState = msl::generateRandomState(this->seed, ant_index);
+            int* rowdata = &this->tours[ant_index * width];
             int fromCity = msl::randInt(0, width - 1, randomState);
             rowdata[fromCity] = 0;
-
             double distance = 0;
-
             for (int i = 1; i < width; i++) {
+                int nextCity = -1;
                 double etaTauSum = 0;
                 for (int j = 0; j < IROULETE; j++) {
                     int toCity = iroulette[fromCity * IROULETE + j];
@@ -172,8 +239,6 @@ namespace msl::aco {
                         etaTauSum += etataus[toCity * width + fromCity];
                     }
                 }
-
-                int nextCity;
                 if (etaTauSum != 0) {
                     double rand = msl::randDouble(0.0, etaTauSum, randomState);
                     double etaTauSum2 = 0;
@@ -187,22 +252,15 @@ namespace msl::aco {
                             break;
                     }
                 } else {
-                    // Select any city at random
                     int startCity = msl::randInt(0, width - 1, randomState);
                     for (int j = 0; j < width; j++) {
                         if (rowdata[(startCity + j) % width] == -1) {
                             nextCity = (startCity + j) % width;
-                            break;
-                        }/*if (j == width - 1) {
-                            printf("Somehow, ant %d found no free city in step %d\n", row, i);
-                        }*/
+                        }
                     }
                 }
-
                 rowdata[nextCity] = i;
-                //printf("Next city: %d - %d\n", nextCity, fromCity);
                 distance += distances[nextCity * width + fromCity];
-
                 fromCity = nextCity;
             }
 
@@ -232,7 +290,6 @@ namespace msl::aco {
             double result = 0.0;
             for (int k = 0; k < nants; k++) {
                 double rlength = dist_routes[k];
-                dist_routes[k] = rlength;
                 int city1VisitIndex = flipped_routes[k * ncities + row];
                 int city2VisitIndex = flipped_routes[k * ncities + column];
                 if (abs(city1VisitIndex - city2VisitIndex) == 1) {
@@ -249,79 +306,7 @@ namespace msl::aco {
             return (1 - RO) * (prevphero + deltaphero);
         }
     };
-    int readsize(const std::string &basicString) {
-        int n_cities;
-        if (basicString == "djibouti") {
-            n_cities = 38;
-        } else if (basicString == "luxembourg") {
-            n_cities = 980;
-        } else if (basicString == "catar") {
-            n_cities = 194;
-        } else if (basicString == "a280") {
-            n_cities = 280;
-        } else if (basicString == "d198") {
-            n_cities = 198;
-        } else if (basicString == "d1291") {
-            n_cities = 1291;
-        } else if (basicString == "lin318") {
-            n_cities = 318;
-        } else if (basicString == "pcb442") {
-            n_cities = 442;
-        } else if (basicString == "pcb1173") {
-            n_cities = 1173;
-        } else if (basicString == "pr1002") {
-            n_cities = 1002;
-        } else if (basicString == "pr2392") {
-            n_cities = 2392;
-        } else if (basicString == "rat783") {
-            n_cities = 783;
-        } else {
-            std::cout << "No valid import file provided. Please provide a valid import file." << std::endl;
-            exit(-1);
-        }
-        return n_cities;
-    }
 
-
-    void readData(const std::string &basicString, int ncities, DA <city> &cities, DM<double> &phero) {
-        std::ifstream data;
-        data.open("/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/data/" + basicString + ".txt", std::ifstream::in);
-        randoms = new Randoms(15);
-
-        if (data.is_open()){
-            double randn;
-            for(int j = 0;j<ncities;j++){
-                for(int k = 0;k<ncities;k++){
-                    if(j!=k){
-                        randn = randoms -> Uniforme() * TAUMAX;
-                        phero.setLocal((j * ncities) + k, randn);
-                        phero.setLocal((k * ncities) + j, randn);
-                    }
-                    else{
-                        phero.setLocal((j * ncities) + k, 0.0);
-                        phero.setLocal((k * ncities) + j, 0.0);
-                    }
-                }
-            }
-            int i = 0;
-            double index, x, y;
-            index = 0.0; x = 0.0; y = 0.0;
-            city city = {0.0,0.0};
-            while(i < ncities){
-                data >> index;
-                data >> x;
-                data >> y;
-
-                city[0] = (double)x;
-                city[1] = (double)y;
-                cities.setLocal(i, city);
-                i += 1;
-            }
-            data.close();
-        } else{
-            printf(" File not opened\n");
-        }
-    }
     void checkminroute(int nants, double minroute, const DA<double>& dist_routes) {
         for (int ii = 0; ii < nants; ii++) {
             if (minroute > dist_routes.localPartition[ii]) {
@@ -330,6 +315,7 @@ namespace msl::aco {
             }
         }
     }
+
     void checkvalidroute(const DM<int>& routes, int ncities, int nants) {
         for (int ant = 0; ant < nants; ant++) {
             for (int n = 0; n < ncities; n++) {
@@ -346,106 +332,131 @@ namespace msl::aco {
         }
     }
 
-    void aco(int iterations, const std::string& importFile, int nants) {
-        int niroulet = IROULETE;
-        int ncities = readsize(importFile);
-        double dsinit = 0.0;
-        msl::startTiming();
-        DA<city> cities(ncities, {});
-        DM<double> phero(ncities, ncities, {});
-        DM<double> distance(ncities, ncities, {});
-        readData(importFile, ncities, cities, phero);
-        DM<int> iroulet(ncities, niroulet, 0);
-        CalcDistance calcdistance(cities.getUserFunctionData());
-        distance.mapIndexInPlace(calcdistance);
-        distance.updateHost();
+    DA<city> readCities(const std::string &problem) {
+        std::ifstream data("/home/n_herr03@WIWI.UNI-MUENSTER.DE/research/aco-project/programs/lowlevel/tsp/tsplib/" + problem + ".txt");
 
+        if (!data.is_open()) {
+            std::cerr << "File could not be opened!" << std::endl;
+            exit(-1);
+        }
+
+        std::vector<city> cities;
+
+        while(true) {
+            int index;
+            city city;
+            data >> index;
+            if (data.fail())
+                break;
+            data >> city[0];
+            data >> city[1];
+            cities.push_back(city);
+        }
+        data.close();
+
+        DA<city> cityArray(cities.size());
+        for (int i = 0; i < cities.size(); i++) {
+            cityArray.localPartition[i] = cities[i];
+        }
+        cityArray.updateDevice(true);
+
+        return cityArray;
+    }
+
+    DM<double> createPheroMatrix(int ncities) {
+        Randoms randoms(15);
+        DM<double> phero(ncities, ncities, 0);
+        for (int j = 0; j < ncities; j++) {
+            for (int k = 0; k <= j; k++) {
+                if (j != k) {
+                    double randn = randoms.Uniforme() * TAUMAX;
+                    phero.set2D(j, k, randn);
+                    phero.set2D(k, j, randn);
+                }
+            }
+        }
+        phero.updateDevice(true);
+        return phero;
+    }
+
+    DM<int> createIRoulette(const DM<double> &distances, int ncities) {
+        DM<int> iroulette(ncities, IROULETE, 0);
         for (int i = 0; i < ncities; i++) {
             for (int y = 0; y < IROULETE; y++) {
-                double maxdistance = 999999.9;
-                double c_dist;
+                double maxdistance = std::numeric_limits<double>::infinity();
                 int city = -1;
                 for (int j = 0; j < ncities; j++) {
                     bool check = true;
                     for (int k = 0; k < y; k++) {
-                        if (iroulet.getLocal(i * IROULETE + k) == j) {
+                        if (iroulette.localPartition[i * IROULETE + k] == j) {
                             check = false;
                         }
                     }
-
                     if (i != j && check) {
-                        c_dist = distance.getLocal(i*ncities + j);
+                        double c_dist = distances.localPartition[i * ncities + j];
                         if (c_dist < maxdistance) {
                             maxdistance = c_dist;
                             city = j;
                         }
                     }
                 }
-                iroulet.set(i * IROULETE + y, city);
+                iroulette.set2D(i, y, city);
             }
         }
-        msl::syncStreams();
+        iroulette.updateDevice(true);
+        return iroulette;
+    }
+
+    void aco(int iterations, const std::string& importFile, int nants) {
+        msl::startTiming();
+        DA<city> cities = readCities(importFile);
+        int ncities = cities.getSize();
+        DM<double> phero = createPheroMatrix(ncities);
+        DM<double> distance(ncities, ncities, 0);
+        CalcDistance calcdistance(cities.getUserFunctionData());
+        distance.mapIndexInPlace(calcdistance);
+        distance.updateHost();
+        DM<int> iroulette = createIRoulette(distance, ncities);
         DM<int> flipped_tours(nants, ncities, -1);
         DM<double> deltaphero(ncities, ncities, 0);
-        DM<double> etatau(ncities, ncities, {});
+        DM<double> etatau(ncities, ncities, 0);
         DA<double> dist_routes(nants, 0);
 
-        Reset reset;
+        Fill fill(-1);
         Min min;
         double minroute;
-        EtaTauCalc etataucalc(ncities);
+        EtaTauCalc etataucalc;
         int veryGoodSeed = (int) time(nullptr);
         WorkHorse workHorse(ncities, veryGoodSeed);
         UpdateDelta updatedelta(ncities, nants);
         UpdatePhero updatephero;
-        dsinit = msl::stopTiming();
-        double etataucalctime = 0.0,
-                constructtime = 0.0,
-                deltapherotime = 0.0,
-                updatepherotime = 0.0,
-                resettime = 0.0,
-                minroutetime = 0.0;
+        double dsinit = msl::stopTiming();
 
-        double alltimeminroute = 999999.9;
+        double alltimeminroute = std::numeric_limits<double>::infinity();
         for (int i = 0; i < iterations; i++) {
-            msl::startTiming();
-            etataucalc.setIterationsParams(distance.getUserFunctionData(), phero.getUserFunctionData());
+            flipped_tours.mapInPlace(fill);
             // Write the eta tau value to the data structure.
-            etatau.mapIndexInPlace(etataucalc);
-            etataucalctime += msl::stopTiming();
-            msl::syncStreams();
-            msl::startTiming();
-            workHorse.setIterationParams(iroulet.getUserFunctionData(), etatau.getUserFunctionData(), distance.getUserFunctionData(), flipped_tours.getUserFunctionData());
+            etatau.zipIndexInPlace3(distance, phero, etataucalc);
+            workHorse.setIterationParams(iroulette.getUserFunctionData(), etatau.getUserFunctionData(), distance.getUserFunctionData(), flipped_tours.getUserFunctionData());
             dist_routes.mapIndexInPlace(workHorse);
-            constructtime += msl::stopTiming();
             // Get the best route.
-            msl::startTiming();
-            msl::syncStreams();
             minroute = dist_routes.foldCPU(min);
-            minroutetime += msl::stopTiming();
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
-
-            msl::startTiming();
             updatedelta.setIterationsParams(flipped_tours.getUserFunctionData(), dist_routes.getUserFunctionData());
             // Calculate the delta pheromone.
             deltaphero.mapIndexInPlace(updatedelta);
-            deltapherotime += msl::stopTiming();
             // Update the pheromone.
-            msl::startTiming();
             phero.zipIndexInPlace(deltaphero, updatephero);
-            updatepherotime += msl::stopTiming();
-
-            msl::startTiming();
             if (i != iterations - 1) {
                 flipped_tours.fill(-1);
             }
-            resettime += msl::stopTiming();
         }
-        double calctime = etataucalctime + constructtime + deltapherotime + updatepherotime + resettime + minroutetime;
+        double calctime = msl::stopTiming();// etataucalctime + constructtime + deltapherotime + updatepherotime + resettime + minroutetime;
         printf("%s;%d;%s;%f;%f;%f;", importFile.c_str(), nants, "flippedds",
                calctime, dsinit+calctime, alltimeminroute);// %.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime, resettime, alltimeminroute);
+
         dist_routes.updateHost();
         flipped_tours.updateHost();
         if (CHECKCORRECTNESS) {
@@ -459,7 +470,7 @@ namespace msl::aco {
 
 void exitWithUsage() {
     std::cerr
-            << "Usage: ./gassimulation_test [-g <nGPUs>] [-n <iterations>] [-i <importFile>] [-e <exportFile>] [-t <threads>] [-c <cities>] [-a <ants>] [-r <runs>]"
+            << "Usage: ./gassimulation_test [-g <nGPUs>] [-n <iterations>] [-i <importFile>] [-t <threads>] [-c <cities>] [-a <ants>] [-r <runs>]"
             << "Default 1 GPU 1 Iteration No import File No Export File threads omp_get_max_threads cities 10 random generated cities ants 16 runs 1" <<std::endl;
     exit(-1);
 }

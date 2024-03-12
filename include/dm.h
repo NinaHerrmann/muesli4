@@ -453,7 +453,7 @@ public:
      * @tparam ZipIndexFunctor Functor type.
      */
     template<typename T2, typename T3, typename ZipIndexFunctor>
-    void zipInPlace3(DM<T2> &b, DM<T3> &c, ZipIndexFunctor &f);
+    void zipIndexInPlace3(DM<T2> &b, DM<T3> &c, ZipIndexFunctor &f);
 
     /**
      * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
