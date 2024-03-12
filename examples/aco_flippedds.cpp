@@ -136,10 +136,10 @@ namespace msl::aco {
     private:
         int width;
         int seed;
-        int * iroulette;
-        double * etataus;
-        double * distances;
-        int * tours;
+        int * iroulette{};
+        double * etataus{};
+        double * distances{};
+        int * tours{};
     public:
         WorkHorse(int width, int seed) : width(width), seed(seed) {
         }
@@ -164,7 +164,8 @@ namespace msl::aco {
             for (int i = 1; i < width; i++) {
                 double etaTauSum = 0;
                 for (int j = 0; j < IROULETE; j++) {
-                    int toCity = iroulette[row * IROULETE + j];
+                    int toCity = iroulette[fromCity * IROULETE + j];
+
                     // Not visited yet.
                     if (rowdata[toCity] == -1) {
                         // x = fromCity, y = toCity.
@@ -178,7 +179,7 @@ namespace msl::aco {
                     double etaTauSum2 = 0;
 
                     for (int j = 0; j < IROULETE; j++) {
-                        nextCity = iroulette[row * IROULETE + j];
+                        nextCity = iroulette[fromCity * IROULETE + j];
                         if (rowdata[nextCity] == -1) {
                             etaTauSum2 += etataus[nextCity * width + fromCity];
                         }
@@ -191,15 +192,18 @@ namespace msl::aco {
                     for (int j = 0; j < width; j++) {
                         if (rowdata[(startCity + j) % width] == -1) {
                             nextCity = (startCity + j) % width;
-                        }
-                        if (j == width - 1) {
+                            break;
+                        }/*if (j == width - 1) {
                             printf("Somehow, ant %d found no free city in step %d\n", row, i);
-                        }
+                        }*/
                     }
                 }
 
                 rowdata[nextCity] = i;
+                //printf("Next city: %d - %d\n", nextCity, fromCity);
                 distance += distances[nextCity * width + fromCity];
+
+                fromCity = nextCity;
             }
 
             return distance;
@@ -336,6 +340,7 @@ namespace msl::aco {
                 }
                 if (found != 1) {
                     printf("Ant %d: Visit %d was found %d times\n", ant, n, found);
+                    exit(1);
                 }
             }
         }
@@ -394,8 +399,12 @@ namespace msl::aco {
         UpdateDelta updatedelta(ncities, nants);
         UpdatePhero updatephero;
         dsinit = msl::stopTiming();
-        double etataucalctime = 0.0, constructtime = 0.0, deltapherotime = 0.0, updatepherotime = 0.0, resettime = 0.0,
-            minroutetime = 0.0;
+        double etataucalctime = 0.0,
+                constructtime = 0.0,
+                deltapherotime = 0.0,
+                updatepherotime = 0.0,
+                resettime = 0.0,
+                minroutetime = 0.0;
 
         double alltimeminroute = 999999.9;
         for (int i = 0; i < iterations; i++) {
@@ -404,19 +413,16 @@ namespace msl::aco {
             // Write the eta tau value to the data structure.
             etatau.mapIndexInPlace(etataucalc);
             etataucalctime += msl::stopTiming();
-            etatau.show("dist routes", 6);
-
+            msl::syncStreams();
             msl::startTiming();
             workHorse.setIterationParams(iroulet.getUserFunctionData(), etatau.getUserFunctionData(), distance.getUserFunctionData(), flipped_tours.getUserFunctionData());
             dist_routes.mapIndexInPlace(workHorse);
             constructtime += msl::stopTiming();
-            dist_routes.show("dist routes", 6);
             // Get the best route.
             msl::startTiming();
             msl::syncStreams();
             minroute = dist_routes.foldCPU(min);
             minroutetime += msl::stopTiming();
-            printf("minroute: %.2f\n", minroute);
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
@@ -438,18 +444,14 @@ namespace msl::aco {
             resettime += msl::stopTiming();
         }
         double calctime = etataucalctime + constructtime + deltapherotime + updatepherotime + resettime + minroutetime;
-        printf("%s;%d;%.6f;%.6f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f \n", importFile.c_str(), nants,
-               dsinit, calctime, etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime,
-               resettime, alltimeminroute);
-        // importFile.c_str(), nants,   dsinit, fill,   ds2fill     etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime, alltimeminroute);
-        // pcb442;              256;    2.9862; 0.1416; 0.0058;     6.4798;         3.7537;         0.6522;        76.8972;        2.1370;             0.0008;         0.0169;     0.0033,          217790.4655
+        printf("%s;%d;%s;%f;%f;%f;", importFile.c_str(), nants, "flippedds",
+               calctime, dsinit+calctime, alltimeminroute);// %.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime, resettime, alltimeminroute);
         dist_routes.updateHost();
         flipped_tours.updateHost();
-        flipped_tours.show("flipped tours", 76);
         if (CHECKCORRECTNESS) {
             checkminroute(nants, minroute, dist_routes);
             checkvalidroute(flipped_tours, ncities, nants);
-            printf("Made it!\n");
+            // printf("Made it!");
         }
         msl::stopTiming();
     }
