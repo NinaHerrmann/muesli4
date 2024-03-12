@@ -69,13 +69,20 @@ __global__ void msl::detail::mapIndexKernelDM(T *in, R *out, size_t size,
     }
 }
 
-
 template<typename T, typename R, typename F>
 __global__ void msl::detail::mapIndexKernelDA(T *in, R *out, size_t size, size_t first, F func) {
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-
     if (x < size) {
         out[x] = func(x + first, in[x]);
+    }
+}
+template<typename T, typename T2, typename R, typename F>
+__global__ void msl::detail::mapIndexDMKernelDA(T *in, T2* in2, R *out, size_t size, size_t first, int dmcols, F func) {
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < size) {
+        // TODO only with offset.
+        T2 * in2offset = &in2[x * dmcols];
+        out[x] = func(x + first, in2offset, in[x]);
     }
 }
 

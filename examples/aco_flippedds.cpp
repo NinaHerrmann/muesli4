@@ -198,44 +198,38 @@ namespace msl::aco {
                 distance += distances[nextCity * width + fromCity];
                 fromCity = nextCity;
             }
-
             return distance;
         }
     };
-    class WorkHorse : public Functor2<int, double, double> {
+    class TourConstruction: public Functor3<int, int *, double, double> {
     private:
         int width;
         int seed;
         int * iroulette{};
         double * etataus{};
         double * distances{};
-        int * tours{};
     public:
-        WorkHorse(int width, int seed) : width(width), seed(seed) {
+        TourConstruction(int width, int seed) : width(width), seed(seed) {
         }
 
-        void setIterationParams(int * _iroulette, double * _etataus, double * _distances, int * _tours) {
+        void setIterationParams(int * _iroulette, double * _etataus, double * _distances) {
             this->iroulette = _iroulette;
             this->etataus = _etataus;
             this->distances = _distances;
-            this->tours = _tours;
         }
 
-        MSL_USERFUNC double operator()(int ant_index, double unused) const override {
+        MSL_USERFUNC double operator()(int ant_index, int * tour, double current_distance) const override {
             MSL_RANDOM_STATE randomState = msl::generateRandomState(this->seed, ant_index);
-            int* rowdata = &this->tours[ant_index * width];
             int fromCity = msl::randInt(0, width - 1, randomState);
-            rowdata[fromCity] = 0;
+
+            tour[fromCity] = 0;
             double distance = 0;
             for (int i = 1; i < width; i++) {
                 int nextCity = -1;
                 double etaTauSum = 0;
                 for (int j = 0; j < IROULETE; j++) {
                     int toCity = iroulette[fromCity * IROULETE + j];
-
-                    // Not visited yet.
-                    if (rowdata[toCity] == -1) {
-                        // x = fromCity, y = toCity.
+                    if (tour[toCity] == -1) {
                         etaTauSum += etataus[toCity * width + fromCity];
                     }
                 }
@@ -245,7 +239,7 @@ namespace msl::aco {
 
                     for (int j = 0; j < IROULETE; j++) {
                         nextCity = iroulette[fromCity * IROULETE + j];
-                        if (rowdata[nextCity] == -1) {
+                        if (tour[nextCity] == -1) {
                             etaTauSum2 += etataus[nextCity * width + fromCity];
                         }
                         if (rand < etaTauSum2)
@@ -254,19 +248,17 @@ namespace msl::aco {
                 } else {
                     int startCity = msl::randInt(0, width - 1, randomState);
                     for (int j = 0; j < width; j++) {
-                        if (rowdata[(startCity + j) % width] == -1) {
+                        if (tour[(startCity + j) % width] == -1) {
                             nextCity = (startCity + j) % width;
                         }
                     }
                 }
-                rowdata[nextCity] = i;
+                tour[nextCity] = i;
                 distance += distances[nextCity * width + fromCity];
                 fromCity = nextCity;
             }
-
             return distance;
         }
-
     };
 
     class UpdateDelta : public Functor3<int, int, double, double> {
@@ -427,7 +419,7 @@ namespace msl::aco {
         double minroute;
         EtaTauCalc etataucalc;
         int veryGoodSeed = (int) time(nullptr);
-        WorkHorse workHorse(ncities, veryGoodSeed);
+        TourConstruction tourConstruction(ncities, veryGoodSeed);
         UpdateDelta updatedelta(ncities, nants);
         UpdatePhero updatephero;
         double dsinit = msl::stopTiming();
@@ -437,14 +429,17 @@ namespace msl::aco {
             flipped_tours.mapInPlace(fill);
             // Write the eta tau value to the data structure.
             etatau.zipIndexInPlace3(distance, phero, etataucalc);
-            workHorse.setIterationParams(iroulette.getUserFunctionData(), etatau.getUserFunctionData(), distance.getUserFunctionData(), flipped_tours.getUserFunctionData());
-            dist_routes.mapIndexInPlace(workHorse);
+            tourConstruction.setIterationParams(iroulette.getUserFunctionData(),
+                                                etatau.getUserFunctionData(),
+                                                distance.getUserFunctionData());
+            dist_routes.mapIndexInPlaceDMRows(flipped_tours, tourConstruction);
             // Get the best route.
             minroute = dist_routes.foldCPU(min);
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
-            updatedelta.setIterationsParams(flipped_tours.getUserFunctionData(), dist_routes.getUserFunctionData());
+            updatedelta.setIterationsParams(flipped_tours.getUserFunctionData(),
+                                            dist_routes.getUserFunctionData());
             // Calculate the delta pheromone.
             deltaphero.mapIndexInPlace(updatedelta);
             // Update the pheromone.

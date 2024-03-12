@@ -96,6 +96,18 @@ namespace msl {
         */
         template<typename T, typename R, typename F>
         __global__ void mapIndexKernelDA(T *in, R *out, size_t size, size_t first, F func);
+/**
+        * \brief MapIndex function for DA. \em Calls Functor which has two Arguments: the index and the value at the index.
+        *
+        * @param in Pointer to gpu memory of datastructure (DA) which provides the data to calcuate on.
+        * @param out Pointer to gpu memory of datastructure (DA) where the data is written to.
+        * @param size of the data.
+        * @param first functor to be called.
+        * @param func functor to be called.
+        * @param localIndices Evaluate - is this feature necessary? Can be used to calculate with local indices.
+        */
+        template<typename T, typename T2, typename R, typename F>
+        __global__ void mapIndexDMKernelDA(T *in, T2 * in2, R *out, size_t size, size_t first, int dmcols, F func);
 
         /**
         * \brief MapIndex function for DC. \em Calls Functor which has four Arguments: the three indeces and the value at the index.

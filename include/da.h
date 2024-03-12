@@ -162,6 +162,18 @@ namespace msl {
          */
         template<typename MapIndexFunctor>
         void mapIndex(MapIndexFunctor &f, DA<T> &result);  // should be return type DA<R>; debug
+/**
+         * \brief Returns the distributed array with a[i] = f(i, a[i]). Note
+         *        that besides the element itself also its index is passed to the functor.
+         *        Moreover, the rows of the DM can be adjusted.
+         *
+         * @param f The mapIndex functor, must be of type \em Functor4.
+         * @tparam MapIndexFunctor Functor type.
+         * @tparam R Return type.
+         * @return The newly created distributed array.
+         */
+        template<typename MapIndexFunctor, typename T2>
+        void mapIndexInPlaceDMRows(DM<T2> &result, MapIndexFunctor &f);
 
         /**
          * \brief Replaces each element a[i] of the distributed array with f(i, a).

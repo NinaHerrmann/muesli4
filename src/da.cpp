@@ -241,7 +241,6 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
         dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
-
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
     }
@@ -259,7 +258,38 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
     msl::syncStreams();
     this->cpuMemoryInSync = false;
 }
+template<typename T>
+template<typename MapIndexFunctor, typename T2>
+void msl::DA<T>::mapIndexInPlaceDMRows(DM<T2>& rows, MapIndexFunctor &f) {
+    if (Muesli::num_gpus == 1 && Muesli::num_local_procs == 1) {
+        this->updateDevice();
+        // map on GPUs
+    #ifdef __CUDACC__
+        for (int i = 0; i < Muesli::num_gpus; i++) {
+            cudaSetDevice(i);
+            dim3 dimBlock(Muesli::threads_per_block);
+            dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
+            detail::mapIndexDMKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
+                    this->plans[i].d_Data, rows.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
+                            this->plans[i].first, rows.getExecPlans()[i].gpuCols, f);
+        }
+    #endif
+        // map on CPU cores
+        T2 *blocalPartition = rows.getLocalPartition();
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+        for (int i = 0; i < this->nCPU; i++) {
+            this->setLocal(i, f((i + this->firstIndex), blocalPartition, this->localPartition[i]));
+        }
 
+        // check for errors during gpu computation
+        msl::syncStreams();
+        this->setCpuMemoryInSync(false);
+    } else{
+        throws(detail::NotYetImplementedException());
+    }
+}
 
 template<typename T>
 template<typename MapIndexFunctor>
