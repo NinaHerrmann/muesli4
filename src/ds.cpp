@@ -953,7 +953,7 @@ T msl::DS<T>::foldCPU(FoldFunctor &f) {
     // calculate global result from local results
     T global_result = local_results[0];
 #ifdef _OPENMP
-#pragma omp parallel for shared(local_results) reduction(+: global_result)
+#pragma omp parallel for shared(local_results, global_result)
 #endif
     for (int i = 1; i < np; i++) {
         global_result = f(global_result, local_results[i]);

@@ -261,7 +261,7 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
 template<typename T>
 template<typename MapIndexFunctor, typename T2>
 void msl::DA<T>::mapIndexInPlaceDMRows(DM<T2>& rows, MapIndexFunctor &f) {
-    if (Muesli::num_gpus == 1 && Muesli::num_local_procs == 1) {
+    if (Muesli::num_gpus <= 1 && Muesli::num_local_procs == 1) {
         this->updateDevice();
         // map on GPUs
     #ifdef __CUDACC__
