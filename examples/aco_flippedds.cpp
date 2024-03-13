@@ -250,6 +250,7 @@ namespace msl::aco {
                     for (int j = 0; j < width; j++) {
                         if (tour[(startCity + j) % width] == -1) {
                             nextCity = (startCity + j) % width;
+                            break;
                         }
                     }
                 }

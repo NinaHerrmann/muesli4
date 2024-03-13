@@ -112,7 +112,7 @@ namespace msl::aco {
             // For every city which can be visited, calculate the eta and tau value.
             if (fromcity != next_city && !bvisited) {
                 // Looks like zero but is just very small.
-                eta_tau_return[0] = (double) pow(1 /  dist[fromcity * this->cities + next_city], d_BETA);
+                eta_tau_return[0] = (double) pow(1/dist[fromcity * this->cities + next_city], d_BETA);
                 eta_tau_return[1] = (double) pow(phero[fromcity * this->cities + next_city], d_ALPHA);
                 eta_tau = eta_tau_return[0] * eta_tau_return[1];
             }
