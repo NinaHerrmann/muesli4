@@ -304,9 +304,8 @@ set(EXAMPLE_SRCS
         #${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
         #${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
         #${PROJECT_SOURCE_DIR}/examples/nbody.cpp
-        ${PROJECT_SOURCE_DIR}/examples/aco.cpp
-        ${PROJECT_SOURCE_DIR}/examples/aco_singlekernel.cpp
-        ${PROJECT_SOURCE_DIR}/examples/aco_flippedds.cpp
+        ${PROJECT_SOURCE_DIR}/examples/aco_tsp.cpp
+        ${PROJECT_SOURCE_DIR}/examples/aco_tsp_dataset.cpp
         #${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
         #${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
         #${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
