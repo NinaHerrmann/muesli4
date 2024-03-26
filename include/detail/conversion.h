@@ -1,8 +1,8 @@
 /*
  * conversion.h
  *
- *      Author:
- *
+ *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
+ * 
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -32,19 +32,13 @@
 
 #pragma once
 
-namespace msl {
-
-namespace detail {
-
 // liefert true, wenn U oeffentlich von T erbt oder wenn T und U den gleichen Typ besitzen
-#define MSL_IS_SUPERCLASS(T, U) (detail::Conversion<const U*, const T*>::exists && !detail::Conversion<const T*, const void*>::sameType)
+#define MSL_IS_SUPERCLASS(T, U) (MSL_Conversion<const U*, const T*>::exists && !MSL_Conversion<const T*, const void*>::sameType)
 
-/* MSL_Conversion erkennt zur Compilezeit, ob sich T nach U konvertieren laesst.
- exists = true, wenn sich T nach U konvertieren laesst, sonst false
- */
+// MSL_Conversion erkennt zur Compilezeit, ob sich T nach U konvertieren laesst.
+// exists = true, wenn sich T nach U konvertieren laesst, sonst false
 template<class T, class U>
-class Conversion
-{
+class MSL_Conversion {
 
 private:
 
@@ -52,62 +46,45 @@ private:
   typedef char Small;
 
   // sizeof(Big) > 1
-  class Big
-  {
+  class Big {
     char dummy[2];
   };
 
-  // Compiler waehlt diese Funktion, wenn er eine Umwandlung von T nach U findet
-  static Small Test(U);
-  // sonst nimmer er diese
-  static Big Test(...);
-  // Erzeugt ein Objekt vom Typ T, selbst wenn der Konstruktor als private deklariert wurde
-  static T MakeT();
+  static Small Test(U);     // Compiler waehlt diese Funktion, wenn er eine Umwandlung von T nach U findet
+  static Big Test(...);       // sonst nimmer er diese
+  static T MakeT();         // Erzeugt ein Objekt vom Typ T, selbst wenn der Konstruktor als private deklariert wurde
 
 public:
 
-  enum
-  {
+  enum {
     exists = sizeof(Test(MakeT())) == sizeof(Small)
   };
 
-  enum
-  {
+  enum {
     sameType = false
   };
 
 };
 
-/* Überladung von MSL_Conversion, um den Fall T = U zu erkennen
- */
+// Überladung von MSL_Conversion, um den Fall T = U zu erkennen
 template<class T>
-class Conversion<T, T>
-{
+class MSL_Conversion<T, T> {
 
 public:
 
-  enum
-  {
+  enum {
     exists = true, sameType = true
   };
 
 };
 
-/* MSL_Int2Type erzeugt aus ganzzahligen Konstanten einen eigenen Typ. Wird
- benoetigt, damit der Compiler zur Compilezeit die korrekte MSL_Send Methode
- auswaehlen kann.
- */
+// MSL_Int2Type erzeugt aus ganzzahligen Konstanten einen eigenen Typ.
+// wird benoetigt, damit der Compiler zur Compilezeit die korrekte MSL_Send Methode auswaehlen kann.
 template<int v>
-struct Int2Type
-{
+struct Int2Type {
 
-  enum
-  {
+  enum {
     value = v
   };
 
 };
-
-}
-
-}

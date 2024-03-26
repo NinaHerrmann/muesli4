@@ -1,9 +1,6 @@
 #! /bin/bash
-rm -rf build/* \
-## && mkdir build \
-cd build \
-&& cmake -G "Unix Makefiles" .. \
-&& make \
-&& cd ..
-
-
+rm -rf build
+mkdir build
+cd build || exit
+cmake -Dpath=build ..
+cmake --build .

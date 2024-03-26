@@ -38,7 +38,6 @@
 #include "lmatrix.h"
 #include "plmatrix.h"
 #include "exec_plan.h"
-#include "darray.h"
 #ifdef __CUDACC__
 #include "map_kernels.cuh"
 #include "zip_kernels.cuh"
