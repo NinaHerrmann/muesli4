@@ -440,7 +440,6 @@ GPUExecutionPlan<T> *msl::DS<T>::getExecPlans() {
 
 template<typename T>
 void msl::DS<T>::updateDevice(int forceupdate) {
-    std::vector<T *> dev_pointers;
 #ifdef __CUDACC__
     if (cpuMemoryInSync || forceupdate) {
         for (int i = 0; i < ng; i++) {

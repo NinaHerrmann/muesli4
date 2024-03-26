@@ -234,15 +234,10 @@ void msl::DA<T>::mapIndexInPlace(MapIndexFunctor &f) {
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
         cudaSetDevice(i);
-
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-        dim3 dimBlock(1024);
+        dim3 dimBlock(Muesli::threads_per_block);
         dim3 dimGrid((this->plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapIndexKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 this->plans[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal, this->plans[i].first, f);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
     }
 #endif
     // calculate offsets for indices
@@ -280,7 +275,7 @@ void msl::DA<T>::mapIndexInPlaceDMRows(DM<T2>& rows, MapIndexFunctor &f) {
     #pragma omp parallel for
     #endif
         for (int i = 0; i < this->nCPU; i++) {
-            this->setLocal(i, f((i + this->firstIndex), blocalPartition, this->localPartition[i]));
+            this->setLocal(i, f((i + this->firstIndex), &blocalPartition[i*rows.getnCol()], this->localPartition[i]));
         }
 
         // check for errors during gpu computation

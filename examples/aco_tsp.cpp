@@ -254,6 +254,7 @@ namespace msl::aco {
                         }
                     }
                 }
+
                 tour[nextCity] = i;
                 distance += distances[nextCity * width + fromCity];
                 fromCity = nextCity;
@@ -325,16 +326,14 @@ namespace msl::aco {
         }
     }
 
-    DA<city> readCities(const std::string &problem) {
+    void readCities(const std::string &problem, DA<city>& cityArray) {
         std::ifstream data("/home/n_herr03@WIWI.UNI-MUENSTER.DE/research/aco-project/programs/lowlevel/tsp/tsplib/" + problem + ".txt");
 
         if (!data.is_open()) {
             std::cerr << "File could not be opened!" << std::endl;
             exit(-1);
         }
-
         std::vector<city> cities;
-
         while(true) {
             int index;
             city city;
@@ -346,19 +345,14 @@ namespace msl::aco {
             cities.push_back(city);
         }
         data.close();
-
-        DA<city> cityArray(cities.size());
         for (int i = 0; i < cities.size(); i++) {
             cityArray.localPartition[i] = cities[i];
         }
         cityArray.updateDevice(true);
-
-        return cityArray;
     }
 
-    DM<double> createPheroMatrix(int ncities) {
+    void createPheroMatrix(int ncities, DM<double>& phero) {
         Randoms randoms(15);
-        DM<double> phero(ncities, ncities, 0);
         for (int j = 0; j < ncities; j++) {
             for (int k = 0; k <= j; k++) {
                 if (j != k) {
@@ -369,7 +363,6 @@ namespace msl::aco {
             }
         }
         phero.updateDevice(true);
-        return phero;
     }
 
     DM<int> createIRoulette(const DM<double> &distances, int ncities) {
@@ -402,11 +395,42 @@ namespace msl::aco {
 
     void aco(int iterations, const std::string& importFile, int nants) {
         msl::startTiming();
-        DA<city> cities = readCities(importFile);
-        int ncities = cities.getSize();
-        DM<double> phero = createPheroMatrix(ncities);
+        int ncities;
+        if (importFile == "djibouti") {
+            ncities = 38;
+        } else if (importFile == "luxembourg") {
+            ncities = 980;
+        } else if (importFile == "catar") {
+            ncities = 194;
+        } else if (importFile == "a280") {
+            ncities = 280;
+        } else if (importFile == "d198") {
+            ncities = 198;
+        } else if (importFile == "d1291") {
+            ncities = 1291;
+        } else if (importFile == "lin318") {
+            ncities = 318;
+        } else if (importFile == "pcb442") {
+            ncities = 442;
+        } else if (importFile == "pcb1173") {
+            ncities = 1173;
+        } else if (importFile == "pr1002") {
+            ncities = 1002;
+        } else if (importFile == "pr2392") {
+            ncities = 2392;
+        } else if (importFile == "rat783") {
+            ncities = 783;
+        } else {
+            std::cout << "No valid import file provided. Please provide a valid import file." << std::endl;
+            exit(-1);
+        }
+        DA<city> cityArray(ncities, {});
+
+        readCities(importFile, cityArray);
+        DM<double> phero(ncities, ncities, 0);
+        createPheroMatrix(ncities, phero);
         DM<double> distance(ncities, ncities, 0);
-        CalcDistance calcdistance(cities.getUserFunctionData());
+        CalcDistance calcdistance(cityArray.getUserFunctionData());
         distance.mapIndexInPlace(calcdistance);
         distance.updateHost();
         DM<int> iroulette = createIRoulette(distance, ncities);
@@ -414,7 +438,6 @@ namespace msl::aco {
         DM<double> deltaphero(ncities, ncities, 0);
         DM<double> etatau(ncities, ncities, 0);
         DA<double> dist_routes(nants, 0);
-
         Fill fill(-1);
         Min min;
         double minroute;
@@ -436,6 +459,7 @@ namespace msl::aco {
             dist_routes.mapIndexInPlaceDMRows(flipped_tours, tourConstruction);
             // Get the best route.
             minroute = dist_routes.foldCPU(min);
+            //printf("Minroute %f\n", minroute);
             if (minroute < alltimeminroute) {
                 alltimeminroute = minroute;
             }
@@ -445,22 +469,20 @@ namespace msl::aco {
             deltaphero.mapIndexInPlace(updatedelta);
             // Update the pheromone.
             phero.zipIndexInPlace(deltaphero, updatephero);
-            if (i != iterations - 1) {
-                flipped_tours.fill(-1);
-            }
         }
+        msl::syncStreams();
         double calctime = msl::stopTiming();// etataucalctime + constructtime + deltapherotime + updatepherotime + resettime + minroutetime;
-        printf("%s;%d;%s;%f;%f;%f;", importFile.c_str(), nants, "flippedds",
-               calctime, dsinit+calctime, alltimeminroute);// %.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime, resettime, alltimeminroute);
+        printf("%s;%d;%s;%f;%f;%f;", importFile.c_str(), nants, "flippedds", calctime, calctime + dsinit,
+               minroute);// alltimeminroute %.4f;%.4f;%.4f;%.4f;%.4f;%.4f;%.4f etataucalctime, constructtime, minroutetime, deltapherotime, updatepherotime, resettime, alltimeminroute);
+        msl::syncStreams();
 
         dist_routes.updateHost();
         flipped_tours.updateHost();
         if (CHECKCORRECTNESS) {
             checkminroute(nants, minroute, dist_routes);
             checkvalidroute(flipped_tours, ncities, nants);
-            // printf("Made it!");
         }
-        msl::stopTiming();
+        // msl::stopTiming();
     }
 } // close namespaces
 

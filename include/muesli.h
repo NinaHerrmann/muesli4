@@ -618,7 +618,8 @@ MSL_USERFUNC MSL_RANDOM_STATE generateRandomState(size_t seed, size_t someIndex)
     curand_init(seed, someIndex, 0, &state);
     return state;
 #else
-    return false; // TODO
+    srand(time(NULL)); // TODO
+    return false;
 #endif
 }
 
@@ -627,7 +628,7 @@ MSL_USERFUNC double randDouble(double min, double max, MSL_RANDOM_STATE& state) 
     double f = curand_uniform_double(&state);
     return (f + min) * (max - min);
 #else
-    return 0; // TODO
+    return min + (double)rand() / RAND_MAX * (max - min); // TODO
 #endif
 }
 
@@ -636,7 +637,7 @@ MSL_USERFUNC int randInt(int min, int max, MSL_RANDOM_STATE& state) {
         double f = curand_uniform_double(&state);
         return (int) (f * (max - min + 0.9999999)) + min;
 #else
-    return 0; // TODO
+    return min + rand() % (max - min + 1); // TODO
 #endif
 }
 

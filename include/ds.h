@@ -83,7 +83,7 @@ namespace msl {
          *
          * @param elements Size of the ds.
          */
-        DS(int size);
+        explicit DS(int size);
 
         /**
          * \brief Creates an empty datastructure with \em elements datapoints and value
@@ -527,7 +527,6 @@ namespace msl {
          */
         MSL_USERFUNC T * getUserFunctionData(){
 #ifdef __CUDACC__
-            msl::syncStreams();
             return plans[0].d_Data;
 #else
             return localPartition;

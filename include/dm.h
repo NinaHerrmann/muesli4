@@ -576,6 +576,14 @@ public:
      * @return The element at the given global index.
      */
     void setColumn(DA<T> &da, int col);
+     /**
+      * \brief Sets a column at the given global index \em col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    int getnCol(){return ncol;}
     /**
      * \brief Manually download the local partition from GPU memory.
      */

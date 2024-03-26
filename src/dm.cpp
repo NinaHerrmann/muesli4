@@ -1740,7 +1740,14 @@ void msl::DM<T>::reducetwoColumns(msl::DA<T2> &c, ReduceFunctor &f) {
         }
     } else {
         // throw NotYetImplementedException
-        throws(detail::NotYetImplementedException());
+        for (int i = 0; i < nrow; i++) {
+            T2 sum = 0;
+            for (int j = 0; j < ncol; j++) {
+                sum = f(this->getLocal((i * ncol) + j),
+                        this->getLocal((i * ncol) + ((j + 1) % ncol)), sum);
+            }
+            c.set(i, sum);
+        }
     }
 }
 
