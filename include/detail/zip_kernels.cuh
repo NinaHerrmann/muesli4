@@ -67,8 +67,32 @@ namespace msl::detail {
                            int first,
                            FCT3 func,
                            int nCols);
+        template<typename T1, typename T3, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernelA(const T1 *in0,
+                           const T3 *in2,
+                           R *out,
+                           size_t n,
+                           int first,
+                           FCT3 func,
+                           int nCols);
+        template<typename T1, typename T2, typename T3, typename T4, typename R, typename FCT3>
+        __global__ void
+        zipIndexKernelAAA(const T1 *in0,
+                           const T2 *in1,
+                           const T3 *in2,
+                           const T4 *in3,
+                           R *out,
+                           size_t n,
+                           int first,
+                           FCT3 func,
+                           int nCols);
 
-        /**
+    template<typename T, typename T2, typename T3, typename R, typename F>
+    __global__ void zipIndexDMKernelDA(T *in, T2 * in2, T3 * in3, R *out, size_t size, size_t first, int dmcols, F func);
+
+
+    /**
        * \brief From HK Zip Skeleton for Index Variants of DMs.
        *
        * @param in1 Pointer to gpu memory of DM which provides the data to calculate on.

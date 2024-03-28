@@ -174,6 +174,8 @@ namespace msl {
          */
         template<typename MapIndexFunctor, typename T2>
         void mapIndexInPlaceDMRows(DM<T2> &result, MapIndexFunctor &f);
+        template<typename MapIndexFunctor, typename T1, typename T2>
+        void zipIndexInPlaceDMRows(DA<T1> &b, DM<T2> &result, MapIndexFunctor &f);
 
         /**
          * \brief Replaces each element a[i] of the distributed array with f(i, a).

@@ -188,6 +188,29 @@ public:
      */
     virtual ~Functor5() {}
 };
+template <typename T1, typename T2, typename T3, typename T4,typename T5, typename T6, typename R>
+class Functor6 {
+
+public:
+    /**
+     * \brief Function call operator has to be implemented by the user.
+     *
+     * @param x 1st input for the operator.
+     * @param y 2nd input for the operator.
+     * @param z 3rd input for the operator.
+     * @param v 4th input for the operator.
+     * @param l 5th input for the operator.
+     * @param m 6th input for the operator.
+     * @return Output of the operator.
+     */
+    MSL_USERFUNC
+    virtual R operator()(T1 x, T2 y, T3 z, T4 v, T5 l, T6 m) const = 0;
+
+    /**
+     * \brief Destructor.
+     */
+    virtual ~Functor6() {}
+};
 /**************************************************************************
  * \brief Class Functor4P represents a 4ary functor with 2 Pointers
  *

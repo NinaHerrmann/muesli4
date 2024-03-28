@@ -466,6 +466,28 @@ public:
      */
     template<typename T2, typename T3, typename ZipIndexFunctor>
     void zipIndexInPlaceMA(DM<T2> &b, DA<T3> &c, ZipIndexFunctor &f);
+ /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T3, typename ZipIndexFunctor>
+    void zipIndexInPlaceA(DA<T3> &c, ZipIndexFunctor &f);
+ /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename T4, typename ZipIndexFunctor>
+    void zipIndexInPlaceAAA(DA<T2> &b, DA<T3> &c, DA<T4> &d, ZipIndexFunctor &f);
 
     /**
      * \brief Replaces each element a[i] of the distributed array with f(i, a[i],

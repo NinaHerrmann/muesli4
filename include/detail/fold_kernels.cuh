@@ -51,6 +51,7 @@ __global__ void foldKernel(T *g_idata, T *g_odata, size_t n, F func);
 template<typename T, typename F, size_t blockSize, bool nIsPow2>
 __global__ void foldColsKernel(T *g_idata, T *g_odata, size_t n, F func);
 
+
 template<typename T, typename F, size_t blockSize, bool nIsPow2>
 __global__ void foldRowsKernel(T *g_idata, T *g_odata, size_t n, F func);
 

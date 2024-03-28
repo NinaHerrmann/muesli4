@@ -51,7 +51,32 @@ __global__ void msl::detail::zipIndexKernelDMMA(const T1 *in0, const T2 *in1, co
         out[x] = func((x + first) / nCols, (x + first) % nCols, in0[x], in1[x], in2[row]);
     }
 }
-
+template<typename T1, typename T3, typename R, typename FCT3>
+__global__ void msl::detail::zipIndexKernelA(const T1 *in0, const T3 *in2, R *out, size_t n,
+                                                int first, FCT3 func, int nCols) {
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < n) {
+        int row = x / nCols;
+        out[x] = func((x + first) / nCols, (x + first) % nCols, in0[x], in2[row]);
+    }
+}
+template<typename T1, typename T2, typename T3, typename T4, typename R, typename FCT3>
+__global__ void msl::detail::zipIndexKernelAAA(const T1 *in0, const T2 *in1, const T3 *in2, const T4 *in3, R *out, size_t n,
+                                                int first, FCT3 func, int nCols) {
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < n) {
+        int row = x / nCols;
+        out[x] = func((x + first) / nCols, (x + first) % nCols, in0[x], in1[row], in2[row], in3[row]);
+    }
+}
+template<typename T, typename T2, typename T3, typename R, typename F>
+__global__ void msl::detail::zipIndexDMKernelDA(T *in, T2* in2, T3* in3, R *out, size_t size, size_t first, int dmcols, F func) {
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x < size) {
+        T2 * in2offset = &in2[x * dmcols];
+        out[x] = func(x + first, in2offset, in3[x], in[x]);
+    }
+}
 
 // new kernel for DM, HK 06.11.2020 -- TODO better to start matrix of threads?
 template<typename T1, typename T2, typename R, typename FCT3>
