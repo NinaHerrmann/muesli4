@@ -1,0 +1,28 @@
+-- Host System: Linux-6.5.0-14-generic
+-- compiler id: GNU
+-- compiler flags: 
+-- compiler flags debug: -g
+-- compiler flags release: -O3 -DNDEBUG -O3 -march=native -ftree-vectorize -funroll-loops -fopenmp -w
+-- compiler flags minsizerel: -Os -DNDEBUG
+-- compiler flags relwithdebinfo: -O2 -g -DNDEBUG
+-- mpi compiler: /usr/bin/mpicxx
+-- mpi compile flags: 
+-- mpi link flags: 
+-- mpi libraries: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so
+-- mpi include paths: /usr/lib/x86_64-linux-gnu/openmpi/include/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
+-- OpenMP CXX compiler flags: -fopenmp
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/build/aco
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/build
+Consolidate compiler generated dependencies of target aco_seq
+[ 33%] Built target aco_seq
+Consolidate compiler generated dependencies of target aco_cpu
+[ 66%] Built target aco_cpu
+[ 83%] Building NVCC (Device) object CMakeFiles/aco_gpu.dir/tmp/aco_gpu_generated_aco.cpp.o
+Starting with 1 nodes 1 cpus and 1 gpus
+Minroute 11974.80 
+AlltimeminRoute: 11974.80 
+etataucalctime, reduceRowstime, calcprobstime, nextsteptime, deltapherotime, updatepherotime, calcrlengthtime, minroutetime
+0.00, 0.08, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00
+city 0 visited twice in ant 0

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/dc_test_gpu.dir/tmp/dc_test_gpu_generated_dc_test.cpp.o -o ../dc_test/dc_test_gpu  -Wl,-rpath,/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/cuda/lib64/libcudart.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp -lcuda 

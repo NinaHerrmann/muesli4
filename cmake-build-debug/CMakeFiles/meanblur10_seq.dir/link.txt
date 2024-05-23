@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/meanblur10_seq.dir/examples/meanblur10.cpp.o -o ../meanblur10/meanblur10_seq  -Wl,-rpath,/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 

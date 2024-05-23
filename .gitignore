@@ -1,5 +1,6 @@
 build/
 .idea/
+.vscode/
 
 *.o
 *.ppm
@@ -87,3 +88,6 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Temporary ignore CMake
+CMakeLists.txt

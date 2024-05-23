@@ -2,7 +2,7 @@
  * exec_plan.h
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
- * 
+ *
  * -------------------------------------------------------------------------------
  *
  * The MIT License
@@ -32,26 +32,55 @@
 
 #pragma once
 
-template <typename T>
-struct GPUExecutionPlan
-{
-  int size;
+template <typename T> struct GPUExecutionPlan {
+  // Number of elements per GPU
+  long size;
 
+  // Number of byte stored on the GPU
   size_t bytes;
 
+  // Number of rows on the GPU
+  // On the new DM data structure this has been repurposed to hold the number of
+  // elements.
   int nLocal;
 
+  // Number of columns on the GPU. Obsolete on the new data structure
   int mLocal;
 
+  // Number of rows on the GPU (relevant for the new Data structures only)
+  int gpuRows;
+
+  // Number of columns on the GPU (relevant on the new data structures only)
+  int gpuCols;
+
+  // Opt: for 3D Number of Depth on the GPU (relevant on the new data structures only)
+  int gpuDepth;
+
+  // Index of the first element processed in the GPU. If data structure is a
+  // matrix, then this is the row major index.
   int first;
 
+  // First row where the GPU processing starts (global)
   int firstRow;
 
+  // First column where the GPU processing starts (global)
   int firstCol;
 
-  T* h_Data;
+  // First depth where the GPU processing starts (global)
+  int firstDepth;
 
-  T* d_Data;
+  // Last row where the GPU processing ends (global)
+  int lastRow;
+
+  // Last column where the GPU processing ends. (global)
+  int lastCol;
+
+  // Last Depth where the GPU processing ends. (global)
+  int lastDepth;
+
+  // Host copy of the data stored in the GPU
+  T *h_Data;
+
+  // Data stored in the GPU
+  T *d_Data;
 };
-
-

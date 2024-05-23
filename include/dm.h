@@ -3,13 +3,13 @@
  *
  *      Author: Steffen Ernsting <s.ernsting@uni-muenster.de>
  *              Herbert Kuchen <kuchen@uni-muenster.de>
- * 
+ *              Nina Herrmann <nina.herrmann@uni-muenster.de>
  * -------------------------------------------------------------------------------
  *
  * The MIT License
  *
  * Copyright 2014-2020 	Steffen Ernsting <s.ernsting@uni-muenster.de>,
- *                	Herbert Kuchen <kuchen@uni-muenster.de.
+ *                	    Herbert Kuchen <kuchen@uni-muenster.de.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -32,28 +32,34 @@
  */
 
 #pragma once
-
 #include <type_traits>
+#include "ds.h"
+#include "da.h"
+#include <cstring>
+#ifndef MUESLI_DM_H
+#define MUESLI_DM_H
 
 #include "muesli.h"
-#include "da.h"
-#include "exception.h"
+#include "detail/exception.h"
 #include "functors.h"
-// #include "plarray.h"
-#include "exec_plan.h"
-#include "conversion.h"
+#include "detail/conversion.h"
+#include "detail/exec_plan.h"
+#include <utility>
+#include "plmatrix.h"
+#include "nplmatrix.h"
+
 #ifdef __CUDACC__
-#include "map_kernels.cuh"
-#include "zip_kernels.cuh"
-#include "fold_kernels.cuh"
-#include "copy_kernel.cuh"
-#include "properties.cuh"
-#include "exec_plan.h"
+#include "detail/copy_kernel.cuh"
+#include "detail/fold_kernels.cuh"
+#include "detail/map_kernels.cuh"
+#include "detail/properties.cuh"
+#include "detail/zip_kernels.cuh"
+
 #endif
 
 namespace msl {
 /**
- * \brief Class DA represents a distributed array.
+ * \brief Class DM represents a distributed array.
  *
  * A distributed array represents a one-dimensional parallel container and is
  * distributed among all MPI processes the application was started with. It
@@ -63,639 +69,605 @@ namespace msl {
  * \tparam T Element type. Restricted to classes without pointer data members.
  */
 template <typename T>
-class DM
-{
+class DM : public msl::DS<T>{
 public:
+    //
+    // CONSTRUCTORS / DESTRUCTOR
+    //
 
-  //
-  // CONSTRUCTORS / DESTRUCTOR
-  //
-
-  /**
-   * \brief Default constructor.
-   */
-  DM();
-
-  /**
-   * \brief Creates an empty distributed matrix.
-   *
-   * @param size Size of the distributed array.
-   * @param d Distribution of the distributed array.
-   */
-  DM(int col, int row);
-
-  /**
-   * \brief Creates a distributed matrix with \em size elements equal to
-   *        \em initial_value.
-   *
-   * @param size Size of the distributed array.
-   * @param initial_value Initial value for all elements.
-   */
-  DM(int col, int row, const T& initial_value);
+    /**
+     * \brief Default constructor.
+     */
+    DM();
 
 
-  /**
-   * \brief Destructor.
-   */
-  ~DM();
+    /**
+     * \brief Creates a distributed matrix with \em size elements equal to
+     *        \em initial_value.
+     *
+     * @param size Size of the distributed array.
+     * @param initial_value Initial value for all elements.
+     */
+    DM(int row, int col, const T &v);
 
-  /**
-   * \brief Initializes the elements of the distributed array with the value \em
-   *        value.
-   *
-   * @param value The value.
-   */
-  void fill(const T& value);
+    /**
+     * @brief Creates a distributed matrix with \em size elements equal to
+     *        \em initial_value.
+     * @param col number or columns
+     * @param row Number of rows
+     * @param initial_value Initial value of the matrix
+     * @param rowComplete if true, the matrix will be distributed between nodes in
+     * full rows. If mapStencil will be used, this option needs to be set to true.
+     */
+    DM(int row, int col, const T &v, bool rowComplete);
 
-  /**
-   * \brief Initializes the elements of the distributed matrix with the elements
-   *        of the given array of values. Note that the length of \em values must
-   *        match the size of the distributed array (not checked).
-   *
-   * @param values The array of values.
-   */
-  void fill(T* const values);
+//#pragma region Rule of five
+    /**
+     * For more details see https://cpppatterns.com/patterns/rule-of-five.html
+     * The 5 functions here are needed to perform operations such as std::move.
+     * See examples/jacobi.cu for a usage reference.
+     */
 
-  /**
-   * \brief Initializes the elements of the distributed array via the given
-   *        function \em f. Note that global indices are pass to this function
-   *        as arguments.
-   *
-   * @param f The initializer function.
-   */
-  void fill(T (*f)(int));
+    /**
+     * @brief Copy constructor. Fully copies the object and it's data.
+     *
+     */
+    DM(const DM<T> &other);
 
-  /**
-   * \brief Initializes the elements of the distributed array via the given
-   *        functor \em f. Note that global indices are pass to this functor
-   *        as arguments.
-   *
-   * @param f The initializer functor.
-   * @tparam F2 Functor type.
-   */
-  template <typename F>
-  void fill(const F& f);
+    /**
+     * @brief Move constructor. Transfers ownership of resources allocated by \em
+     * other to the object that is being created
+     *
+     * @param other
+     */
+    DM(DM<T> &&other) noexcept;
 
-  /**
-   * \brief Initializes the elements of the distributed array with the elements
-   *        of the given array of values. Note that the length of \em values must
-   *        match the size of the distributed array (not checked).
-   *        The array is only read by the root process, and afterwards the data is
-   *        distributed among all processes.
-   *
-   * @param values The array of values.
-   */
-  void fill_root_init(T* const values);
+    /**
+     * @brief Copy assignment operator. Works the same as the copy constructor.
+     *
+     * @param other
+     * @return DM<T>&
+     */
+    DM<T> &operator=(const DM<T> &other);
 
+    /**
+     * @brief Move assignment operator. This assigs the object defined in \em
+     * other to the left hand side of the operation without creating copies
+     *
+     * @param other
+     * @return DM<T>&
+     */
+    DM<T> &operator=(DM<T> &&other) noexcept;
 
-  //
-  // SKELETONS / COMPUTATION
-  //
+    /**
+     * \brief Destructor.
+     */
+    ~DM();
+    /**
+     * \brief Sets the element at the given global index \em globalIndex to the
+     *        given value \em v, with 0 <= globalIndex < size.
+     *
+     * @param globalIndex The global index.
+     * @param v The new value.
+     */
+    void setPointer(const T * pointer);
+//#pragma endregion
 
-  // SKELETONS / COMPUTATION / MAP
+    //
+    // SKELETONS / COMPUTATION
+    //
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *
-   * @param f The map functor, must be of type \em AMapFunctor.
-   * @tparam MapFunctor Functor type.
-   */
-  template <typename MapFunctor>
-  void mapInPlace(MapFunctor& f);
+    // SKELETONS / COMPUTATION / MAP
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor.
-   *
-   * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
-   * @tparam MapIndexFunctor Functor type.
-   */
-  template <typename MapIndexFunctor>
-  void mapIndexInPlace(MapIndexFunctor& f);
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
+     *        Note that besides the element itself also its index is passed to the
+     *        functor.
+     *
+     * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
+     * @tparam MapIndexFunctor Functor type.
+     */
+    template<typename MapIndexFunctor>
+    void mapIndexInPlace(MapIndexFunctor &f);
 
-  /**
-   * \brief Returns a new distributed array with a_new[i] = f(a[i]).
-   *
-   * @param f The map functor, must be of type \em AMapFunctor.
-   * @tparam MapFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename F>
-  msl::DM<T> map(F& f);  // preliminary simplification, in order to avoid type error
-  // should be: msl::DA<R> map(F& f);
+    /**
+     * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
+     *        that besides the element itself also its index is passed to the
+     * functor.
+     *
+     * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
+     * @tparam MapIndexFunctor Functor type.
+     * @tparam R Return type.
+     * @return The newly created distributed array.
+     */
+    template<typename MapIndexFunctor>
+    void mapIndex(MapIndexFunctor &f, DM<T> &b); // should be return type DA<R>; debug
 
-  /**
-   * \brief Returns a new distributed array with a_new[i] = f(i, a[i]). Note
-   *        that besides the element itself also its index is passed to the functor.
-   *
-   * @param f The mapIndex functor, must be of type \em AMapIndexFunctor.
-   * @tparam MapIndexFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename MapIndexFunctor>
-  DM<T> mapIndex(MapIndexFunctor& f);  // should be return type DA<R>; debug
+    /**
+     * \brief TODO Replaces each element a[i] of the distributed array with f(i, a).
+     *        Note that the index i and the local partition is passed to the
+     *        functor.
+     *
+     * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
+     * @tparam MapStencilFunctor Functor type.
+     */
+    template<typename MapStencilFunctor, typename NeutralValueFunctor>
+    void mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a).
-   *        Note that the index i and the local partition is passed to the
-   *        functor.
-   *
-   * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
-   * @tparam MapStencilFunctor Functor type.
-   */
-  template <typename MapStencilFunctor>
-  void mapStencilInPlace(MapStencilFunctor& f, T neutral_value);
+    /**
+    * @brief TODO Non-inplace variant of the mapStencil skeleton.
+    *
+    * @tparam R type of the resulting matrix
+    * @tparam MapStencilFunctor
+    * @tparam NeutralValueFunctor
+    * @param result the dm to save the result
+    * @param f
+    * @param neutral_value_functor
+    * @return void
+    */
+    template<typename T2, typename MapStencilFunctor, typename NeutralValueFunctor>
+    void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, NeutralValueFunctor &neutral_value_functor);
+/**
+    * @brief Non-inplace variant of the mapStencil skeleton.
+    *
+    * @tparam R type of the resulting matrix
+    * @tparam MapStencilFunctor
+    * @tparam NeutralValueFunctor
+    * @param result the dm to save the result
+    * @param f
+    * @param neutral_value_functor
+    * @return void
+    */
+    template<msl::NPLMMapStencilFunctor<T> f>
+    void mapStencil(DM<T> &result, size_t stencilSize, T neutralValue, bool shared_mem);
 
-  /**
-   * \brief Non-inplace variant of the mapStencil skeleton.
-   *
-   * @see mapStencilInPlace()
-   * @param f The mapStencil functor, must be of type \em AMapStencilFunctor.
-   * @tparam MapFunctor Functor type.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename MapStencilFunctor>
-  DM<R> mapStencil(MapStencilFunctor& f, T neutral_value);
+    void initNPLMatrixes(int stencilSize, T neutralValue) {
+        nplMatrixes = std::vector<NPLMatrix<T>>();
+#ifdef __CUDACC__
+        nplMatrixes.reserve(this->ng);
+        for (int i = 0; i < this->ng; i++) {
+            nplMatrixes.push_back(NPLMatrix<T>(
+                    this->ncol, this->nrow,
+                    {this->plans[i].firstCol, this->plans[i].firstRow},
+                    {this->plans[i].lastCol, this->plans[i].lastRow},
+                    i,
+                    stencilSize,
+                    neutralValue,
+                    this->plans[i].d_Data
+            ));
+        }
 
-#ifndef __CUDACC__
+#else
+        int slicePerProcess = this->nrow / msl::Muesli::num_total_procs;
+        int slicethisProcess = slicePerProcess * msl::Muesli::proc_id;
 
-  // SKELETONS / COMPUTATION / MAP / INPLACE
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map functor, must be a 'curried' function pointer.
-   * @tparam F Function type.
-   */
-  template <typename F>
-  void mapInPlace(const msl::Fct1<T, T, F>& f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i]).
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapInPlace(T(*f)(T));
-
-  // SKELETONS / COMPUTATION / MAP / INDEXINPLACE
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor. Also note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex functor, must be a 'curried' function pointer.
-   * @tparam F Function type.
-   */
-  template <typename F>
-  void mapIndexInPlace(const msl::Fct2<int, T, T, F>& f);
-
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i]).
-   *        Note that besides the element itself also its index is passed to the
-   *        functor. Also note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   */
-  void mapIndexInPlace(T(*f)(int, T));
-
-  // SKELETONS / COMPUTATION / MAP
-  /**
-   * \brief Non-inplace variant of the map skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename F>
-  msl::DM<R> map(const msl::Fct1<T, R, F>& f);
-
-  /**
-   * \brief Non-inplace variant of the map skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The map function.
-   * @tparam R Return type.
-   */
-  template <typename R>
-  msl::DM<R> map(R(*f)(T));
-
-  // SKELETONS / COMPUTATION / MAP / INDEX
-  /**
-   * \brief Non-inplace variant of the mapIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex functor, must be a 'curried' function pointer.
-   * @tparam R Return type.
-   * @tparam F Function type.
-   * @return The newly created distributed array.
-   */
-  template <typename R, typename F>
-  DM<R> mapIndex(const msl::Fct2<int, T, R, F>& f);
-
-  /**
-   * \brief Non-inplace variant of the mapIndex skeleton.
-   *        Note that this is a <b>CPU only</b> skeleton.
-   *
-   * @param f The mapIndex function.
-   * @tparam R Return type.
-   * @return The newly created distributed array.
-   */
-  template <typename R>
-  DM<R> mapIndex(R(*f)(int, T));
-
+        nplMatrixes.push_back(NPLMatrix<T>(
+            this->ncol, this->nrow,
+            {0, slicethisProcess},
+            {this->ncol-1, (slicethisProcess + slicePerProcess)-1},
+            0,
+            stencilSize,
+            neutralValue,
+            this->localPartition
+    ));
 #endif
+        if (msl::Muesli::num_total_procs > 1) {
+            size_t topPaddingElements = stencilSize * this->ncol * sizeof(T);
+            nodeBottomPadding = new T[topPaddingElements];
+            nodeTopPadding = new T[topPaddingElements];
+        }
 
-  // SKELETONS / COMPUTATION / ZIP
+        supportedStencilSize = stencilSize;
+    }
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(a[i], b[i])
-   *        with \em b being another distributed array of the same size.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename ZipFunctor>
-  void zipInPlace(DM<T2>& b, ZipFunctor& f);
+    void freeNPLMatrix() {
+        supportedStencilSize = -1;
+    }
 
-  /**
-   * \brief Replaces each element a[i] of the distributed array with f(i, a[i], b[i]).
-   *        Note that besides the elements themselves also the index is passed to the
-   *        functor.
-   *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   */
-  template <typename T2, typename ZipIndexFunctor>
-  void zipIndexInPlace(DM<T2>& b, ZipIndexFunctor& f);
+    void syncNPLMatrixes(int stencilSize, T neutralValue) {
+        if (stencilSize > supportedStencilSize) {
+            freeNPLMatrix();
+            initNPLMatrixes(stencilSize, neutralValue);
+        }
+#ifdef __CUDACC__
+        if (stencilSize > supportedStencilSize) {
+            freeNPLMatrix();
+            initNPLMatrixes(stencilSize, neutralValue);
+        }
+        for (int i = 1; i < this->ng; i++) {
+            size_t bottomPaddingSize = nplMatrixes[i - 1].getBottomPaddingElements() * sizeof(T);
+            (cudaMemcpyAsync(
+                    nplMatrixes[i - 1].bottomPadding, nplMatrixes[i].data, bottomPaddingSize, cudaMemcpyDeviceToDevice, Muesli::streams[i - 1]
+            ));
 
-  /**
-   * \brief Non-inplace variant of the zip skeleton.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipFunctor Functor type.
-   * @return The newly created distributed array.
-   */
-  template <typename T2, typename ZipFunctor>
-  DM<T> zip(DM<T2>& b, ZipFunctor& f);  // should have result type DA<R>; debug
+            size_t topPaddingSize = nplMatrixes[i].getTopPaddingElements() * sizeof(T);
+            (cudaMemcpyAsync(
+                    nplMatrixes[i].topPadding, nplMatrixes[i - 1].data + (this->plans[i - 1].size - nplMatrixes[i].getTopPaddingElements()), topPaddingSize,
+                    cudaMemcpyDeviceToDevice, Muesli::streams[i]
+            ));
+        }
+        msl::syncStreams();
+#endif
+    }
+    void updateNodePaddingGPU(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        int topPaddingElements = topPaddingSize / sizeof(T);
 
-  /**
-   * \brief Non-inplace variant of the zipIndex skeleton.
-   *
-   * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
-   * @tparam R Return type.
-   * @tparam T2 Element type of the distributed matrix to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   * @return The newly created distributed array.
-   */
-  template <typename T2, typename ZipIndexFunctor>
-  DM<T> zipIndex(DM<T2>& b, ZipIndexFunctor& f);
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            (cudaMemcpyAsync(
+                    this->localPartition + (this->nLocal - topPaddingElements),
+                    nplMatrixes[lastgpu].data + (this->plans[lastgpu].size - topPaddingElements),
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            (cudaMemcpyAsync(
+                    this->localPartition,
+                    nplMatrixes[firstgpu].data,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#endif
+    }
+    void updateGPUPaddingNode(int topPaddingSize) {
+#ifdef __CUDACC__
+        int lastgpu = this->ng - 1;
+        int firstgpu = 0;
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+            (cudaMemcpyAsync(
+                    nplMatrixes[lastgpu].bottomPadding,
+                    nodeBottomPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[lastgpu]
+            ));
+        }
+        if (msl::Muesli::proc_id > 0) {
+            (cudaMemcpyAsync(
+                    nplMatrixes[firstgpu].topPadding,
+                    nodeTopPadding,
+                    topPaddingSize,
+                    cudaMemcpyDefault, Muesli::streams[firstgpu]
+            ));
+        }
+#else
+        if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+        memcpy(nplMatrixes[0].bottomPadding, nodeBottomPadding, topPaddingSize);
+    }
+    if (msl::Muesli::proc_id > 0) {
+        memcpy(nplMatrixes[0].topPadding, nodeTopPadding, topPaddingSize);
+    }
+#endif
+    }
+    void syncNPLMatrixesMPI(int stencilSize) {
+            if (msl::Muesli::num_total_procs <= 1) {
+                //printf("Only one process no need to sync MPI\n");
+                return;
+            }
+            size_t topPaddingElements = stencilSize * this->ncol;
+            size_t topPaddingSize = stencilSize * this->ncol * sizeof(T);
 
-  /**
-   * \brief Replaces each element a[i,j] of the distributed matrix by f(a[i,j], b[i,j], c[i,j])
-   *        with \em b and \em c being other distributed matrices of the same size.
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the 1st distributed matrix to zip with.
-   * @tparam T3 Element type of the 2nd distributed matrix to zip with.
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename T3, typename ZipFunctor>
-  void zipInPlace3(DM<T2>& b, DM<T3>& c, ZipFunctor& f);
+            // Update from GPU
+            updateNodePaddingGPU(topPaddingSize);
+            MPI_Status statstart;
+            MPI_Request reqstart;
+            MPI_Status statbottom;
+            MPI_Request reqbottom;
 
-  /**
-   * \brief Replaces each element a[i,j] of the distributed matrix a by f(a[i,j], b[i], c[i], d[i,j]),
-   *        with \em b and \em c being distributed arrays with a number of elements corresponding to
-   *        the number of rows of a
-   *        and d being another distributed matrix of the same size as a
-   *
-   * @param f The zip functor, must be of type \em AZipFunctor.
-   * @tparam T2 Element type of the 1st distributed array b
-   * @tparam T3 Element type of the 2nd distributed array c
-   * @tparam T4 Element type of the other distributed matrix d
-   * @tparam ZipFunctor Functor type.
-   */
-  template <typename T2, typename T3, typename T4, typename ZipFunctor>
-  void zipInPlaceAAM(DA<T2>& b, DA<T3>& c, DM<T4>& d, ZipFunctor& f);
+            if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+                // Send ending parts. NON BLOCKING
+                MSL_ISend(Muesli::proc_id + 1,
+                          this->localPartition + this->nLocal - topPaddingElements,
+                          reqstart, topPaddingElements,
+                          msl::MYTAG);
+            }
 
+            if (msl::Muesli::proc_id > 0) {
+                // SEND STARTING PARTS NON BLOCKING
+                MSL_ISend(Muesli::proc_id - 1,
+                          this->localPartition,
+                          reqbottom, topPaddingElements,
+                          msl::MYADULTTAG);
+                // Receive upper parts BLOCKING
+                MSL_Recv(Muesli::proc_id - 1,
+                         nodeTopPadding,
+                         statstart, topPaddingElements,
+                         msl::MYTAG);
+            }
+            if (msl::Muesli::proc_id < msl::Muesli::num_total_procs - 1) {
+                MSL_Recv(Muesli::proc_id + 1,
+                         nodeBottomPadding,
+                         statbottom, topPaddingElements,
+                         msl::MYADULTTAG);
+            }
 
-  /**
-   * \brief fold skeleton.
-   *
-   * @param f The fold functor
-   * @tparam T Element type of the distributed matrix to zip with.
-   * @tparam ZipIndexFunctor Functor type.
-   * @return the result of combining all elements of the arra by the binary, associative and commutativ 
-   *         operation f
-   */
-  template <typename FoldFunctor>
-  T fold(FoldFunctor& f,  bool final_fold_on_cpu);
+            // Update to GPU
+            updateGPUPaddingNode(topPaddingSize);
+        }
 
-  //
-  // SKELETONS / COMMUNICATION
-  //
+    /**
+    * @brief Methods to generalize MapStencil Code snippets.
+    *
+    * @tparam MapStencilFunctor
+    * @param int stencil_size
+    * @param int padding_size
+    * @param int kw
+    * @param f MapStencilFunctor
+    * @param int rowoffset
+    * @param int coloffset
+    * @return void
+    */
+    template<typename MapStencilFunctor>
+    void initializeConstantsStencil(int &stencil_size, int &padding_size, int &col_size, int &kw, MapStencilFunctor &f,
+                                                    int &rowoffset, int &coloffset, std::vector<T *> d_dm);
+    /**
+    * @brief Methods to communicate borders between nodes.
+    *
+    * @tparam MapStencilFunctor
+    * @param int stencil_size
+    * @param int padding_size
+    * @param int kw
+    * @param int rowoffset
+    * @param int coloffset
+    * @return void
+    */
+    void communicateNodeBorders(int col_size, int stencil_size, int padding_size);
+/**
+    * @brief TODO inplace variant of the mapStencil skeleton.
+    *
+    * @tparam R type of the resulting matrix
+    * @tparam the dm to save the result
+    * @tparam MapStencilFunctor
+    * @tparam NeutralValueFunctor
+    * @param f
+    * @param neutral_value_functor
+    * @return DM<R>
+    */
+    template<typename T2, typename MapStencilFunctor>
+    void mapStencilMM(DM<T2> &result, MapStencilFunctor &f, T neutral_value);
 
-  // SKELETONS / COMMUNICATION / BROADCAST PARTITION
+    // SKELETONS / COMPUTATION / ZIP
 
-  /**
-   * \brief Broadcasts the partition with index \em partitionIndex to all processes.
-   *        Afterwards, each partition of the distributed array stores the same
-   *        values. Note that 0 <= \em partitionIndex <= size/numProcesses.
-   *
-   * @param partitionIndex The index of the partition to broadcast.
-   */
-  void broadcastPartition(int partitionIndex);
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename ZipIndexFunctor>
+    void zipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
 
-  // SKELETONS / COMMUNICATION / GATHER
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename ZipIndexFunctor>
+    void zipIndexInPlace3(DM<T2> &b, DM<T3> &c, ZipIndexFunctor &f);
 
-  /**
-   * \brief Transforms a distributed array to an ordinary array by copying each
-   *        element to the given array \em b. \em b must at least be of length
-   *        \em size.
-   *
-   * @param b The array to store the elements of the distributed array.
-   */
-  void gather(T* b);
-
-  /**
-   * \brief Transforms a distributed array to a copy distributed distributed array
-   *        by copying each element to the given distributed array \em da. \em da
-   *        must be copy distributed, otherwise this function immediately returns.
-   *
-   * @param da The (copy distributed) distributed array to stores the elements of the
-   *           distributed array.
-   */
-  void gather(msl::DM<T>& dm);
-
-  // SKELETONS / COMMUNICATION / PERMUTE PARTITION
-
-  /**
-   * \brief Permutes the partitions of the distributed array according to the
-   *        given function \em f. \em f must be bijective and return the ID
-   *        of the new process p_i to store the partition, with 0 <= i < np.
-   *
-   * @param f bijective functor
-   * @tparam F Function type for \em f.
-   */
-  template <typename Functor>
-  inline void permutePartition(Functor& f);
-
-  /**
-   * \brief Permutes the partitions of the distributed array according to the
-   *        given function \em f. \em f must be bijective and return the the
-   *        ID of the new process p_i to store the partition, with 0 <= i < np.
-   *
-   * @param f The bijective function.
-   */
-  // inline void permutePartition(int (*f)(int));
-
-
-  //
-  // GETTERS AND SETTERS
-  //
-
-  /**
-   * \brief Returns the local partition.
-   *
-   * @return The local partition.
-   */
-  T* getLocalPartition();
-
-  /**
-   * \briefs Sets the local partition.
-   *
-   * @param elements for the local partition.
-   */
-   void setLocalPartition(T* elements);
-
-  /**
-   * \brief Returns the element at the given global index \em index.
-   *
-   * @param index The global index.
-   * @return The element at the given global index.
-   */
-  T get(int index) const;
-
-  /**
-   * \brief Sets the element at the given global index \em globalIndex to the
-   *        given value \em v, with 0 <= globalIndex < size.
-   *
-   * @param globalIndex The global index.
-   * @param v The new value.
-   */
-  void set(int globalIndex, const T& v);
-
-  /**
-   * \brief Returns the global size of the distributed array.
-   *
-   * @return The global size.
-   */
-  int getSize() const;
-
-  /**
-   * \brief Returns the size of local partitions of the distributed array.
-   *
-   * @return The size of local partitions.
-   */
-  int getLocalSize() const;
-
-  /**
-   * \brief Returns the first (global) index of the local partition.
-   *
-   * @return The first (global) index.
-   */
-  int getFirstIndex() const;
-
-   /**
-   * \brief Setter for cpuMemoryInSync. 
-   *
-   * @param b new value of cpuMemoryInSync
-   */
-  void setCpuMemoryInSync(bool b);
-
-  /**
-   * \brief Checks whether the element at the given global index \em index is
-   *        locally stored.
-   *
-   * @param index The global index.
-   * @return True if the element is locally stored.
-   */
-  bool isLocal(int index) const;
-
-  /**
-   * \brief Returns the element at the given local index \em index. Note that
-   *        0 <= \em index < getLocalSize() must hold (will not be checked, for
-   *        reasons of performance).
-   *
-   * @param index The local index.
-   */
-  T getLocal(int localIndex);
-
-  /**
-   * \brief Sets the element at the given local index \em localIndex to the
-   *        given value \em v.
-   *
-   * @param localIndex The local index.
-   * @param v The new value.
-   */
-  void setLocal(int localIndex, const T& v);
-
-  /**
-   * \brief Returns the GPU execution plans that store information about size, etc.
-   *        for the GPU partitions. For internal purposes.
-   *
-   * @return The GPU execution plans.
-   */
-  GPUExecutionPlan<T>* getExecPlans();
-
-  /**
-   * \brief Returns the GPU execution plan for device \em device.
-   *        For internal purposes.
-   *
-   * @param device The device to get the execution plan for.
-   * @return The GPU execution plan for device \em device.
-   */
-  GPUExecutionPlan<T> getExecPlan(int device);
-
-  /**
-   * \brief Switch the distribution scheme from distributed to copy distributed.
-   */
-  void setCopyDistribution();
-
-  /**
-   * \brief Switch the distribution scheme from copy distributed to distributed.
-   */
-  void setDistribution();
-
-
-  //
-  // AUXILIARY
-  //
-
-  /**
-   * \brief Manually upload the local partition to GPU memory.
-   *
-   * @return void
-   */
-
-  void upload();
-
-  /**
-   * \brief Manually download the local partition from GPU memory.
-   */
-  void download();
-
-  /**
-   * \brief Manually free device memory.
-   */
-  void freeDevice();
-
-  /**
-   * \brief Set how the local partition is distributed among the GPUs. Current
-   *        distribution schemes are: distributed, copy distributed.
-   *
-   * @param dist The GPU distribution scheme.
-   */
-  void setGpuDistribution(Distribution dist);
-
-  /**
-   * \brief Returns the current GPU distribution scheme.
-   *
-   * @return The GPU distribution scheme.
-   */
-  Distribution getGpuDistribution();
-
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename ZipIndexFunctor>
+    void zipIndexInPlaceMA(DM<T2> &b, DA<T3> &c, ZipIndexFunctor &f);
  /**
-   * \brief Prints the local partion of the root processor of the distributed array to standard output. Optionally, the user
-   *        may pass a description that will be printed with the output. Just useful for debugging.
-   *
-   * @param descr The description string.
-   */
-  void showLocal(const std::string& descr);
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T3, typename ZipIndexFunctor>
+    void zipIndexInPlaceA(DA<T3> &c, ZipIndexFunctor &f);
+ /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * b[i]). Note that besides the elements themselves also the index is passed
+     * to the functor.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename T3, typename T4, typename ZipIndexFunctor>
+    void zipIndexInPlaceAAA(DA<T2> &b, DA<T3> &c, DA<T4> &d, ZipIndexFunctor &f);
 
-  /**
-   * \brief Prints the distributed array to standard output. Optionally, the user
-   *        may pass a description that will be printed with the output.
-   *
-   * @param descr The description string.
-   */
-  void show(const std::string& descr = std::string());
+    /**
+     * \brief Replaces each element a[i] of the distributed array with f(i, a[i],
+     * *b[]). Note that besides the elements themselves also the index is passed
+     * to the functor. Also note that the whole column is passed.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     */
+    template<typename T2, typename ZipIndexFunctor>
+    void crossZipIndexInPlace(DM<T2> &b, ZipIndexFunctor &f);
 
-  /**
-   * \brief Each process prints its local partition of the distributed array.
-   */
-  void printLocal();
+    /**
+     * \brief Non-inplace variant of the zipIndex skeleton.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam R Return type.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ZipIndexFunctor Functor type.
+     * @return The newly created distributed array.
+     */
+    template<typename T2, typename ZipIndexFunctor>
+    void zipIndex(DM<T2> &b, DM<T2> &c, ZipIndexFunctor &f);
+
+    /**
+     * \brief Non-inplace variant of the zipIndex skeleton.
+     *
+     * @param f The zipIndex functor, must be of type \em AZipIndexFunctor.
+     * @tparam R Return type.
+     * @tparam T2 Element type of the distributed matrix to zip with.
+     * @tparam ReduceFunctor Functor type.
+     * @return The newly created distributed array.
+     */
+    template<typename ReduceFunctor>
+    void reduceRows(DA<T> &c, ReduceFunctor &f);
+
+
+    template<typename T2, typename ReduceFunctor>
+    void reducetwoColumns(DA<T2> &c, ReduceFunctor &f);
+
+    //
+    // SKELETONS / COMMUNICATION
+    //
+
+    /**
+     * \brief Broadcasts the partition with index \em partitionIndex to all
+     * processes. Afterwards, each partition of the distributed array stores the
+     * same values. Note that 0 <= \em partitionIndex <= size/numProcesses.
+     *
+     * @param partitionIndex The index of the partition to broadcast.
+     */
+    void broadcastPartition(int partitionIndex);
+
+
+    // SKELETONS / COMMUNICATION / PERMUTE PARTITION
+    /**
+       * \brief Rotates the partitions of the distributed matrix cyclically in vertical
+       *        direction.
+       *
+       * Rotates the partitions of the distributed matrix cyclically in vertical direction.
+       * The number of steps depends on the given Integer a. Negative numbers correspond to
+       * cyclic rotations upwards, positive numbers correspond to cyclic rotations downwards.
+       *
+       * @param a Integer - Positive rotate down negative rotate up.
+       */
+    void rotateRows(int a);
+
+    /**
+     * \brief Rotates the partitions of the distributed matrix cyclically in horizontal
+     *        direction.
+     *
+     * Rotates the partitions of the distributed matrix cyclically in horizontal direction.
+     * The number of steps depends on the given Integer a. Negative numbers correspond to
+     * cyclic rotations to the left, positive numbers correspond to cyclic rotations to the
+     * right.
+     *
+     * @param a Integer - Positive rotate down negative rotate up.
+     */
+    void rotateCols(int a);
+
+
+    //
+    // GETTERS AND SETTERS
+    //
+
+    /**
+     * \brief Returns the element at the given global index \em row, col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    MSL_USERFUNC
+    T get2D(int row, int col) const;
+    /**
+     * \brief Sets the element at the given global index \em row, col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    void set2D(int row, int col, T value);/**
+     * \brief Sets a column at the given global index \em col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    void setColumn(DA<T> &da, int col);
+     /**
+      * \brief Sets a column at the given global index \em col.
+     *
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    int getnCol(){return ncol;}
+    /**
+     * \brief Manually download the local partition from GPU memory.
+     */
+    void updateDeviceupperpart(int paddingsize);
+
+    /**
+     * \brief Manually download the local partition from GPU memory.
+     */
+    void updateDevicelowerpart(int paddingsize);
+
+    /**
+     * \brief Prints the distributed array to standard output. Optionally, the
+     * user may pass a description that will be printed with the output.
+     *
+     * @param descr The description string.
+     */
+    void show(const std::string &descr = std::string(), int limited = 0);
+    // TODO private?
+    std::vector<NPLMatrix<T>> nplMatrixes;
 
 private:
+    //
+    // Attributes
+    //
 
-  //
-  // Attributes
-  //
+    // number of cols
+    int ncol;
+    // number of rows
+    int nrow;
+    // Number of local rows. If the distribution is not row complete, a row will
+    // be counted if one or more elements from that row are part of this
+    // partition.
+    int nlocalRows{};
+    // first (global) row in local partition
+    int firstRow{};
 
-  // local partition
-  T* localPartition;
-  // position of processor in data parallel group of processors; zero-base
-  int id;
-  // number of elements
-  int n;
-  // number of local elements
-  int ncol;
-  // number of cols
-  int nrow;
-  // number of rows
-  int nLocal;
-  // first (global) index of local partition
-  int firstIndex;
-  // first (global) row in local partition
-  int firstRow;
-  // total number of MPI processes
-  int np;
-  // tells, whether data is up to date in main (cpu) memory; true := up-to-date, false := newer data on GPU
-  bool cpuMemoryInSync;
-  // execution plans for each gpu
-  GPUExecutionPlan<T>* plans = 0;
-  // checks whether data is copy distributed among all processes
-  Distribution dist;
-  // checks whether data is copy distributed among all gpus
-  bool gpuCopyDistributed = 0;
-  // number of GPUs per node (= Muesli::num_gpus)
-  int ng;  
-  // number of elements per GPU (all the same!)                   
-  int nGPU;  
-  // number of elements on CPU                 
-  int nCPU;
-  // firstIndex caclulated by GPU
-  int indexGPU;
-  
+    std::vector<PLMatrix<T> *> vplm;
 
-  //
-  // AUXILIARY
-  //
+    // Indicates whether the matrix should be distributed in full rows between
+    // the nodes. The map stencil functor needs this type of distribution
+    bool rowComplete;
 
-  // initializes distributed matrix (used in constructors).
-  void init();
+    std::vector<T *> d_dm;
+    // Padding to save data calculated from other cpu.
+    T * nodeTopPadding, * nodeBottomPadding;
 
-  // initializes the GPU execution plans.
-  void initGPUs();
+    int supportedStencilSize = -1;
 
-  // returns the GPU id that locally stores the element at index index.
-  int getGpuId(int index) const;
-};
+    /**
+     * \brief Malloc the necessary space for all GPUs and generates the necessary GPU plans.
+     */
+    void initGPUs();
+
+    /**
+     * \brief Malloc the necessary space for all GPUs and generates the necessary GPU plans.
+     */
+    void DMinit();
+
+    };
 
 } // namespace msl
-
 #include "../src/dm.cpp"
 
-
-
+#endif
 

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/aco_bpp_gpu.dir/tmp/aco_bpp_gpu_generated_aco_bpp.cpp.o -o ../aco_bpp/aco_bpp_gpu  -Wl,-rpath,/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/cuda/lib64/libcudart.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp -lcuda 
