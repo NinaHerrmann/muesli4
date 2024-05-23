@@ -95,7 +95,7 @@ msl::DC<T>::DC(const DC <T> &other)
           nlocalRows(other.nlocalRows), ncol(other.ncol), nrow(other.nrow), depth(other.depth),
           firstRow(other.firstRow),
           rowComplete(other.rowComplete) {
-    copyLocalPartition(other);
+    this->copyLocalPartition(other);
 
     // this->cpuMemoryInSync = true;
     // this->updateDevice();
@@ -556,7 +556,6 @@ void msl::DC<T>::mapStencilInPlace(MapStencilFunctor &f, NeutralValueFunctor &ne
     printf("mapStencilInPlace\n");
     throws(detail::NotYetImplementedException());
 }
-
 template<typename T>
 template<msl::DCMapStencilFunctor<T> f>
 void msl::DC<T>::mapStencil(msl::DC<T> &result, size_t stencilSize, T neutralValue) {

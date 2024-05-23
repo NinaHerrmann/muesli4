@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/da_test_seq.dir/examples/da_test.cpp.o -o ../da_test/da_test_seq  -Wl,-rpath,/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/gaussianblur_cpu.dir/examples/gaussianblur.cpp.o -o ../gaussianblur/gaussianblur_cpu  -Wl,-rpath,/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp -fopenmp /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 

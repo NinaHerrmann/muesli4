@@ -127,7 +127,7 @@ endif (compiler_flag_wno_unknown_pragmas)
 ## GPU
 if (BUILD_GPU)
   ## include directories
-  cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/examples/helpers ${PROJECT_SOURCE_DIR}/include/detail ${MPI_CXX_INCLUDE_PATH})
+  cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src/include ${PROJECT_SOURCE_DIR}/examples/helpers ${PROJECT_SOURCE_DIR}/include/detail ${MPI_CXX_INCLUDE_PATH})
 
   ## NVCC flags
   set(CUDA_PROPAGATE_HOST_FLAGS "OFF") # these are manually set via -Xcompiler flag ( -Xcompiler "-flag -flag" )
@@ -185,6 +185,7 @@ file(GLOB MUESLI_FILES
         ${PROJECT_SOURCE_DIR}/include/*.cuh
         ${PROJECT_SOURCE_DIR}/include/detail/*.cuh
         ${PROJECT_SOURCE_DIR}/src/*.cpp
+        ${PROJECT_SOURCE_DIR}/src/include/*.h
         ${PROJECT_SOURCE_DIR}/src/*.cu
         ${PROJECT_SOURCE_DIR}/include/test_hepers/*.cpp
         )
@@ -298,25 +299,22 @@ endif (BUILD_GPU)
 ## use of glob is discouraged, so add each file separately
 ## names must be unique, folders are not considered
 set(EXAMPLE_SRCS
-        #${PROJECT_SOURCE_DIR}/examples/da_test.cpp
-        #${PROJECT_SOURCE_DIR}/examples/dc_map_stencil_test.cpp
-        # ${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
-        #${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
-        #${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
-        #${PROJECT_SOURCE_DIR}/examples/nbody.cpp
+        ${PROJECT_SOURCE_DIR}/examples/da_test.cpp
+        ${PROJECT_SOURCE_DIR}/examples/dc_test.cpp
+        ${PROJECT_SOURCE_DIR}/examples/dc_test_comp.cpp
+        ${PROJECT_SOURCE_DIR}/examples/ds_test.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gameoflife.cpp
         ${PROJECT_SOURCE_DIR}/examples/aco_tsp.cpp
-        #${PROJECT_SOURCE_DIR}/examples/aco_tsp_dataset.cpp
-        #${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
-        #${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
-        #${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
-        #${PROJECT_SOURCE_DIR}/examples/aco.cpp
-        #${PROJECT_SOURCE_DIR}/examples/minnested.cpp
-        #${PROJECT_SOURCE_DIR}/examples/gassimulation.cpp
-        #${PROJECT_SOURCE_DIR}/examples/heatdiffusion.cpp
-        #${PROJECT_SOURCE_DIR}/examples/meanblur2.cpp
-        #${PROJECT_SOURCE_DIR}/examples/meanblur8.cpp
-        #${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
-        #${PROJECT_SOURCE_DIR}/examples/piDA.cpp
+        ${PROJECT_SOURCE_DIR}/examples/aco_bpp.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gaussianblur.cpp
+        ${PROJECT_SOURCE_DIR}/examples/gaussianblur-color.cpp
+        ${PROJECT_SOURCE_DIR}/examples/jacobisolver.cpp
+        ${PROJECT_SOURCE_DIR}/examples/minnested.cpp
+        ${PROJECT_SOURCE_DIR}/examples/heatdiffusion.cpp
+        ${PROJECT_SOURCE_DIR}/examples/meanblur2.cpp
+        ${PROJECT_SOURCE_DIR}/examples/meanblur8.cpp
+        ${PROJECT_SOURCE_DIR}/examples/meanblur10.cpp
+        ${PROJECT_SOURCE_DIR}/examples/piDA.cpp
         )
 foreach (example_src ${EXAMPLE_SRCS})
 
@@ -361,7 +359,7 @@ foreach (example_src ${EXAMPLE_SRCS})
     if (EXISTS "${PROJECT_SOURCE_DIR}/examples/${example_name}.h")
       configure_file(${PROJECT_SOURCE_DIR}/examples/${example_name}.h "tmp/${example_name}.h")
     endif (EXISTS "${PROJECT_SOURCE_DIR}/examples/${example_name}.h")
-
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --extended-lambda")
     ## build executable
     cuda_add_executable(${example_name}_gpu ${CMAKE_CURRENT_BINARY_DIR}/${example_src_tmp} OPTIONS ${GPU_COMPILER_OPTIONS} DEBUG ${GPU_COMPILER_OPTIONS_DEBUG} ${GPU_HOST_COMPILER_OPTIONS_DEBUG} RELEASE ${GPU_COMPILER_OPTIONS_RELEASE} ${GPU_HOST_COMPILER_OPTIONS_RELEASE} RELWITHDEBINFO ${GPU_COMPILER_OPTIONS_RELWITHDEBINFO} ${GPU_HOST_COMPILER_OPTIONS_RELWITHDEBINFO} MINSIZEREL ${GPU_COMPILER_OPTIONS_MINSIZEREL} ${GPU_HOST_COMPILER_OPTIONS_MINSIZEREL}) # copy hack: use copied file
 

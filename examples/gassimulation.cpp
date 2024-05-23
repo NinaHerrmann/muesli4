@@ -139,46 +139,50 @@ namespace msl::gassimulation {
         float dot = offsets[i] * c * v;
         return wi * p * (1 + (1 / (c * c)) * (3 * dot + (9 / (2 * c * c)) * dot * dot - (3.f / 2) * (v * v)));
     }
+    class Update : public DCMapStencilFunctor<cell_t> {
+    public:
+        Update() : DCMapStencilFunctor<cell_t>(1) {}
 
-    MSL_USERFUNC cell_t update(const PLCube<cell_t> &plCube, int x, int y, int z) {
-        cell_t cell = plCube(x, y, z);
+        MSL_USERFUNC cell_t operator()(const PLCube<cell_t> &plCube, int x, int y, int z) const override {
+            cell_t cell = plCube(x, y, z);
 
-        auto* parts = (floatparts*) &cell[0];
+            auto* parts = (floatparts*) &cell[0];
 
-        if (parts->exponent == 255 && parts->mantissa & FLAG_KEEP_VELOCITY) {
-            return cell;
-        }
+            if (parts->exponent == 255 && parts->mantissa & FLAG_KEEP_VELOCITY) {
+                return cell;
+            }
 
-        // Streaming.
-        for (int i = 1; i < Q; i++) {
-            int sx = x + (int) offsets[i].x;
-            int sy = y + (int) offsets[i].y;
-            int sz = z + (int) offsets[i].z;
-            cell[i] = plCube(sx, sy, sz)[i];
-        }
+            // Streaming.
+            for (int i = 1; i < Q; i++) {
+                int sx = x + (int) offsets[i].x;
+                int sy = y + (int) offsets[i].y;
+                int sz = z + (int) offsets[i].z;
+                cell[i] = plCube(sx, sy, sz)[i];
+            }
 
-        // Collision.
-        if (parts->exponent == 255 && parts->mantissa & FLAG_OBSTACLE) {
-            if (parts->mantissa & FLAG_OBSTACLE) {
-                cell_t cell2 = cell;
-                for (size_t i = 1; i < Q; i++) {
-                    cell[i] = cell2[opposite[i]];
+            // Collision.
+            if (parts->exponent == 255 && parts->mantissa & FLAG_OBSTACLE) {
+                if (parts->mantissa & FLAG_OBSTACLE) {
+                    cell_t cell2 = cell;
+                    for (size_t i = 1; i < Q; i++) {
+                        cell[i] = cell2[opposite[i]];
+                    }
                 }
+                return cell;
+            }
+            float p = 0;
+            vec3f vp {0, 0, 0};
+            for (size_t i = 0; i < Q; i++) {
+                p += cell[i];
+                vp += offsets[i] * cellwidth * cell[i];
+            }
+            vec3f v = p == 0 ? vp : vp * (1 / p);
+            for (size_t i = 0; i < Q; i++) {
+                cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
             }
             return cell;
         }
-        float p = 0;
-        vec3f vp {0, 0, 0};
-        for (size_t i = 0; i < Q; i++) {
-            p += cell[i];
-            vp += offsets[i] * cellwidth * cell[i];
-        }
-        vec3f v = p == 0 ? vp : vp * (1 / p);
-        for (size_t i = 0; i < Q; i++) {
-            cell[i] = cell[i] + deltaT / tau * (feq(i, p, v) - cell[i]);
-        }
-        return cell;
-    }
+    };
 
     class Initialize : public Functor4<int, int, int, cell_t, cell_t> {
 
@@ -222,6 +226,7 @@ namespace msl::gassimulation {
         size = dimension;
         DC<cell_t> dc(size.x, size.y, size.z);
         DC<cell_t> dc2(size.x, size.y, size.z);
+        DA<cell_t> da(size.x, {});
 
         double timeinit = splitTime(0);
         if (importFile.empty()) {
@@ -255,10 +260,11 @@ namespace msl::gassimulation {
         DC<cell_t> *dcp1 = &dc;
         DC<cell_t> *dcp2 = &dc2;
         double timefill = splitTime(0);
-
+        // dc.mapStencil<update>()
+        Update update;
         for (int i = 0; i < iterations; i++) {
-            dcp1->mapStencil<update>(*dcp2, 1, {});
-            dcp2->mapStencil<update>(*dcp1, 1, {});
+            dcp1->mapStencil<update>(*dcp2, 1); // , {});
+            dcp2->mapStencil<update>(*dcp1, 1); //, {});
         }
 
         double totalkerneltime = splitTime(0);

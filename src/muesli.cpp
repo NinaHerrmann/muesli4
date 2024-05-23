@@ -217,6 +217,8 @@ void msl::syncStreams() {
         (cudaStreamSynchronize(Muesli::streams[i]));
     }
     cudaDeviceSynchronize();
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
 #endif
 }
 

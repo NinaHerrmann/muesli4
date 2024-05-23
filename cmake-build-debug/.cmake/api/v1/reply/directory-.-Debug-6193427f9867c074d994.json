@@ -1,0 +1,93 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 250,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 254,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 279,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/muesli-4.1/cmake",
+			"paths" : 
+			[
+				"cmake-build-debug/muesli-config.cmake",
+				"cmake-build-debug/muesli-config-version.cmake"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "include/muesli-4.1",
+			"paths" : 
+			[
+				"include",
+				"src"
+			],
+			"type" : "directory"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Unspecified",
+			"destination" : "include/muesli-4.1/lib",
+			"exportName" : "muesli_targets",
+			"exportTargets" : 
+			[
+				{
+					"id" : "muesli::@6890427a1f51a3e7e1df",
+					"index" : 0
+				},
+				{
+					"id" : "muesli_seq::@6890427a1f51a3e7e1df",
+					"index" : 0
+				},
+				{
+					"id" : "muesli_cpu::@6890427a1f51a3e7e1df",
+					"index" : 0
+				}
+			],
+			"paths" : 
+			[
+				"CMakeFiles/Export/include/muesli-4.1/lib/muesli-lib-config.cmake"
+			],
+			"type" : "export"
+		}
+	],
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	}
+}

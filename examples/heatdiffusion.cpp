@@ -91,10 +91,8 @@ namespace msl::heatdiffusion {
         DM<float> *dmp1 = &dm;
         DM<float> *dmp2 = &dm_copy;
         for (size_t i = 0; i < iterations; ++i) {
-            dmp1->mapStencil<heat2D>(dm_copy, 1, 0);
-            dmp2->mapStencil<heat2D>(dm, 1, 0);
-            //dmp1->mapStencil<heat2D>(dm_copy, 1, 0, true);
-            //dmp2->mapStencil<heat2D>(dm, 1, 0, true);
+            dmp1->mapStencil<heat2D>(dm_copy, 1, 0, false);
+            dmp2->mapStencil<heat2D>(dm, 1, 0, false);
         }
         double timecalc = splitTime(0);
 

@@ -29,7 +29,7 @@ public:
         return ran1(&xpto);
     }
     // Returns a random number between -m and m.
-    double sorte(int m)
+    static double sorte(int m)
     {
         return (1.0*rand())/(1.0*RAND_MAX)*2.0*m-m;
     }

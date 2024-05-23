@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/aco_tsp_cpu.dir/examples/aco_tsp.cpp.o -o ../aco_tsp/aco_tsp_cpu  -Wl,-rpath,/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp -fopenmp /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 

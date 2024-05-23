@@ -621,9 +621,6 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
         dim3 dimGrid((plans[i].size + dimBlock.x) / dimBlock.x);
         detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                 plans[i].d_Data, plans[i].d_Data, plans[i].size, f);
-
-        gpuErrchk( cudaPeekAtLastError() );
-        gpuErrchk( cudaDeviceSynchronize() );
     }
 #endif
     if (nCPU > 0) {
@@ -641,18 +638,14 @@ void msl::DS<T>::mapInPlace(MapFunctor &f) {
 template<typename T>
 template<typename F>
 void msl::DS<T>::map(F &f, DS<T> &b) {        // preliminary simplification in order to avoid type error
-
     updateDevice();
-
-    // map
 #ifdef __CUDACC__
     for (int i = 0; i < Muesli::num_gpus; i++) {
       cudaSetDevice(i);
       dim3 dimBlock(Muesli::threads_per_block);
       dim3 dimGrid((plans[i].size+dimBlock.x)/dimBlock.x);
       detail::mapKernel<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
-              b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f);
-    }
+              b.getExecPlans()[i].d_Data, plans[i].d_Data, plans[i].size, f); }
 #endif
 
     if (nCPU > 0) {
@@ -778,14 +771,14 @@ T msl::DS<T>::fold(FoldFunctor &f, bool final_fold_on_cpu) {
             }
             (cudaMalloc((void **) &d_odata[i], blocks[i] * sizeof(T)));
         }
-
         // fold on gpus: step 1
         for (int i = 0; i < Muesli::num_gpus; i++) {
             cudaSetDevice(i);
             detail::reduce<T, FoldFunctor>(plans[i].size, plans[i].d_Data, d_odata[i], threads[i], blocks[i], f,
                                            Muesli::streams[i], i);
         }
-
+        //printf("printGPU: %d \n", blocks[0]);
+        //detail::printGPU<<<1,1>>>(d_odata[0], blocks[0], 256);
         // fold local elements on CPU (overlap with GPU computations)
         T cpu_result = 0;
         if (nCPU > 0) {
@@ -934,9 +927,9 @@ T msl::DS<T>::foldCPU(FoldFunctor &f) {
     }
     T localresult = localPartition[0];
 
-/*#ifdef _OPENMP
+#ifdef _OPENMP
 #pragma omp parallel for shared(localPartition, localresult)
-#endif*/
+#endif
     for (int i = 1; i < nLocal; i++) {
         localresult = f(localresult, localPartition[i]);
     }

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/aco_nexttry_seq.dir/examples/aco_nexttry.cpp.o -o ../aco_nexttry/aco_nexttry_seq  -Wl,-rpath,/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 

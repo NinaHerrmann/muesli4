@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/aco_tsp_gpu.dir/tmp/aco_tsp_gpu_generated_aco_tsp.cpp.o -o ../aco_tsp/aco_tsp_gpu  -Wl,-rpath,/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/cuda/lib64/libcudart.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -fopenmp -lcuda 

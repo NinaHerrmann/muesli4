@@ -1,0 +1,50 @@
+/home/n_herr03@WIWI.UNI-MUENSTER.DE/Programme/clion-2022.2.4/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/usr/bin/make -G "CodeBlocks - Unix Makefiles" -S /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli -B /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/cmake-build-debug
+Muesli Version 4.1
+-- Host System: Linux-6.2.0-32-generic
+-- compiler id: GNU
+-- compiler flags: 
+-- compiler flags debug: -g
+-- compiler flags release: -O3 -DNDEBUG -O3 -march=native -ftree-vectorize -funroll-loops -fopenmp
+-- compiler flags minsizerel: -Os -DNDEBUG
+-- compiler flags relwithdebinfo: -O2 -g -DNDEBUG
+Build type is: Debug
+Muesli installation path: /usr/local
+Example build output directory: /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/cmake-build-debug/bin
+-- mpi compiler: /usr/bin/mpicxx
+-- mpi compile flags: 
+-- mpi link flags: 
+-- mpi libraries: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so
+-- mpi include paths: /usr/lib/x86_64-linux-gnu/openmpi/include/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
+-- OpenMP CXX compiler flags: -fopenmp
+Build sequential variant.
+OpenMP found can build CPU variant.
+Cuda found can build GPU variant.
+MPI found can use mpirun to start multiple nodes.
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//da_test
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//dc_map_stencil_test
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//dc_test
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//dc_test_comp
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//ds_test
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//gameoflife
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//nbody
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//aco_tsp
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//aco_bpp
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//aco_tsp_dataset
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//gaussianblur
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//gaussianblur-color
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//jacobisolver
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//aco
+CMake Error: File /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/examples/aco.cpp does not exist.
+CMake Error at CMakeLists.txt:360 (configure_file):
+  configure_file Problem configuring file
+
+
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//minnested
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//gassimulation
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//heatdiffusion
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//meanblur2
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//meanblur8
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//meanblur10
+-- /home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli//piDA
+-- Configuring incomplete, errors occurred!
+See also "/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/cmake-build-debug/CMakeFiles/CMakeOutput.log".

@@ -267,6 +267,8 @@ void msl::DA<T>::mapIndexInPlaceDMRows(DM<T2>& rows, MapIndexFunctor &f) {
             detail::mapIndexDMKernelDA<<<dimGrid, dimBlock, 0, Muesli::streams[i]>>>(
                     this->plans[i].d_Data, rows.getExecPlans()[i].d_Data, this->plans[i].d_Data, this->plans[i].nLocal,
                             this->plans[i].first, rows.getExecPlans()[i].gpuCols, f);
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
         }
     #endif
         // map on CPU cores

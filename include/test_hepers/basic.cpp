@@ -55,8 +55,8 @@ void arg_helper(int argc, char** argv, int &dim, int &nGPUs, int &reps, bool &CH
     argc >= 4 ? msl::Muesli::cpu_fraction = std::strtod(argv[3], nullptr) : msl::Muesli::cpu_fraction = 0.0;
     argc >= 5 ? CHECK = to_bool(argv[4]) : CHECK = true;
     argc >= 6 ? reps = std::stoi(argv[5]) : reps = 1;
-    argc >= 7 ? skeletons = argv[6] : skeletons = "all";
-    CHECK = false;
+    argc >= 7 ? msl::setNumThreads(std::stoi(argv[6])) : msl::setNumThreads(32);
+    argc >= 8 ? skeletons = argv[7] : skeletons = "all";
     if (msl::isRootProcess()){
         if (argc < 2 || CHECK) {
             printf("FYI Taking cl arguments: #elements \t nGPUs \t cpu-Fraction \t compare results to non parallel results "
@@ -114,20 +114,20 @@ void check_value_value_equal(const char* skelet, T value, T expected_value){
     }
 }
 template <typename T>
-void print_and_doc_runtimes(int OUTPUT, const std::string &nextfile, T runtimes[], int arraysize){
-    if (OUTPUT) {
+void print_and_doc_runtimes(int OUTPUT, const std::string &nextfile, T runtimes[], int arraysize, int dim, int reps){
+    if (true) {
         std::ofstream outputFile;
-        std::cout << "Follow this command: " << nextfile << "\n";
         outputFile.open(nextfile, std::ios_base::app);
-        outputFile << std::to_string(msl::Muesli::cpu_fraction) + ";";
+        outputFile << std::to_string(msl::Muesli::cpu_fraction) + ";" + std::to_string(msl::Muesli::num_threads) + ";"
+            + std::to_string(dim) + ";" + std::to_string(reps) + ";";
         for (int i = 0; i < arraysize; i++) {
             outputFile << "" + std::to_string(runtimes[i]) + ";";
         }
         outputFile << "\n";
         outputFile.close();
     }
-    printf("Map; \tMapInPlace; \tMapIndex; \tMapIndexInPlace; \tZip; \tZipInPlace; \tZipIndex; \tZipIndexInPlace; \tFold\n");
+    // printf("Map; \tMapInPlace; \tMapIndex; \tMapIndexInPlace; \tZip; \tZipInPlace; \tZipIndex; \tZipIndexInPlace; \tFold\n");
     for (int i = 0; i < arraysize; i++) {
-        printf("%.4f;\t\t", runtimes[i]);
+        printf("%.4f;", runtimes[i]);
     }
 }

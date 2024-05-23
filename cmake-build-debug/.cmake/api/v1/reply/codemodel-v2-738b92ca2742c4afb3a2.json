@@ -1,0 +1,268 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-6193427f9867c074d994.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10.2"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Muesli",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_bpp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_bpp-Debug-a06b22e23e3a0e0ba725.json",
+					"name" : "aco_bpp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_bpp_cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_bpp_cpu-Debug-81048e9c18e72117fe24.json",
+					"name" : "aco_bpp_cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_bpp_gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_bpp_gpu-Debug-fe6addd5b0b325aa437b.json",
+					"name" : "aco_bpp_gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_bpp_seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_bpp_seq-Debug-9579b6cabecc787715dc.json",
+					"name" : "aco_bpp_seq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_tsp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_tsp-Debug-8f06c88ad26f97653fcc.json",
+					"name" : "aco_tsp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_tsp_cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_tsp_cpu-Debug-4d1284fb96ff32cf719f.json",
+					"name" : "aco_tsp_cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_tsp_gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_tsp_gpu-Debug-d1b878d4f08d54eade00.json",
+					"name" : "aco_tsp_gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "aco_tsp_seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-aco_tsp_seq-Debug-c6ae093f22d3e4b726a7.json",
+					"name" : "aco_tsp_seq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-cpu-Debug-bee8ba691d93cbc60fdc.json",
+					"name" : "cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "da_test::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-da_test-Debug-a9750cd078d87f2747db.json",
+					"name" : "da_test",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "da_test_cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-da_test_cpu-Debug-96a0b9c8aa8b9d107de4.json",
+					"name" : "da_test_cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "da_test_gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-da_test_gpu-Debug-5a0db8de1d7d8b0d8c69.json",
+					"name" : "da_test_gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "da_test_seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-da_test_seq-Debug-7afb320fbc98e9c6919f.json",
+					"name" : "da_test_seq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test-Debug-b2362866f61a081318a3.json",
+					"name" : "dc_test",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_comp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_comp-Debug-31ae05291c6625db8745.json",
+					"name" : "dc_test_comp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_comp_cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_comp_cpu-Debug-b412a13d60587137aeb5.json",
+					"name" : "dc_test_comp_cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_comp_gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_comp_gpu-Debug-fb8e948402f95545d7eb.json",
+					"name" : "dc_test_comp_gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_comp_seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_comp_seq-Debug-caae5c81b9f5567194f7.json",
+					"name" : "dc_test_comp_seq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_cpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_cpu-Debug-8ec45f5b0e0f6b931635.json",
+					"name" : "dc_test_cpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_gpu-Debug-0c8b382a9acdf527202e.json",
+					"name" : "dc_test_gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dc_test_seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dc_test_seq-Debug-3f0abd9c565d76f1f5c5.json",
+					"name" : "dc_test_seq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "gpu::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-gpu-Debug-e12fe53c065cd9ab47a6.json",
+					"name" : "gpu",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "muesli_ide::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-muesli_ide-Debug-bc4a354083908d6e2304.json",
+					"name" : "muesli_ide",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "seq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-seq-Debug-4999930af38371820b5e.json",
+					"name" : "seq",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli/cmake-build-debug",
+		"source" : "/home/n_herr03@WIWI.UNI-MUENSTER.DE/Schreibtisch/muesli"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 4
+	}
+}
