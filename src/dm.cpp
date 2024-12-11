@@ -278,7 +278,7 @@ void msl::DM<T>::show(const std::string &descr, int limited) {
     msl::allgather(this->localPartition, b, this->nLocal);
     int localn = limited > 0 ? limited : this->n;
 
-    if (msl::isRootProcess()) {
+    if (isRootProcess()) {
         // s << std::fixed << std::setprecision(2); // Setting precision for std::ostringstream
         s << "[";
         for (int i = 0; i < localn - 1; i++) {
@@ -288,10 +288,8 @@ void msl::DM<T>::show(const std::string &descr, int limited) {
         s << b[localn - 1] << "]" << std::endl;
         s << std::endl;
     }
-
     delete[] b;
-
-    if (msl::isRootProcess())
+    if (isRootProcess())
         printf("%s", s.str().c_str());
 }
 

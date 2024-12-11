@@ -69,7 +69,7 @@ namespace msl {
  * \tparam T Element type. Restricted to classes without pointer data members.
  */
 template <typename T>
-class DM : public msl::DS<T>{
+class DM : public DS<T>{
 public:
     //
     // CONSTRUCTORS / DESTRUCTOR
@@ -606,6 +606,13 @@ public:
      * @return The element at the given global index.
      */
     int getnCol(){return ncol;}
+    /**
+      * \brief Sets a column at the given global index \em col.
+     * @param row The row index.
+     * @param col The col index.
+     * @return The element at the given global index.
+     */
+    int getnRow(){return nrow;}
     /**
      * \brief Manually download the local partition from GPU memory.
      */

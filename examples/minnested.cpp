@@ -65,7 +65,6 @@ namespace msl::minnested {
 
     struct Outerfunction : public Functor2<int, int, int> {
         MSL_USERFUNC int operator()(int x, int z) const {
-
             return innerfunction(x, z);
         }
     };
